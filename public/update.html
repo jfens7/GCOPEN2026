@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update Registration | 2026 Gold Coast Open</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="nav-brand"><span class="gc-badge">GCTTA</span> 2026 GOLD COAST OPEN</a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/registration">Registration</a>
+            <a href="/update.html" class="active">Update Registration</a>
+            <a href="/schedule">Schedule</a>
+            <a href="/admin">Admin Portal</a>
+        </div>
+    </nav>
+
+    <div class="form-container">
+        <!-- STEP 1: Lookup -->
+        <div id="lookupStep">
+            <h2 style="color: var(--gctta-navy); margin-top:0;">Manage Your Registration</h2>
+            <p>Enter your details below to add events or pay an outstanding balance.</p>
+            
+            <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" id="lookupEmail" required>
+            </div>
+            <div class="form-group">
+                <label>Date of Birth</label>
+                <input type="text" id="lookupDob" placeholder="YYYY" required>
+                <small style="color: #64748B;">Enter your birth year (e.g., 1985)</small>
+            </div>
+            <button class="btn-primary btn-block" id="findRegBtn">Find Registration</button>
+            <p id="lookupError" style="color:red; display:none; margin-top:10px;"></p>
+        </div>
+
+        <!-- STEP 2: Balance/Events Update -->
+        <div id="updateStep" style="display:none;">
+            <h3 style="color: var(--gctta-navy);">Registration Found</h3>
+            <p><strong>Player:</strong> <span id="playerNameDisplay"></span></p>
+            
+            <div id="balanceSection" style="display:none; background: #FFF3CD; padding: 15px; border-left: 4px solid #856404; margin-bottom: 20px;">
+                <h4 style="margin-top:0; color: #856404;">Action Required: Outstanding Balance</h4>
+                <p>You have an unpaid balance on your account.</p>
+                <p><strong>Amount Due: $<span id="balanceAmountDisplay"></span></strong></p>
+                <button class="btn-primary" id="payBalanceBtn">Pay Balance Now</button>
+            </div>
+
+            <div id="eventsEditSection">
+                <h4 style="color: var(--gctta-navy); border-bottom: 2px solid #E2E8F0; padding-bottom: 5px;">Update Events</h4>
+                <p style="font-size: 13px; color: #64748B;">You can add additional events below. If you need to remove events and request a refund, please contact the administrator.</p>
+                
+                <form id="updateEventsForm">
+                    <div id="updateEventsContainer" style="max-height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; border-radius: 4px; background: #F8FAFC; margin-bottom: 15px;">
+                        <!-- Checkboxes populated via JS -->
+                    </div>
+                    
+                    <div id="doublesPartnerSectionUpdate" style="display: none; background: #FFF3CD; padding: 15px; margin-top: 15px; border-left: 4px solid #856404; border-radius: 4px;">
+                        <h4 style="margin-top:0; color: #856404;">Doubles Partner Selection</h4>
+                        <div id="partnerInputsUpdate"></div>
+                    </div>
+
+                    <div style="background: #E2E8F0; padding: 25px; border-radius: 8px; margin-top: 30px;">
+                        <p>Originally Paid: $<span id="oldPaidAmount">0.00</span></p>
+                        <p>New Total (Events + Levy - Discounts): $<span id="newTotalAmount">0.00</span></p>
+                        <hr>
+                        <h3 style="margin:0;">Difference to Pay: $<span id="differenceAmount">0.00</span></h3>
+                        <p id="refundWarning" style="color:#DC2626; font-weight:bold; display:none; margin-top: 10px;">You have removed events. Please contact the administrator for a refund. Online updates are only for adding events.</p>
+                        <button type="button" id="payDifferenceBtn" class="btn-primary btn-block" style="margin-top:15px;" disabled>PROCEED TO PAY DIFFERENCE</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+    <script src="update.js"></script>
+</body>
+</html>

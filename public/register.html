@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registration | 2026 Gold Coast Open</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="nav-brand"><span class="gc-badge">GCTTA</span> 2026 GOLD COAST OPEN</a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/registration" class="active">Registration</a>
+            <a href="/update.html">Update Registration</a>
+            <a href="/schedule">Schedule</a>
+            <a href="/admin">Admin Portal</a>
+        </div>
+        <a href="#" class="btn-mobile-app">Mobile App</a>
+    </nav>
+
+    <div class="form-container">
+        <form id="registrationForm">
+            <!-- STEP 1: Personal Details -->
+            <div id="step1">
+                <h2 style="color: var(--gctta-navy); margin-top:0;">Player Registration Details</h2>
+                
+                <div class="form-group" style="background: #EBF4FF; padding: 15px; border-radius: 8px; border: 1px solid #BAE6FD;">
+                    <label style="color: var(--gctta-navy);">Have a National Member ID?</label>
+                    <div class="form-row">
+                        <input type="text" id="nationalId" placeholder="Enter ID to Auto-Fill Details" style="flex: 2; border-color: #93C5FD;">
+                        <button type="button" id="autoFillByIdBtn" class="lookup-btn" style="flex: 1;">Auto-Fill Details</button>
+                    </div>
+                    <div id="ttaIdFeedback" style="font-size:13px; margin-top: 5px;"></div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>First Name</label>
+                        <input type="text" id="firstName" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name</label>
+                        <input type="text" id="lastName" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input type="text" id="phone" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Date of Birth</label>
+                        <input type="text" id="dob" placeholder="DD/MM/YYYY" required>
+                        <small style="color: #64748B;">Age limits are automatically calculated based on your age at the end of 2026.</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Gender</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="gender" value="Male" required> Male</label>
+                            <label><input type="radio" name="gender" value="Female" required> Female</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <button type="button" id="lookupTtaBtn" class="btn-secondary-small">Search TTA ID By Name (If Unknown)</button>
+                    <div id="ttaLookupFeedback" style="font-size:13px; margin-top: 5px;"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Club Affiliation</label>
+                    <select id="clubSelect" required onchange="toggleClubOther()"></select>
+                    <input type="text" id="clubOther" placeholder="Please enter your club name" style="display:none; margin-top:10px;">
+                </div>
+
+                <div class="form-group" style="background: #F8FAFC; padding: 20px; border-radius: 8px; border: 1px solid #E2E8F0;">
+                    <label>Ratings Central Profile (Optional)</label>
+                    <div class="form-row">
+                        <input type="text" id="rcProfile" placeholder="Enter Name or RC ID" style="flex: 2;">
+                        <button type="button" id="lookupRcBtn" class="lookup-btn">FIND PROFILE</button>
+                    </div>
+                    <div id="rcLookupResults"></div>
+                    <small style="color: #64748B; margin-top: 10px; display: block;">Leave blank if you have never played a rated tournament.</small>
+                </div>
+
+                <button type="button" class="btn-primary btn-block" onclick="nextStep()">CONTINUE TO EVENTS →</button>
+            </div>
+
+            <!-- STEP 2: Event Selection -->
+            <div id="step2" style="display: none;">
+                <button type="button" onclick="prevStep()" style="background: none; border: none; color: var(--gctta-navy); cursor: pointer; font-weight: bold; margin-bottom: 20px;">← Back to Details</button>
+                <h3 style="color: var(--gctta-navy);">Select Your Events (Max 1 per time slot)</h3>
+
+                <div style="background: #F8FAFC; padding: 15px; margin-bottom: 15px; border-left: 4px solid var(--gctta-navy); border-radius: 4px;">
+                    <h4 style="margin-top:0;">Saturday 8th August | 9:00am - 12:00pm</h4>
+                    <label><input type="radio" name="sat_am" value='{"id":10, "name":"Event #10: Under 17 Boy’s Singles", "price":10}'> Event #10: Under 17 Boy’s Singles ($10)</label><br>
+                    <label><input type="radio" name="sat_am" value='{"id":11, "name":"Event #11: Under 17 Girl’s Singles", "price":10}'> Event #11: Under 17 Girl’s Singles ($10)</label><br>
+                    <label><input type="radio" name="sat_am" value='{"id":12, "name":"Event #12: Under 15 Boy’s Singles", "price":10}'> Event #12: Under 15 Boy’s Singles ($10)</label><br>
+                    <label><input type="radio" name="sat_am" value='{"id":13, "name":"Event #13: Under 15 Girl’s Singles", "price":10}'> Event #13: Under 15 Girl’s Singles ($10)</label><br>
+                    <label><input type="radio" name="sat_am" value='{"id":16, "name":"Event #16: Under 11 Boy’s Singles", "price":10}'> Event #16: Under 11 Boy’s Singles ($10)</label><br>
+                    <label><input type="radio" name="sat_am" value='{"id":17, "name":"Event #17: Under 11 Girl’s Singles", "price":10}'> Event #17: Under 11 Girl’s Singles ($10)</label><br>
+                    <label><input type="radio" name="sat_am" value="" checked> None</label>
+                </div>
+
+                <div style="background: #F8FAFC; padding: 15px; margin-bottom: 15px; border-left: 4px solid var(--gctta-navy); border-radius: 4px;">
+                    <h4 style="margin-top:0;">Saturday 8th August | 12:00pm - 4:00pm</h4>
+                    <label><input type="radio" name="sat_mid" value='{"id":8, "name":"Event #8: Under 19 Boy’s Singles", "price":10}'> Event #8: Under 19 Boy’s Singles ($10)</label><br>
+                    <label><input type="radio" name="sat_mid" value='{"id":9, "name":"Event #9: Under 19 Girl’s Singles", "price":10}'> Event #9: Under 19 Girl’s Singles ($10)</label><br>
+                    <label><input type="radio" name="sat_mid" value='{"id":14, "name":"Event #14: Under 13 Boy’s Singles", "price":10}'> Event #14: Under 13 Boy’s Singles ($10)</label><br>
+                    <label><input type="radio" name="sat_mid" value='{"id":15, "name":"Event #15: Under 13 Girl’s Singles", "price":10}'> Event #15: Under 13 Girl’s Singles ($10)</label><br>
+                    <label><input type="radio" name="sat_mid" value='{"id":3, "name":"Event #3: Men’s Open Doubles", "price":12}'> Event #3: Men’s Open Doubles ($12 ea)</label><br>
+                    <label><input type="radio" name="sat_mid" value='{"id":4, "name":"Event #4: Women’s Open Doubles", "price":12}'> Event #4: Women’s Open Doubles ($12 ea)</label><br>
+                    <label><input type="radio" name="sat_mid" value='{"id":6, "name":"Event #6: Under 1700 Singles", "price":15}'> Event #6: Under 1700 Singles ($15)</label><br>
+                    <label><input type="radio" name="sat_mid" value="" checked> None</label>
+                </div>
+
+                <div style="background: #F8FAFC; padding: 15px; margin-bottom: 15px; border-left: 4px solid var(--gctta-navy); border-radius: 4px;">
+                    <h4 style="margin-top:0;">Saturday 8th August | 4:00pm - 8:00pm</h4>
+                    <label><input type="radio" name="sat_pm" value='{"id":1, "name":"Event #1: Men’s Open Singles", "price":25}'> Event #1: Men’s Open Singles ($25)</label><br>
+                    <label><input type="radio" name="sat_pm" value='{"id":2, "name":"Event #2: Women’s Open Singles", "price":20}'> Event #2: Women’s Open Singles ($20)</label><br>
+                    <label><input type="radio" name="sat_pm" value='{"id":5, "name":"Event #5: Para Open Singles", "price":10}'> Event #5: Para Open Singles ($10)</label><br>
+                    <label><input type="radio" name="sat_pm" value='{"id":7, "name":"Event #7: Under 1400 Singles", "price":15}'> Event #7: Under 1400 Singles ($15)</label><br>
+                    <label><input type="radio" name="sat_pm" value="" checked> None</label>
+                </div>
+
+                <div style="background: #F8FAFC; padding: 15px; margin-bottom: 15px; border-left: 4px solid var(--gctta-navy); border-radius: 4px;">
+                    <h4 style="margin-top:0;">Sunday 9th August | 9:00am - 12:00pm</h4>
+                    <label><input type="radio" name="sun_am" value='{"id":26, "name":"Event #26: Over 50 Men’s Singles", "price":15}'> Event #26: Over 50 Men’s Singles ($15)</label><br>
+                    <label><input type="radio" name="sun_am" value='{"id":27, "name":"Event #27: Over 50 Women’s Singles", "price":15}'> Event #27: Over 50 Women’s Singles ($15)</label><br>
+                    <label><input type="radio" name="sun_am" value='{"id":30, "name":"Event #30: Over 70 Men’s Singles", "price":10}'> Event #30: Over 70 Men’s Singles ($10)</label><br>
+                    <label><input type="radio" name="sun_am" value='{"id":31, "name":"Event #31: Over 70 Women’s Singles", "price":10}'> Event #31: Over 70 Women’s Singles ($10)</label><br>
+                    <label><input type="radio" name="sun_am" value='{"id":20, "name":"Event #20: Under 800 Singles", "price":12}'> Event #20: Under 800 Singles ($12)</label><br>
+                    <label><input type="radio" name="sun_am" value="" checked> None</label>
+                </div>
+
+                <div style="background: #F8FAFC; padding: 15px; margin-bottom: 15px; border-left: 4px solid var(--gctta-navy); border-radius: 4px;">
+                    <h4 style="margin-top:0;">Sunday 9th August | 12:00pm - 3:00pm</h4>
+                    <label><input type="radio" name="sun_mid" value='{"id":24, "name":"Event #24: Over 40 Men’s Singles", "price":15}'> Event #24: Over 40 Men’s Singles ($15)</label><br>
+                    <label><input type="radio" name="sun_mid" value='{"id":25, "name":"Event #25: Over 40 Women’s Singles", "price":15}'> Event #25: Over 40 Women’s Singles ($15)</label><br>
+                    <label><input type="radio" name="sun_mid" value='{"id":21, "name":"Event #21: Open Rating Doubles", "price":10}'> Event #21: Open Rating Doubles ($10 ea)</label><br>
+                    <label><input type="radio" name="sun_mid" value='{"id":33, "name":"Event #33: Veteran Women’s Doubles", "price":10}'> Event #33: Veteran Women’s Doubles ($10 ea)</label><br>
+                    <label><input type="radio" name="sun_mid" value='{"id":34, "name":"Event #34: Veteran Men’s Doubles", "price":10}'> Event #34: Veteran Men’s Doubles ($10 ea)</label><br>
+                    <label><input type="radio" name="sun_mid" value='{"id":19, "name":"Event #19: Under 1000 Singles", "price":15}'> Event #19: Under 1000 Singles ($15)</label><br>
+                    <label><input type="radio" name="sun_mid" value="" checked> None</label>
+                </div>
+
+                <div style="background: #F8FAFC; padding: 15px; margin-bottom: 15px; border-left: 4px solid var(--gctta-navy); border-radius: 4px;">
+                    <h4 style="margin-top:0;">Sunday 9th August | 3:00pm - 6:00pm</h4>
+                    <label><input type="radio" name="sun_pm" value='{"id":22, "name":"Event #22: Over 30 Men’s Singles", "price":15}'> Event #22: Over 30 Men’s Singles ($15)</label><br>
+                    <label><input type="radio" name="sun_pm" value='{"id":23, "name":"Event #23: Over 30 Women’s Singles", "price":15}'> Event #23: Over 30 Women’s Singles ($15)</label><br>
+                    <label><input type="radio" name="sun_pm" value='{"id":28, "name":"Event #28: Over 60 Men’s Singles", "price":12}'> Event #28: Over 60 Men’s Singles ($12)</label><br>
+                    <label><input type="radio" name="sun_pm" value='{"id":29, "name":"Event #29: Over 60 Women’s Singles", "price":12}'> Event #29: Over 60 Women’s Singles ($12)</label><br>
+                    <label><input type="radio" name="sun_pm" value='{"id":32, "name":"Event #32: Over 80 Singles", "price":10}'> Event #32: Over 80 Singles ($10)</label><br>
+                    <label><input type="radio" name="sun_pm" value='{"id":18, "name":"Event #18: Under 1200 Singles", "price":15}'> Event #18: Under 1200 Singles ($15)</label><br>
+                    <label><input type="radio" name="sun_pm" value="" checked> None</label>
+                </div>
+
+                <!-- Dynamic Doubles Partner Section -->
+                <div id="doublesPartnerSection" style="display: none; background: #FFF3CD; padding: 15px; margin-bottom: 20px; border-left: 4px solid #856404; border-radius: 4px;">
+                    <h4 style="margin-top:0; color: #856404;">Doubles Partner Selection</h4>
+                    <div id="partnerInputs"></div>
+                </div>
+
+                <!-- Summary & Payment -->
+                <div style="background: #E2E8F0; padding: 25px; border-radius: 8px; margin-top: 30px;">
+                    <h4 style="margin-top:0;">Payment Summary</h4>
+                    <p>Events Total: $<span id="eventsTotal">0.00</span></p>
+                    <p>TTQ Tournament Levy: $5.00</p>
+                    
+                    <div class="form-row" style="margin-bottom:10px;">
+                        <input type="text" id="discountCode" placeholder="Discount Code">
+                        <button type="button" id="applyDiscountBtn" class="lookup-btn">Verify</button>
+                    </div>
+                    
+                    <p>Discount Applied: $<span id="discountAmount">0.00</span></p>
+                    <hr>
+                    <h3 style="margin:0;">Total Due: $<span id="finalTotal">5.00</span></h3>
+                    <button type="submit" id="checkoutBtn" class="btn-primary btn-block">PROCEED TO SECURE PAYMENT</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        function nextStep() {
+            document.getElementById('step1').style.display = 'none';
+            document.getElementById('step2').style.display = 'block';
+            if (typeof validateEligibility === "function") validateEligibility();
+        }
+        function prevStep() {
+            document.getElementById('step2').style.display = 'none';
+            document.getElementById('step1').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
