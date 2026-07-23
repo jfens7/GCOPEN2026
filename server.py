@@ -1,10 +1,7 @@
 import os
-import smtplib
 import string
 import random
 import re
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from flask import Flask, request, jsonify, send_from_directory, redirect
 from flask_cors import CORS
 import firebase_admin
@@ -16,44 +13,42 @@ import stripe
 import requests
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
+import resend
 
-app = Flask(__name__, static_folder='.', static_url_path='')
+app = Flask(__name__, static_folder='public', static_url_path='')
 CORS(app)
 
 # ==========================================
 # CONFIGURATION & INITIALIZATION
 # ==========================================
+# Use environment variables for all sensitive keys in production
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
+resend.api_key = os.getenv("RESEND_API_KEY", "")
+BASE_URL = os.getenv("BASE_URL", "https://gcopen.com") 
 
+# Firebase Setup
 firebase_cred = credentials.Certificate("gc-open-2026-firebase-adminsdk-fbsvc-efd2385c84.json")
 firebase_admin.initialize_app(firebase_cred)
 db = firestore.client()
 
+# Google Sheets Setup
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 gs_creds = ServiceAccountCredentials.from_json_keyfile_name("gc-open-2026-260340b13caf.json", scope)
 client = gspread.authorize(gs_creds)
-
 sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1EJ5lEZs4eIkAUmYIbpssjhMTkJjWWsA5B2-cHO36gyA/edit?gid=0#gid=0").sheet1
 
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
-SENDER_EMAIL = os.getenv("SENDER_EMAIL", "your_email@gmail.com")
-SENDER_PASSWORD = os.getenv("SENDER_PASSWORD", "your_app_password")
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin_email@gmail.com")
+SENDER_EMAIL = os.getenv("SENDER_EMAIL", "noreply@gcopen.com")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "your_actual_email@gmail.com")
 
 def send_email(to_email, subject, body):
     try:
-        msg = MIMEMultipart()
-        msg['From'] = SENDER_EMAIL
-        msg['To'] = to_email
-        msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'html'))
-        
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(SENDER_EMAIL, SENDER_PASSWORD)
-        server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
-        server.quit()
+        params: resend.Emails.SendParams = {
+            "from": f"Gold Coast Open <{SENDER_EMAIL}>",
+            "to": [to_email],
+            "subject": subject,
+            "html": body,
+        }
+        resend.Emails.send(params)
     except Exception as e:
         print(f"Failed to send email: {e}")
 
@@ -309,12 +304,7 @@ def register():
     
     player_email = player_details.get('email', '').strip().lower()
     
-    # We fetch all with this nationalId as well.
     existing_id = list(db.collection('registrations').where(filter=FieldFilter('player.nationalId', '==', player_details['nationalId'])).stream())
-    
-    # For email, since it might not be lowered in db, fetch all or assume we just use exactly what is typed.
-    # To be safe and simple, use the email exact match, or skip it because national ID handles duplication nicely for most.
-    # We will just fetch by email exactly.
     existing_email = list(db.collection('registrations').where(filter=FieldFilter('player.email', '==', player_details['email'])).stream())
     
     if len(existing_email) > 0 or len(existing_id) > 0:
@@ -354,7 +344,6 @@ def register():
         events_str = ", ".join([e['name'] for e in events])
         partners_str = ", ".join([f"{k}: {v}" for k, v in doubles_partners.items()])
         
-        # Now separates RC ID into its own dedicated column
         row = [
             player_details['firstName'], player_details['lastName'], player_details['email'],
             player_details['phone'], player_details['nationalId'], player_details['club'],
@@ -367,7 +356,7 @@ def register():
 
     if data.get('payLater') or final_total == 0:
         if final_total == 0:
-            return jsonify({"url": f"http://localhost:5000/api/payment-success?reg_id={registration_id}", "registrationId": registration_id})
+            return jsonify({"url": f"{BASE_URL}/api/payment-success?reg_id={registration_id}", "registrationId": registration_id})
         
         events_str = ", ".join([e['name'] for e in events])
         partners_str = ", ".join([f"{k}: {v}" for k, v in doubles_partners.items()])
@@ -384,7 +373,7 @@ def register():
         admin_body = f"<p>New PAY LATER Registration:<br>Player: {player_details['firstName']} {player_details['lastName']}<br>Ref ID: {registration_id}<br>Total Due: ${final_total}<br>Events: {events_str}</p>"
         send_email(ADMIN_EMAIL, "New Tournament Registration (Pay Later)", admin_body)
         
-        return jsonify({"url": f"http://localhost:5000/success.html?reg_id={registration_id}", "registrationId": registration_id})
+        return jsonify({"url": f"{BASE_URL}/success.html?reg_id={registration_id}", "registrationId": registration_id})
 
     try:
         checkout_session = stripe.checkout.Session.create(
@@ -398,8 +387,8 @@ def register():
                 'quantity': 1,
             }],
             mode='payment',
-            success_url=f"http://localhost:5000/api/payment-success?session_id={{CHECKOUT_SESSION_ID}}&reg_id={registration_id}",
-            cancel_url="http://localhost:5000/registration",
+            success_url=f"{BASE_URL}/api/payment-success?session_id={{CHECKOUT_SESSION_ID}}&reg_id={registration_id}",
+            cancel_url=f"{BASE_URL}/registration",
         )
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -443,7 +432,6 @@ def payment_success():
             admin_body = f"<p>New Paid Registration:<br>Player: {record['player']['firstName']} {record['player']['lastName']}<br>Ref ID: {reg_id}<br>Total: ${record['finalTotal']}<br>Events: {events_str}<br>Partners: {partners_str}</p>"
             send_email(ADMIN_EMAIL, "New Tournament Registration", admin_body)
 
-    # Redirect to the dedicated success page rather than home
     return redirect(f"/success.html?reg_id={reg_id}")
 
 
@@ -513,8 +501,8 @@ def update_checkout():
                 'reg_id': reg_id,
                 'update_type': 'events_update'
             },
-            success_url=f"http://localhost:5000/api/update-success?session_id={{CHECKOUT_SESSION_ID}}&reg_id={reg_id}",
-            cancel_url="http://localhost:5000/update.html",
+            success_url=f"{BASE_URL}/api/update-success?session_id={{CHECKOUT_SESSION_ID}}&reg_id={reg_id}",
+            cancel_url=f"{BASE_URL}/update.html",
         )
         
         doc_ref.update({
@@ -562,8 +550,8 @@ def pay_balance():
                 'reg_id': reg_id,
                 'update_type': 'balance_payment'
             },
-            success_url=f"http://localhost:5000/api/update-success?session_id={{CHECKOUT_SESSION_ID}}&reg_id={reg_id}",
-            cancel_url="http://localhost:5000/update.html",
+            success_url=f"{BASE_URL}/api/update-success?session_id={{CHECKOUT_SESSION_ID}}&reg_id={reg_id}",
+            cancel_url=f"{BASE_URL}/update.html",
         )
         return jsonify({"url": checkout_session.url})
     except Exception as e:
@@ -731,5 +719,5 @@ def get_discount_codes():
     return jsonify(codes)
 
 if __name__ == '__main__':
-    print("Starting server on http://localhost:5000")
-    app.run(port=5000, debug=True)
+    print("Starting server on port 5001")
+    app.run(host='0.0.0.0', port=5001)

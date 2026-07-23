@@ -19,6 +19,22 @@
         <a href="#" class="btn-mobile-app">Mobile App</a>
     </nav>
 
+    <!-- COUNTDOWN LOCK OVERLAY -->
+    <div id="countdownOverlay" class="login-overlay" style="display: flex;">
+        <div class="login-box" style="text-align: center;">
+            <h2 style="margin-top: 0; color: var(--gctta-navy);">Registrations Locked</h2>
+            <p style="color: #475569;">Registrations open at 7:00 PM today.</p>
+            <h1 id="registerCountdown" style="color: var(--gctta-gold); font-size: 40px; margin: 20px 0; font-weight: 900;">--:--:--</h1>
+            
+            <hr style="margin: 25px 0; border: none; border-top: 1px solid #CBD5E1;">
+            
+            <p style="font-size: 12px; color: #64748B; font-weight: bold; text-transform: uppercase;">Admin Bypass:</p>
+            <input type="password" id="bypassCode" placeholder="Enter test code" style="margin-bottom: 15px;">
+            <button class="btn-primary" style="width: 100%; padding: 12px;" onclick="checkBypass()">Unlock Form</button>
+            <p id="bypassError" style="color: red; display: none; margin-top: 10px; font-size: 13px;">Invalid code</p>
+        </div>
+    </div>
+
     <div class="form-container">
         <form id="registrationForm">
             <!-- STEP 1: Personal Details -->
@@ -190,6 +206,31 @@
         </form>
     </div>
 
+    <!-- TERMS AND CONDITIONS MODAL -->
+    <div id="tcModal" class="login-overlay" style="display: none;">
+        <div class="login-box" style="width: 600px; max-width: 90vw; text-align: left; padding: 25px;">
+            <h2 style="margin-top: 0; color: var(--gctta-navy); border-bottom: 2px solid var(--gctta-gold); padding-bottom: 10px;">Terms & Conditions</h2>
+            
+            <p style="font-size: 14px; color: #DC2626; font-weight: bold; margin-bottom: 15px;">Please read and scroll to the bottom to agree.</p>
+            
+            <div id="tcScrollArea" style="height: 250px; overflow-y: auto; background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 4px; padding: 15px; font-size: 14px; color: #475569; margin-bottom: 20px;">
+                <p><strong>1. Acceptance of Terms</strong><br>By registering for the 2026 Gold Coast Open Table Tennis Championships, you agree to abide by the rules and regulations set forth by the Gold Coast Table Tennis Association (GCTTA) and Table Tennis Queensland (TTQ).</p>
+                <p><strong>2. Eligibility</strong><br>All players must hold a valid National Member ID. If you do not have a rating, you must enter 'Never Played' or select a comparable grade.</p>
+                <p><strong>3. Media Release</strong><br>By entering, you grant GCTTA the right to take photographs and video during the tournament for promotional purposes.</p>
+                <p><strong>4. Refunds</strong><br>Withdrawals made after the closing date will not be eligible for a refund. Extenuating medical circumstances require a certificate.</p>
+                <p><strong>5. Equipment and Attire</strong><br>All equipment must comply with ITTF regulations. White clothing is strictly prohibited during gameplay as the official ball is white.</p>
+                <p><strong>6. Conduct</strong><br>Good sportsmanship is expected at all times. The Referee's decision on all matters is final.</p>
+                <br><br><br><br>
+                <p style="text-align: center;"><i>End of Terms and Conditions</i></p>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button type="button" id="tcAgreeBtn" class="btn-primary" style="flex: 2; opacity: 0.5; cursor: not-allowed;" disabled>I Agree & Proceed to Payment</button>
+                <button type="button" class="btn-secondary-small" style="flex: 1; background: #64748B;" onclick="closeTcModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
     <script>
         function nextStep() {
@@ -200,6 +241,41 @@
         function prevStep() {
             document.getElementById('step2').style.display = 'none';
             document.getElementById('step1').style.display = 'block';
+        }
+
+        // ==========================================
+        // COUNTDOWN & ADMIN BYPASS LOGIC
+        // ==========================================
+        const targetTimeReg = new Date('July 23, 2026 19:00:00').getTime();
+        const overlay = document.getElementById('countdownOverlay');
+        
+        function updateRegCountdown() {
+            const now = new Date().getTime();
+            const distance = targetTimeReg - now;
+            const el = document.getElementById('registerCountdown');
+            
+            if (distance < 0) {
+                overlay.style.display = 'none'; // Auto unlock when time hits!
+                return;
+            }
+            
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            
+            if(el) el.innerText = (hours > 0 ? hours + "h " : "") + minutes + "m " + seconds + "s";
+        }
+        
+        setInterval(updateRegCountdown, 1000);
+        updateRegCountdown();
+
+        function checkBypass() {
+            const code = document.getElementById('bypassCode').value;
+            if (code === 'gctta01') {
+                overlay.style.display = 'none';
+            } else {
+                document.getElementById('bypassError').style.display = 'block';
+            }
         }
     </script>
 </body>

@@ -34,7 +34,11 @@
 
         <p>The Club would like to acknowledge our event partners in the City of Gold Coast, Table Tennis Queensland & Table Tennis World. Many thanks for your support!</p>
 
-        <h3 style="color: #DC2626; font-weight: 900; text-align: center; margin-top: 40px; letter-spacing: 1px;">REGISTRATIONS OPENING SOON</h3>
+        <!-- LIVE COUNTDOWN BANNER -->
+        <div style="background-color: #FEF2F2; border: 2px solid #DC2626; border-radius: 8px; padding: 20px; text-align: center; margin-top: 40px;">
+            <h3 style="color: #DC2626; font-weight: 900; margin: 0; letter-spacing: 1px;">REGISTRATIONS OPEN AT 7:00 PM</h3>
+            <h2 id="indexCountdown" style="color: var(--gctta-navy); font-size: 32px; margin: 10px 0 0 0;">--:--:--</h2>
+        </div>
 
         <h2>Event Details</h2>
 
@@ -55,18 +59,48 @@
 
         <div class="schedule-grid">
             <div class="schedule-card">
-                <h3>SATURDAY 9th AUGUST</h3>
-                <p>9:00am - 12:00pm - Under 11's, Under 13's, Under 15's, Division 1, Division 2, Division 3</p>
-                <p>12:30pm - 3:30pm - Division 4, Division 5, Division 6</p>
-                <p>4:00pm - 7:00pm - Men's Open, Women's Open, Under 17's, Under 19's, Under 21's</p>
+                <h3>SATURDAY 8th AUGUST</h3>
+                <p><strong>9:00am - 12:00pm</strong><br>
+                Under 17 Boy's & Girl's Singles, Under 15 Boy's & Girl's Singles, Under 11 Boy's & Girl's Singles</p>
+                <p><strong>12:00pm - 4:00pm</strong><br>
+                Under 19 Boy's & Girl's Singles, Under 13 Boy's & Girl's Singles, Men's & Women's Open Doubles, Under 1700 Singles</p>
+                <p><strong>4:00pm - 8:00pm</strong><br>
+                Men's & Women's Open Singles, Para Open Singles, Under 1400 Singles</p>
             </div>
             <div class="schedule-card">
-                <h3>SUNDAY 10th AUGUST</h3>
-                <p>9:00am - 12:00pm - Over 30's, Over 40's, Over 50's, Over 60's, Over 65's</p>
-                <p>12:30pm - 3:30pm - Over 70's, Over 75's, Over 80's</p>
-                <p>4:00pm - 7:00pm - Open Doubles Events</p>
+                <h3>SUNDAY 9th AUGUST</h3>
+                <p><strong>9:00am - 12:00pm</strong><br>
+                Over 50 Men's & Women's Singles, Over 70 Men's & Women's Singles, Under 800 Singles</p>
+                <p><strong>12:00pm - 3:00pm</strong><br>
+                Over 40 Men's & Women's Singles, Open Rating Doubles, Veteran Men's & Women's Doubles, Under 1000 Singles</p>
+                <p><strong>3:00pm - 6:00pm</strong><br>
+                Over 30 Men's & Women's Singles, Over 60 Men's & Women's Singles, Over 80 Singles, Under 1200 Singles</p>
             </div>
         </div>
     </div>
+
+    <!-- SCRIPT FOR INDEX COUNTDOWN -->
+    <script>
+        const targetTimeIndex = new Date('July 23, 2026 19:00:00').getTime();
+        
+        function updateIndexCountdown() {
+            const now = new Date().getTime();
+            const distance = targetTimeIndex - now;
+            const el = document.getElementById('indexCountdown');
+            
+            if (distance < 0) {
+                if(el) el.innerText = "REGISTRATIONS ARE OPEN!";
+                return;
+            }
+            
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            
+            if(el) el.innerText = (hours > 0 ? hours + "h " : "") + minutes + "m " + seconds + "s";
+        }
+        setInterval(updateIndexCountdown, 1000);
+        updateIndexCountdown();
+    </script>
 </body>
 </html>

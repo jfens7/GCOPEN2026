@@ -432,9 +432,36 @@ if (form) {
         });
     }
 
-    form.addEventListener('submit', async (e) => {
+    form.addEventListener('submit', (e) => {
         e.preventDefault();
-        await window.submitRegistration(false);
+        
+        // 1. Run standard validation first before showing T&Cs
+        currentEvents = [];
+        const radios = document.querySelectorAll('input[type="radio"][name^="sat_"]:checked, input[type="radio"][name^="sun_"]:checked');
+        radios.forEach(radio => {
+            if (radio.value) currentEvents.push(JSON.parse(radio.value));
+        });
+
+        if(currentEvents.length === 0) {
+            alert("Please select at least one event!");
+            return;
+        }
+
+        let missingPartner = false;
+        currentEvents.forEach(ev => {
+            if (doublesEventIds.includes(ev.id)) {
+                const pName = document.getElementById(`partner_${ev.id}`).value.trim();
+                if (!pName) missingPartner = true;
+            }
+        });
+
+        if (missingPartner) {
+            alert("Please fill out your doubles partner details (or click 'Need Partner').");
+            return;
+        }
+
+        // 2. If valid, open the Terms & Conditions Modal instead of submitting directly
+        openTcModal(false); 
     });
 
     window.submitRegistration = async function(payLater = false) {
@@ -805,4 +832,55 @@ async function loadStats() {
         const pendingEl = document.getElementById('statPending');
         if (pendingEl) pendingEl.innerText = data.pendingPayments;
     } catch (err) { console.error(err); }
+}
+
+// ==========================================
+// TERMS AND CONDITIONS MODAL LOGIC
+// ==========================================
+const tcModal = document.getElementById('tcModal');
+const tcScrollArea = document.getElementById('tcScrollArea');
+const tcAgreeBtn = document.getElementById('tcAgreeBtn');
+let payLaterState = false;
+
+window.openTcModal = function(payLater) {
+    payLaterState = payLater;
+    tcModal.style.display = 'flex';
+    
+    // Reset button state every time modal opens
+    tcAgreeBtn.disabled = true;
+    tcAgreeBtn.style.opacity = '0.5';
+    tcAgreeBtn.style.cursor = 'not-allowed';
+    
+    // Check if text is short enough that it doesn't need scrolling
+    if (tcScrollArea.scrollHeight <= tcScrollArea.clientHeight) {
+        enableTcButton();
+    } else {
+        tcScrollArea.scrollTop = 0; // Reset scroll to top
+    }
+};
+
+window.closeTcModal = function() {
+    tcModal.style.display = 'none';
+};
+
+function enableTcButton() {
+    tcAgreeBtn.disabled = false;
+    tcAgreeBtn.style.opacity = '1';
+    tcAgreeBtn.style.cursor = 'pointer';
+}
+
+if (tcScrollArea) {
+    tcScrollArea.addEventListener('scroll', () => {
+        // We use -5 as a buffer in case of decimal pixel rendering on some zoom levels
+        if (tcScrollArea.scrollTop + tcScrollArea.clientHeight >= tcScrollArea.scrollHeight - 5) {
+            enableTcButton();
+        }
+    });
+}
+
+if (tcAgreeBtn) {
+    tcAgreeBtn.addEventListener('click', async () => {
+        closeTcModal();
+        await window.submitRegistration(payLaterState); // Now process the actual payment API
+    });
 }
