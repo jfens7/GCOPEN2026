@@ -329,9 +329,11 @@ def search_ratings_central():
 # ==========================================
 @app.route('/api/validate-discount/<code>', methods=['GET'])
 def validate_discount(code):
-    docs = list(db.collection('discount_codes').where(filter=FieldFilter('code', '==', code.upper())).where(filter=FieldFilter('used', '==', False)).stream())
+    docs = list(db.collection('discount_codes').where(filter=FieldFilter('code', '==', code.upper())).stream())
     if docs:
-        return jsonify({"valid": True, "discountAmount": docs[0].to_dict()['discountAmount']})
+        d = docs[0].to_dict()
+        if not d.get('used', False) or d.get('isPermanent', False):
+            return jsonify({"valid": True, "discountAmount": d['discountAmount']})
     return jsonify({"valid": False, "discountAmount": 0})
 
 @app.route('/api/register', methods=['POST'])
@@ -356,9 +358,11 @@ def register():
     discount_amount = 0
 
     if discount_code:
-        docs = list(db.collection('discount_codes').where(filter=FieldFilter('code', '==', discount_code)).where(filter=FieldFilter('used', '==', False)).stream())
+        docs = list(db.collection('discount_codes').where(filter=FieldFilter('code', '==', discount_code)).stream())
         if docs:
-            discount_amount = float(docs[0].to_dict()['discountAmount'])
+            d = docs[0].to_dict()
+            if not d.get('used', False) or d.get('isPermanent', False):
+                discount_amount = float(d['discountAmount'])
 
     final_total = (base_total + ttq_levy) - discount_amount
     if final_total < 0:
@@ -443,7 +447,10 @@ def payment_success():
             if applied_code:
                 code_docs = list(db.collection('discount_codes').where('code', '==', applied_code).stream())
                 if code_docs:
-                    db.collection('discount_codes').document(code_docs[0].id).update({"used": True})
+                    doc_data = code_docs[0].to_dict()
+                    # Only mark as used if it is NOT a permanent code
+                    if not doc_data.get('isPermanent', False):
+                        db.collection('discount_codes').document(code_docs[0].id).update({"used": True})
             
             try:
                 cell = sheet.find(reg_id)
@@ -801,15 +808,17 @@ def delete_registration(reg_id):
 def create_discount_code():
     data = request.json
     amount = float(data.get('amount', 5.0))
+    is_perm = data.get('isPermanent', False)
     code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
     
     db.collection('discount_codes').add({
         "code": code,
         "discountAmount": amount,
         "used": False,
+        "isPermanent": is_perm,
         "timestamp": firestore.SERVER_TIMESTAMP
     })
-    return jsonify({"code": code, "amount": amount})
+    return jsonify({"code": code, "amount": amount, "isPermanent": is_perm})
 
 @app.route('/api/admin/discount-codes', methods=['GET'])
 def get_discount_codes():
@@ -820,6 +829,12 @@ def get_discount_codes():
         d['id'] = doc.id
         codes.append(d)
     return jsonify(codes)
+
+@app.route('/api/admin/discount-codes/<doc_id>', methods=['PUT'])
+def update_discount_code(doc_id):
+    data = request.json
+    db.collection('discount_codes').document(doc_id).update(data)
+    return jsonify({"status": "updated"})
 
 if __name__ == '__main__':
     print("Starting server on port 5000")

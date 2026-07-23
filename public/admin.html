@@ -54,7 +54,7 @@
 </head>
 <body style="background-color: #F8FAFC; margin: 0;">
     
-    <!-- ADMIN LOGIN OVERLAY (Solid Background) -->
+    <!-- ADMIN LOGIN OVERLAY -->
     <div id="adminLoginOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background-color: #F8FAFC; display: flex; justify-content: center; align-items: center; z-index: 9999;">
         <div class="login-box" style="text-align: center; width: 350px; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
             <h2 style="margin-top: 0; color: var(--gctta-navy);">Admin Portal Login</h2>
@@ -68,7 +68,7 @@
         </div>
     </div>
 
-    <!-- MAIN DASHBOARD CONTENT (Hidden until logged in) -->
+    <!-- MAIN DASHBOARD CONTENT -->
     <div id="adminDashboardContent" style="display: none;">
         <nav class="navbar">
             <a href="/" class="nav-brand"><span class="gc-badge">GCTTA</span> <span style="font-style: italic;">ADMIN PORTAL</span></a>
@@ -77,7 +77,7 @@
                 <a href="/registration">Registration</a>
                 <a href="/update.html">Update Registration</a>
                 <a href="/schedule">Schedule</a>
-                <a href="/admin" class="active" style="color: var(--gctta-gold);">Admin Portal</a>
+                <a href="#" onclick="logoutAdmin()" style="color: #DC2626; font-weight: bold;">Logout</a>
             </div>
         </nav>
 
@@ -139,8 +139,11 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 style="margin: 0; color: var(--gctta-navy);">Active & Used Discount Codes</h3>
                     
-                    <div style="display: flex; gap: 10px;">
-                        <div style="position: relative;">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <label style="display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: bold; color: var(--gctta-navy); cursor: pointer;">
+                            <input type="checkbox" id="newDiscountPerm"> Permanent (Multi-Use)
+                        </label>
+                        <div style="position: relative; margin-left: 10px;">
                             <span style="position: absolute; left: 12px; top: 10px; font-weight: bold; color: #64748B;">$</span>
                             <input type="number" id="newDiscountAmount" placeholder="Amount" value="5" style="padding: 10px 10px 10px 25px; width: 100px; border-radius: 6px; border: 1px solid #CBD5E1;">
                         </div>
@@ -155,11 +158,12 @@
                             <th>Discount Value</th>
                             <th>Status</th>
                             <th>Created At</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="discountTableBody">
                         <tr>
-                            <td colspan="4" style="text-align: center; padding: 30px;">Loading codes...</td>
+                            <td colspan="5" style="text-align: center; padding: 30px;">Loading codes...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -188,11 +192,46 @@
                     </div>
                     <input type="text" id="editClub" placeholder="Club Name" style="width: 100%; margin-top: 10px;">
                     
-                    <h4 style="margin-bottom: 5px; margin-top: 15px;">Events (Comma separated list)</h4>
-                    <textarea id="editEvents" class="full-width-text" rows="2" placeholder="e.g. Event #1: Men's Open Singles, Event #2: Women's Open Singles"></textarea>
+                    <h4 style="margin-bottom: 5px; margin-top: 15px;">Select Events</h4>
+                    <div class="event-checkbox-list" id="editEventsContainer">
+                        <label><input type="checkbox" value="Event #1: Men’s Open Singles"> Event #1: Men’s Open Singles</label>
+                        <label><input type="checkbox" value="Event #2: Women’s Open Singles"> Event #2: Women’s Open Singles</label>
+                        <label><input type="checkbox" value="Event #3: Men’s Open Doubles"> Event #3: Men’s Open Doubles</label>
+                        <label><input type="checkbox" value="Event #4: Women’s Open Doubles"> Event #4: Women’s Open Doubles</label>
+                        <label><input type="checkbox" value="Event #5: Para Open Singles"> Event #5: Para Open Singles</label>
+                        <label><input type="checkbox" value="Event #6: Under 1700 Singles"> Event #6: Under 1700 Singles</label>
+                        <label><input type="checkbox" value="Event #7: Under 1400 Singles"> Event #7: Under 1400 Singles</label>
+                        <label><input type="checkbox" value="Event #8: Under 19 Boy’s Singles"> Event #8: Under 19 Boy’s Singles</label>
+                        <label><input type="checkbox" value="Event #9: Under 19 Girl’s Singles"> Event #9: Under 19 Girl’s Singles</label>
+                        <label><input type="checkbox" value="Event #10: Under 17 Boy’s Singles"> Event #10: Under 17 Boy’s Singles</label>
+                        <label><input type="checkbox" value="Event #11: Under 17 Girl’s Singles"> Event #11: Under 17 Girl’s Singles</label>
+                        <label><input type="checkbox" value="Event #12: Under 15 Boy’s Singles"> Event #12: Under 15 Boy’s Singles</label>
+                        <label><input type="checkbox" value="Event #13: Under 15 Girl’s Singles"> Event #13: Under 15 Girl’s Singles</label>
+                        <label><input type="checkbox" value="Event #14: Under 13 Boy’s Singles"> Event #14: Under 13 Boy’s Singles</label>
+                        <label><input type="checkbox" value="Event #15: Under 13 Girl’s Singles"> Event #15: Under 13 Girl’s Singles</label>
+                        <label><input type="checkbox" value="Event #16: Under 11 Boy’s Singles"> Event #16: Under 11 Boy’s Singles</label>
+                        <label><input type="checkbox" value="Event #17: Under 11 Girl’s Singles"> Event #17: Under 11 Girl’s Singles</label>
+                        <label><input type="checkbox" value="Event #18: Under 1200 Singles"> Event #18: Under 1200 Singles</label>
+                        <label><input type="checkbox" value="Event #19: Under 1000 Singles"> Event #19: Under 1000 Singles</label>
+                        <label><input type="checkbox" value="Event #20: Under 800 Singles"> Event #20: Under 800 Singles</label>
+                        <label><input type="checkbox" value="Event #21: Open Rating Doubles"> Event #21: Open Rating Doubles</label>
+                        <label><input type="checkbox" value="Event #22: Over 30 Men’s Singles"> Event #22: Over 30 Men’s Singles</label>
+                        <label><input type="checkbox" value="Event #23: Over 30 Women’s Singles"> Event #23: Over 30 Women’s Singles</label>
+                        <label><input type="checkbox" value="Event #24: Over 40 Men’s Singles"> Event #24: Over 40 Men’s Singles</label>
+                        <label><input type="checkbox" value="Event #25: Over 40 Women’s Singles"> Event #25: Over 40 Women’s Singles</label>
+                        <label><input type="checkbox" value="Event #26: Over 50 Men’s Singles"> Event #26: Over 50 Men’s Singles</label>
+                        <label><input type="checkbox" value="Event #27: Over 50 Women’s Singles"> Event #27: Over 50 Women’s Singles</label>
+                        <label><input type="checkbox" value="Event #28: Over 60 Men’s Singles"> Event #28: Over 60 Men’s Singles</label>
+                        <label><input type="checkbox" value="Event #29: Over 60 Women’s Singles"> Event #29: Over 60 Women’s Singles</label>
+                        <label><input type="checkbox" value="Event #30: Over 70 Men’s Singles"> Event #30: Over 70 Men’s Singles</label>
+                        <label><input type="checkbox" value="Event #31: Over 70 Women’s Singles"> Event #31: Over 70 Women’s Singles</label>
+                        <label><input type="checkbox" value="Event #32: Over 80 Singles"> Event #32: Over 80 Singles</label>
+                        <label><input type="checkbox" value="Event #33: Veteran Women’s Doubles"> Event #33: Veteran Women’s Doubles</label>
+                        <label><input type="checkbox" value="Event #34: Veteran Men’s Doubles"> Event #34: Veteran Men’s Doubles</label>
+                    </div>
                     
-                    <h4 style="margin-bottom: 5px; margin-top: 10px;">Doubles Partners (Format -> Event: Partner Name, ...)</h4>
-                    <textarea id="editPartners" class="full-width-text" rows="2" placeholder="e.g. Event #3: Men's Open Doubles: Lukas Kozak, Event #4: Women's Open Doubles: Clare"></textarea>
+                    <h4 style="margin-bottom: 5px; margin-top: 10px;">Doubles Partners (Format -> Event Name: Partner Name)</h4>
+                    <textarea id="editPartners" class="full-width-text" rows="2" placeholder="e.g. Event #3: Men's Open Doubles: Lukas Kozak"></textarea>
                     
                     <h4 style="margin-bottom: 5px; margin-top: 15px;">Payment Details</h4>
                     <div class="form-row">
@@ -299,23 +338,36 @@
     </div>
 
     <script>
-        // Global Array to hold registration data locally
         let allRegistrations = [];
 
         // ==========================================
-        // ADMIN LOGIN LOGIC
+        // AUTO-LOGIN LOGIC
         // ==========================================
+        document.addEventListener("DOMContentLoaded", () => {
+            if(localStorage.getItem('gco_admin_auth') === 'true') {
+                document.getElementById('adminLoginOverlay').style.display = 'none';
+                document.getElementById('adminDashboardContent').style.display = 'block';
+                loadDashboardData();
+            }
+        });
+
         function checkAdminLogin() {
             const user = document.getElementById('adminUser').value;
             const pass = document.getElementById('adminPass').value;
             
             if (user === 'GCTTA' && pass === 'TTgctta01') {
+                localStorage.setItem('gco_admin_auth', 'true');
                 document.getElementById('adminLoginOverlay').style.display = 'none';
                 document.getElementById('adminDashboardContent').style.display = 'block';
                 loadDashboardData(); 
             } else {
                 document.getElementById('adminLoginError').style.display = 'block';
             }
+        }
+
+        function logoutAdmin() {
+            localStorage.removeItem('gco_admin_auth');
+            window.location.reload();
         }
 
         // ==========================================
@@ -333,7 +385,7 @@
             fetch('/api/admin/registrations')
                 .then(res => res.json())
                 .then(data => {
-                    allRegistrations = data; // Store locally for instant editing!
+                    allRegistrations = data; 
                     const tbody = document.getElementById('adminTableBody');
                     tbody.innerHTML = '';
                     
@@ -396,6 +448,9 @@
             }
         }
 
+        // ==========================================
+        // DISCOUNT CODES LOGIC
+        // ==========================================
         function loadDiscounts() {
             fetch('/api/admin/discount-codes')
                 .then(res => res.json())
@@ -404,13 +459,14 @@
                     tbody.innerHTML = '';
                     
                     if (data.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 30px;">No discount codes generated yet.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 30px;">No discount codes generated yet.</td></tr>';
                         return;
                     }
 
                     data.forEach(code => {
-                        const badgeClass = code.used ? 'badge-pending' : 'badge-paid';
-                        const statusText = code.used ? 'Used' : 'Active';
+                        const badgeClass = code.used && !code.isPermanent ? 'badge-pending' : 'badge-paid';
+                        let statusText = code.used && !code.isPermanent ? 'Used / Expired' : 'Active';
+                        if(code.isPermanent) statusText += ' (Permanent)';
                         
                         let dateStr = "N/A";
                         if (code.timestamp) {
@@ -419,12 +475,25 @@
                             } catch(e) {}
                         }
 
+                        // Toggle actions based on current status
+                        const usedAction = code.used ? `<button class="btn-secondary-small" style="padding: 4px 8px; font-size: 11px;" onclick="updateDiscountCode('${code.id}', {used: false})">Reactivate Code</button>` 
+                                                     : `<button class="btn-secondary-small" style="background: #DC2626; color: white; border: none; padding: 4px 8px; font-size: 11px;" onclick="updateDiscountCode('${code.id}', {used: true})">Expire Now</button>`;
+                        
+                        const permAction = code.isPermanent ? `<button class="btn-secondary-small" style="background: #64748B; color: white; border: none; padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="updateDiscountCode('${code.id}', {isPermanent: false})">Make 1-Time Use</button>` 
+                                                            : `<button class="btn-secondary-small" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="updateDiscountCode('${code.id}', {isPermanent: true})">Make Permanent</button>`;
+
                         const row = `
                             <tr>
                                 <td><span class="ref-code" style="font-size: 16px;">${code.code}</span></td>
                                 <td style="font-weight: bold; font-size: 16px;">$${parseFloat(code.discountAmount).toFixed(2)}</td>
                                 <td><span class="badge ${badgeClass}">${statusText}</span></td>
                                 <td style="color: #64748B;">${dateStr}</td>
+                                <td>
+                                    <div style="display: flex; flex-direction: column;">
+                                        ${usedAction}
+                                        ${permAction}
+                                    </div>
+                                </td>
                             </tr>
                         `;
                         tbody.innerHTML += row;
@@ -434,18 +503,28 @@
 
         function generateDiscountCode() {
             const amount = document.getElementById('newDiscountAmount').value;
+            const isPerm = document.getElementById('newDiscountPerm').checked;
             if(!amount || amount <= 0) return alert("Please enter a valid amount.");
             
             fetch('/api/admin/discount-codes', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({amount: parseFloat(amount)})
+                body: JSON.stringify({amount: parseFloat(amount), isPermanent: isPerm})
             })
             .then(res => res.json())
             .then(res => {
-                alert(`New Code Generated: ${res.code} for $${res.amount}`);
+                alert(`New Code Generated: ${res.code} for $${res.amount} ${isPerm ? '(Permanent)' : '(1-Time Use)'}`);
                 loadDiscounts();
             });
+        }
+
+        function updateDiscountCode(id, dataObj) {
+            fetch(`/api/admin/discount-codes/${id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(dataObj)
+            })
+            .then(() => loadDiscounts());
         }
 
         function resendEmail(id) {
@@ -480,13 +559,12 @@
         // FULL EDIT LOGIC
         // ==========================================
         function openEditModal(id) {
-            // Find the full registration data from our local array
             const reg = allRegistrations.find(r => r.id === id);
             if (!reg) return;
 
             document.getElementById('editRegId').value = reg.id;
             
-            // Populate Player Details
+            // Populate Details
             document.getElementById('editFirst').value = reg.player.firstName || '';
             document.getElementById('editLast').value = reg.player.lastName || '';
             document.getElementById('editEmail').value = reg.player.email || '';
@@ -495,12 +573,14 @@
             document.getElementById('editRc').value = reg.player.rcId || '';
             document.getElementById('editClub').value = reg.player.club || '';
             
-            // Populate Events (comma separated string)
-            let eventsStr = '';
+            // Populate Checkboxes
+            document.querySelectorAll('#editEventsContainer input[type="checkbox"]').forEach(cb => cb.checked = false);
             if (reg.events) {
-                eventsStr = reg.events.map(e => e.name).join(', ');
+                const eventNames = reg.events.map(e => e.name);
+                document.querySelectorAll('#editEventsContainer input[type="checkbox"]').forEach(cb => {
+                    if (eventNames.includes(cb.value)) cb.checked = true;
+                });
             }
-            document.getElementById('editEvents').value = eventsStr;
             
             // Populate Partners
             let partnersStr = '';
@@ -525,18 +605,18 @@
             e.preventDefault();
             const id = document.getElementById('editRegId').value;
             
-            // Re-build the events array from the text box
-            const eventsText = document.getElementById('editEvents').value;
-            const eventsArr = eventsText.split(',').map(s => ({name: s.trim()})).filter(e => e.name !== "");
+            // Re-build events array from checkboxes
+            const checkedBoxes = document.querySelectorAll('#editEventsContainer input[type="checkbox"]:checked');
+            const eventsArr = Array.from(checkedBoxes).map(cb => ({name: cb.value}));
 
-            // Re-build the doubles partners dictionary
+            // Re-build doubles partners dictionary
             const partnersText = document.getElementById('editPartners').value;
             const partnersObj = {};
             if(partnersText.trim() !== "") {
                 partnersText.split(',').forEach(pair => {
                     const parts = pair.split(':');
                     if(parts.length >= 2) {
-                        const key = parts.slice(0, -1).join(':').trim(); // Keeps the event name intact even if it has colons
+                        const key = parts.slice(0, -1).join(':').trim(); 
                         const val = parts[parts.length - 1].trim();
                         if(key && val) partnersObj[key] = val;
                     }
