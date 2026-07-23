@@ -756,33 +756,51 @@ def manual_register():
 @app.route('/api/admin/registrations/<reg_id>', methods=['PUT'])
 def update_registration(reg_id):
     data = request.json
-    db.collection('registrations').document(reg_id).update(data)
     
+    # Safely convert dicts to dot notation for Firebase to avoid wiping hidden fields (like DOB)
+    update_payload = {}
+    if 'player' in data:
+        for k, v in data['player'].items():
+            update_payload[f'player.{k}'] = v
+    if 'events' in data: update_payload['events'] = data['events']
+    if 'doublesPartners' in data: update_payload['doublesPartners'] = data['doublesPartners']
+    if 'finalTotal' in data: update_payload['finalTotal'] = data['finalTotal']
+    if 'paymentStatus' in data: update_payload['paymentStatus'] = data['paymentStatus']
+
+    # 1. Update Database safely
+    db.collection('registrations').document(reg_id).update(update_payload)
+    
+    # 2. Get the newly merged master document
+    doc = db.collection('registrations').document(reg_id).get().to_dict()
+    
+    # 3. Push entire row to Google Sheets in ONE bulk API call to avoid rate-limits
     try:
         cell = sheet.find(reg_id)
         if cell:
-            row = cell.row
-            if 'player' in data:
-                p = data['player']
-                if 'firstName' in p: sheet.update_cell(row, 2, p['firstName'])
-                if 'lastName' in p: sheet.update_cell(row, 3, p['lastName'])
-                if 'email' in p: sheet.update_cell(row, 4, p['email'])
-                if 'phone' in p: sheet.update_cell(row, 5, p['phone'])
-                if 'nationalId' in p: sheet.update_cell(row, 6, p['nationalId'])
-                if 'club' in p: sheet.update_cell(row, 7, p['club'])
-                if 'rcId' in p: sheet.update_cell(row, 8, p['rcId'])
-            if 'events' in data:
-                events_str = ", ".join([e['name'] for e in data['events']])
-                sheet.update_cell(row, 9, events_str)
-            if 'doublesPartners' in data:
-                partners_str = ", ".join([f"{k}: {v}" for k, v in data['doublesPartners'].items()])
-                sheet.update_cell(row, 10, partners_str)
-            if 'finalTotal' in data:
-                sheet.update_cell(row, 13, data['finalTotal'])
-            if 'paymentStatus' in data:
-                sheet.update_cell(row, 14, data['paymentStatus'])
+            events_str = ", ".join([e['name'] for e in doc.get('events', [])])
+            partners_str = ", ".join([f"{k}: {v}" for k, v in doc.get('doublesPartners', {}).items()])
+            p = doc.get('player', {})
+            
+            updated_row = [
+                reg_id, 
+                p.get('firstName', ''), 
+                p.get('lastName', ''), 
+                p.get('email', ''),
+                p.get('phone', ''), 
+                p.get('nationalId', 'N/A'), 
+                p.get('club', 'N/A'),
+                p.get('rcId', 'N/A'), 
+                events_str, 
+                partners_str, 
+                doc.get('ttqLevy', 5.0), 
+                doc.get('discountAmount', 0),
+                doc.get('finalTotal', 0), 
+                doc.get('paymentStatus', 'Pending')
+            ]
+            
+            sheet.update(f"A{cell.row}:N{cell.row}", [updated_row])
     except Exception as e:
-        print(f"GSheet Update Error: {e}")
+        print(f"GSheet Bulk Update Error: {e}")
             
     return jsonify({"status": "updated"})
 
