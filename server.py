@@ -26,14 +26,20 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
 resend.api_key = os.getenv("RESEND_API_KEY", "")
 BASE_URL = os.getenv("BASE_URL", "https://gcopen.com") 
 
+# Helper function to find JSON credentials locally or on Render
+def get_secret_path(filename):
+    if os.path.exists(f"/etc/secrets/{filename}"):
+        return f"/etc/secrets/{filename}"
+    return filename
+
 # Firebase Setup
-firebase_cred = credentials.Certificate("gc-open-2026-firebase-adminsdk-fbsvc-efd2385c84.json")
+firebase_cred = credentials.Certificate(get_secret_path("gc-open-2026-firebase-adminsdk-fbsvc-efd2385c84.json"))
 firebase_admin.initialize_app(firebase_cred)
 db = firestore.client()
 
 # Google Sheets Setup
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-gs_creds = ServiceAccountCredentials.from_json_keyfile_name("gc-open-2026-260340b13caf.json", scope)
+gs_creds = ServiceAccountCredentials.from_json_keyfile_name(get_secret_path("gc-open-2026-260340b13caf.json"), scope)
 client = gspread.authorize(gs_creds)
 sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1EJ5lEZs4eIkAUmYIbpssjhMTkJjWWsA5B2-cHO36gyA/edit?gid=0#gid=0").sheet1
 
@@ -719,5 +725,5 @@ def get_discount_codes():
     return jsonify(codes)
 
 if __name__ == '__main__':
-    print("Starting server on port 5001")
-    app.run(host='0.0.0.0', port=5001)
+    print("Starting server on port 5000")
+    app.run(host='0.0.0.0', port=5000)

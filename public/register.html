@@ -44,7 +44,7 @@
                 <div class="form-group" style="background: #EBF4FF; padding: 15px; border-radius: 8px; border: 1px solid #BAE6FD;">
                     <label style="color: var(--gctta-navy);">Have a National Member ID?</label>
                     <div class="form-row">
-                        <input type="text" id="nationalId" placeholder="Enter ID to Auto-Fill Details" style="flex: 2; border-color: #93C5FD;">
+                        <input type="text" id="nationalId" placeholder="Enter ID to Auto-Fill Details" style="flex: 2; border-color: #93C5FD;" required>
                         <button type="button" id="autoFillByIdBtn" class="lookup-btn" style="flex: 1;">Auto-Fill Details</button>
                     </div>
                     <div id="ttaIdFeedback" style="font-size:13px; margin-top: 5px;"></div>
@@ -99,13 +99,16 @@
                 </div>
 
                 <div class="form-group" style="background: #F8FAFC; padding: 20px; border-radius: 8px; border: 1px solid #E2E8F0;">
-                    <label>Ratings Central Profile (Optional)</label>
+                    <label>Ratings Central Profile</label>
+                    <p style="color: #DC2626; font-weight: 900; font-size: 14px; text-transform: uppercase; margin-top: 0; margin-bottom: 10px;">THIS IS NOT YOUR RATING, USE THE FIND FEATURE</p>
                     <div class="form-row">
-                        <input type="text" id="rcProfile" placeholder="Enter Name or RC ID" style="flex: 2;">
+                        <input type="text" id="rcProfile" placeholder="Enter Name or RC ID" style="flex: 2;" required>
                         <button type="button" id="lookupRcBtn" class="lookup-btn">FIND PROFILE</button>
                     </div>
                     <div id="rcLookupResults"></div>
-                    <small style="color: #64748B; margin-top: 10px; display: block;">Leave blank if you have never played a rated tournament.</small>
+                    <label style="display: block; margin-top: 15px; font-weight: bold; cursor: pointer; color: var(--gctta-navy);">
+                        <input type="checkbox" id="neverPlayedBox" onchange="toggleRcProfile()"> I have never played a rated tournament (N/A)
+                    </label>
                 </div>
 
                 <button type="button" class="btn-primary btn-block" onclick="nextStep()">CONTINUE TO EVENTS →</button>
