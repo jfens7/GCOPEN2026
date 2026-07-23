@@ -21,19 +21,16 @@ CORS(app)
 # ==========================================
 # CONFIGURATION & INITIALIZATION
 # ==========================================
-# Use environment variables for all sensitive keys in production
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
 resend.api_key = os.getenv("RESEND_API_KEY", "")
 
-# Safety Net: Ensure the BASE_URL is perfectly formatted for Stripe
 raw_url = os.getenv("BASE_URL", "https://goldcoastopen.com").strip()
 if not raw_url.startswith("http"):
     BASE_URL = f"https://{raw_url}"
 else:
     BASE_URL = raw_url
-BASE_URL = BASE_URL.rstrip("/") # Stripe hates trailing slashes
+BASE_URL = BASE_URL.rstrip("/") 
 
-# Helper function to find JSON credentials locally or on Render
 def get_secret_path(filename):
     if os.path.exists(f"/etc/secrets/{filename}"):
         return f"/etc/secrets/{filename}"
@@ -315,16 +312,14 @@ def register():
     discount_code = data.get('discountCode', '').upper()
     doubles_partners = data.get('doublesPartners', {})
     
-    # We no longer check by email to allow parents to register multiple children
     existing_id = list(db.collection('registrations').where(filter=FieldFilter('player.nationalId', '==', player_details['nationalId'])).stream())
-    
     existing_rc = []
     rc_id = player_details.get('rcId', '').strip()
     if rc_id:
         existing_rc = list(db.collection('registrations').where(filter=FieldFilter('player.rcId', '==', rc_id)).stream())
     
     if len(existing_id) > 0 or len(existing_rc) > 0:
-        return jsonify({"error": "A player with this National ID or Ratings Central ID is already registered. Please contact the tournament admin to change events."}), 400
+        return jsonify({"error": "A player with this National ID or Ratings Central ID is already registered."}), 400
 
     base_total = sum(float(event['price']) for event in events)
     ttq_levy = 5.00
@@ -361,14 +356,17 @@ def register():
         partners_str = ", ".join([f"{k}: {v}" for k, v in doubles_partners.items()])
         
         row = [
-            player_details['firstName'], player_details['lastName'], player_details['email'],
+            registration_id, player_details['firstName'], player_details['lastName'], player_details['email'],
             player_details['phone'], player_details['nationalId'], player_details['club'],
             player_details.get('rcId', ''), events_str, partners_str, 
-            ttq_levy, discount_amount, final_total, "Pending", registration_id
+            ttq_levy, discount_amount, final_total, "Pending"
         ]
-        sheet.append_row(row)
+        
+        # BULLETPROOF FIX: Force exactly into Row 2 (under headers) and push others down
+        sheet.insert_row(row, 2)
+        
     except Exception as e:
-        print(f"GSheet Append Error: {e}")
+        print(f"GSheet Insert Error: {e}")
 
     if data.get('payLater') or final_total == 0:
         if final_total == 0:
@@ -428,7 +426,7 @@ def payment_success():
             try:
                 cell = sheet.find(reg_id)
                 if cell:
-                    sheet.update_cell(cell.row, 13, "Paid") 
+                    sheet.update_cell(cell.row, 14, "Paid") 
             except Exception as e:
                 print(f"GSheet Update Error: {e}")
 
@@ -508,15 +506,12 @@ def update_checkout():
                 'price_data': {
                     'currency': 'aud',
                     'unit_amount': int(difference * 100),
-                    'product_data': {'name': '2026 Gold Coast Open - Registration Update (Additional Events)'},
+                    'product_data': {'name': '2026 Gold Coast Open - Registration Update'},
                 },
                 'quantity': 1,
             }],
             mode='payment',
-            metadata={
-                'reg_id': reg_id,
-                'update_type': 'events_update'
-            },
+            metadata={'reg_id': reg_id, 'update_type': 'events_update'},
             success_url=f"{BASE_URL}/api/update-success?session_id={{CHECKOUT_SESSION_ID}}&reg_id={reg_id}",
             cancel_url=f"{BASE_URL}/update.html",
         )
@@ -562,10 +557,7 @@ def pay_balance():
                 'quantity': 1,
             }],
             mode='payment',
-            metadata={
-                'reg_id': reg_id,
-                'update_type': 'balance_payment'
-            },
+            metadata={'reg_id': reg_id, 'update_type': 'balance_payment'},
             success_url=f"{BASE_URL}/api/update-success?session_id={{CHECKOUT_SESSION_ID}}&reg_id={reg_id}",
             cancel_url=f"{BASE_URL}/update.html",
         )
@@ -603,10 +595,10 @@ def update_success():
                     if cell:
                         events_str = ", ".join([e['name'] for e in new_events])
                         partners_str = ", ".join([f"{k}: {v}" for k, v in new_partners.items()])
-                        sheet.update_cell(cell.row, 8, events_str)
-                        sheet.update_cell(cell.row, 9, partners_str)
-                        sheet.update_cell(cell.row, 12, new_final)
-                        sheet.update_cell(cell.row, 13, "Paid")
+                        sheet.update_cell(cell.row, 9, events_str)
+                        sheet.update_cell(cell.row, 10, partners_str)
+                        sheet.update_cell(cell.row, 13, new_final)
+                        sheet.update_cell(cell.row, 14, "Paid")
                 except Exception as e:
                     print("Sheet update error:", e)
                     
@@ -626,8 +618,8 @@ def update_success():
                 try:
                     cell = sheet.find(reg_id)
                     if cell:
-                        sheet.update_cell(cell.row, 12, old_total + balance)
-                        sheet.update_cell(cell.row, 13, "Paid")
+                        sheet.update_cell(cell.row, 13, old_total + balance)
+                        sheet.update_cell(cell.row, 14, "Paid")
                 except Exception as e:
                     print("Sheet update error:", e)
                     
@@ -676,17 +668,16 @@ def update_registration(reg_id):
     data = request.json
     db.collection('registrations').document(reg_id).update(data)
     
-    # Handle Sheet Updates
     try:
         cell = sheet.find(reg_id)
         if cell:
             if 'paymentStatus' in data:
-                sheet.update_cell(cell.row, 13, data['paymentStatus'])
+                sheet.update_cell(cell.row, 14, data['paymentStatus'])
             if 'finalTotal' in data:
-                sheet.update_cell(cell.row, 12, data['finalTotal'])
+                sheet.update_cell(cell.row, 13, data['finalTotal'])
             if 'events' in data:
                 events_str = ", ".join([e['name'] for e in data['events']])
-                sheet.update_cell(cell.row, 8, events_str)
+                sheet.update_cell(cell.row, 9, events_str)
     except Exception as e:
         print(f"GSheet Update Error: {e}")
             
