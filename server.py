@@ -308,13 +308,16 @@ def register():
     discount_code = data.get('discountCode', '').upper()
     doubles_partners = data.get('doublesPartners', {})
     
-    player_email = player_details.get('email', '').strip().lower()
-    
+    # We no longer check by email to allow parents to register multiple children
     existing_id = list(db.collection('registrations').where(filter=FieldFilter('player.nationalId', '==', player_details['nationalId'])).stream())
-    existing_email = list(db.collection('registrations').where(filter=FieldFilter('player.email', '==', player_details['email'])).stream())
     
-    if len(existing_email) > 0 or len(existing_id) > 0:
-        return jsonify({"error": "You are already registered. Please contact the tournament admin to change your events or request a refund."}), 400
+    existing_rc = []
+    rc_id = player_details.get('rcId', '').strip()
+    if rc_id:
+        existing_rc = list(db.collection('registrations').where(filter=FieldFilter('player.rcId', '==', rc_id)).stream())
+    
+    if len(existing_id) > 0 or len(existing_rc) > 0:
+        return jsonify({"error": "A player with this National ID or Ratings Central ID is already registered. Please contact the tournament admin to change events."}), 400
 
     base_total = sum(float(event['price']) for event in events)
     ttq_levy = 5.00
