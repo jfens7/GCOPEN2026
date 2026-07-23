@@ -31,9 +31,35 @@
         .btn-waive { background: #64748B; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
         .btn-delete { background: #DC2626; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
         .btn-resend { background: var(--gctta-gold); color: var(--gctta-navy); border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
+
+        .event-checkbox-list {
+            max-height: 160px;
+            overflow-y: auto;
+            border: 1px solid #CBD5E1;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            background: #F8FAFC;
+        }
+        .event-checkbox-list label { display: block; margin-bottom: 6px; cursor: pointer; }
     </style>
 </head>
 <body style="background-color: #F8FAFC;">
+    
+    <!-- ADMIN LOGIN OVERLAY -->
+    <div id="adminLoginOverlay" class="login-overlay" style="display: flex; z-index: 9999;">
+        <div class="login-box" style="text-align: center; width: 350px;">
+            <h2 style="margin-top: 0; color: var(--gctta-navy);">Admin Portal Login</h2>
+            <p style="color: #64748B; font-size: 14px; margin-bottom: 20px;">Please enter your credentials.</p>
+            
+            <input type="text" id="adminUser" placeholder="Username" style="width: 100%; margin-bottom: 10px; padding: 12px;">
+            <input type="password" id="adminPass" placeholder="Password" style="width: 100%; margin-bottom: 15px; padding: 12px;">
+            
+            <button class="btn-primary" style="width: 100%; padding: 12px;" onclick="checkAdminLogin()">Login</button>
+            <p id="adminLoginError" style="color: #DC2626; display: none; margin-top: 10px; font-size: 13px; font-weight: bold;">Invalid Username or Password</p>
+        </div>
+    </div>
+
     <nav class="navbar">
         <a href="/" class="nav-brand"><span class="gc-badge">GCTTA</span> <span style="font-style: italic;">ADMIN PORTAL</span></a>
         <div class="nav-links">
@@ -63,16 +89,17 @@
 
         <div class="admin-controls">
             <div class="admin-tabs">
-                <button class="active">Player Registrations</button>
-                <button>Discount Codes</button>
+                <button id="tabPlayers" class="active" onclick="switchTab('players')">Player Registrations</button>
+                <button id="tabDiscounts" onclick="switchTab('discounts')">Discount Codes</button>
             </div>
             <div>
-                <button class="btn-secondary-small" style="background: var(--gctta-gold); color: var(--gctta-navy); margin-right: 10px;" onclick="document.getElementById('manualModal').style.display='flex'">+ Add Manual Entry</button>
-                <button class="btn-primary" style="padding: 10px 20px;">One-Click Zermelo CSV Export</button>
+                <button id="btnManualEntry" class="btn-secondary-small" style="background: var(--gctta-gold); color: var(--gctta-navy); margin-right: 10px;" onclick="document.getElementById('manualModal').style.display='flex'">+ Add Manual Entry</button>
+                <button id="btnExport" class="btn-primary" style="padding: 10px 20px;">One-Click Zermelo CSV Export</button>
             </div>
         </div>
 
-        <div class="admin-table-container">
+        <!-- PLAYER REGISTRATIONS VIEW -->
+        <div id="viewPlayers" class="admin-table-container">
             <h3 style="margin-top: 0; margin-bottom: 20px; color: var(--gctta-navy);">Recent Registrations</h3>
             <input type="text" id="searchInput" placeholder="Search by name, email, or status..." style="width: 100%; padding: 12px; border: 1px solid #CBD5E1; border-radius: 6px; margin-bottom: 20px;">
             
@@ -86,7 +113,7 @@
                         <th style="width: 10%;">Partners</th>
                         <th style="width: 10%;">Total Paid</th>
                         <th style="width: 10%;">Status</th>
-                        <th style="width: 10%; text-align: center;">Actions (Admin Editor)</th>
+                        <th style="width: 10%; text-align: center;">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="adminTableBody">
@@ -95,6 +122,72 @@
                     </tr>
                 </tbody>
             </table>
+        </div>
+
+        <!-- DISCOUNT CODES VIEW -->
+        <div id="viewDiscounts" class="admin-table-container" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: var(--gctta-navy);">Active & Used Discount Codes</h3>
+                
+                <div style="display: flex; gap: 10px;">
+                    <div style="position: relative;">
+                        <span style="position: absolute; left: 12px; top: 10px; font-weight: bold; color: #64748B;">$</span>
+                        <input type="number" id="newDiscountAmount" placeholder="Amount" value="5" style="padding: 10px 10px 10px 25px; width: 100px; border-radius: 6px; border: 1px solid #CBD5E1;">
+                    </div>
+                    <button class="btn-primary" onclick="generateDiscountCode()">Generate New Code</button>
+                </div>
+            </div>
+            
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Discount Value</th>
+                        <th>Status</th>
+                        <th>Created At</th>
+                    </tr>
+                </thead>
+                <tbody id="discountTableBody">
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 30px;">Loading codes...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- EDIT RECORD MODAL -->
+    <div id="editModal" class="login-overlay" style="display: none;">
+        <div class="login-box" style="width: 500px; max-width: 90vw; text-align: left;">
+            <h2 style="margin-top: 0; color: var(--gctta-navy);">Edit Registration</h2>
+            <form id="editForm" onsubmit="submitEdit(event)">
+                <input type="hidden" id="editRegId">
+                <div class="form-row">
+                    <input type="text" id="editFirst" placeholder="First Name" required>
+                    <input type="text" id="editLast" placeholder="Last Name" required>
+                </div>
+                <input type="email" id="editEmail" placeholder="Email Address" style="width: 100%; margin-top: 10px;" required>
+                
+                <div class="form-row" style="margin-top: 15px;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 12px; font-weight: bold;">Total Paid / Owed ($)</label>
+                        <input type="number" id="editTotal" required>
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: 12px; font-weight: bold;">Payment Status</label>
+                        <select id="editStatus" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1;">
+                            <option value="Paid">Paid</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Paid (Waived)">Paid (Waived)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn-primary" style="flex: 2;">Save Changes</button>
+                    <button type="button" class="btn-secondary-small" style="flex: 1; background: #64748B;" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -117,10 +210,45 @@
                 </div>
                 <input type="text" id="manClub" placeholder="Club Name (Optional)" style="width: 100%; margin-top: 10px;">
                 
-                <h4 style="margin-bottom: 5px;">Events (Text Description)</h4>
-                <textarea id="manEvents" placeholder="e.g. Event #1 Open Singles, Event #2 Open Doubles" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1;" rows="2"></textarea>
+                <h4 style="margin-bottom: 5px; margin-top: 15px;">Select Events</h4>
+                <div class="event-checkbox-list" id="manEventsContainer">
+                    <label><input type="checkbox" value="Event #1: Men’s Open Singles"> Event #1: Men’s Open Singles</label>
+                    <label><input type="checkbox" value="Event #2: Women’s Open Singles"> Event #2: Women’s Open Singles</label>
+                    <label><input type="checkbox" value="Event #3: Men’s Open Doubles"> Event #3: Men’s Open Doubles</label>
+                    <label><input type="checkbox" value="Event #4: Women’s Open Doubles"> Event #4: Women’s Open Doubles</label>
+                    <label><input type="checkbox" value="Event #5: Para Open Singles"> Event #5: Para Open Singles</label>
+                    <label><input type="checkbox" value="Event #6: Under 1700 Singles"> Event #6: Under 1700 Singles</label>
+                    <label><input type="checkbox" value="Event #7: Under 1400 Singles"> Event #7: Under 1400 Singles</label>
+                    <label><input type="checkbox" value="Event #8: Under 19 Boy’s Singles"> Event #8: Under 19 Boy’s Singles</label>
+                    <label><input type="checkbox" value="Event #9: Under 19 Girl’s Singles"> Event #9: Under 19 Girl’s Singles</label>
+                    <label><input type="checkbox" value="Event #10: Under 17 Boy’s Singles"> Event #10: Under 17 Boy’s Singles</label>
+                    <label><input type="checkbox" value="Event #11: Under 17 Girl’s Singles"> Event #11: Under 17 Girl’s Singles</label>
+                    <label><input type="checkbox" value="Event #12: Under 15 Boy’s Singles"> Event #12: Under 15 Boy’s Singles</label>
+                    <label><input type="checkbox" value="Event #13: Under 15 Girl’s Singles"> Event #13: Under 15 Girl’s Singles</label>
+                    <label><input type="checkbox" value="Event #14: Under 13 Boy’s Singles"> Event #14: Under 13 Boy’s Singles</label>
+                    <label><input type="checkbox" value="Event #15: Under 13 Girl’s Singles"> Event #15: Under 13 Girl’s Singles</label>
+                    <label><input type="checkbox" value="Event #16: Under 11 Boy’s Singles"> Event #16: Under 11 Boy’s Singles</label>
+                    <label><input type="checkbox" value="Event #17: Under 11 Girl’s Singles"> Event #17: Under 11 Girl’s Singles</label>
+                    <label><input type="checkbox" value="Event #18: Under 1200 Singles"> Event #18: Under 1200 Singles</label>
+                    <label><input type="checkbox" value="Event #19: Under 1000 Singles"> Event #19: Under 1000 Singles</label>
+                    <label><input type="checkbox" value="Event #20: Under 800 Singles"> Event #20: Under 800 Singles</label>
+                    <label><input type="checkbox" value="Event #21: Open Rating Doubles"> Event #21: Open Rating Doubles</label>
+                    <label><input type="checkbox" value="Event #22: Over 30 Men’s Singles"> Event #22: Over 30 Men’s Singles</label>
+                    <label><input type="checkbox" value="Event #23: Over 30 Women’s Singles"> Event #23: Over 30 Women’s Singles</label>
+                    <label><input type="checkbox" value="Event #24: Over 40 Men’s Singles"> Event #24: Over 40 Men’s Singles</label>
+                    <label><input type="checkbox" value="Event #25: Over 40 Women’s Singles"> Event #25: Over 40 Women’s Singles</label>
+                    <label><input type="checkbox" value="Event #26: Over 50 Men’s Singles"> Event #26: Over 50 Men’s Singles</label>
+                    <label><input type="checkbox" value="Event #27: Over 50 Women’s Singles"> Event #27: Over 50 Women’s Singles</label>
+                    <label><input type="checkbox" value="Event #28: Over 60 Men’s Singles"> Event #28: Over 60 Men’s Singles</label>
+                    <label><input type="checkbox" value="Event #29: Over 60 Women’s Singles"> Event #29: Over 60 Women’s Singles</label>
+                    <label><input type="checkbox" value="Event #30: Over 70 Men’s Singles"> Event #30: Over 70 Men’s Singles</label>
+                    <label><input type="checkbox" value="Event #31: Over 70 Women’s Singles"> Event #31: Over 70 Women’s Singles</label>
+                    <label><input type="checkbox" value="Event #32: Over 80 Singles"> Event #32: Over 80 Singles</label>
+                    <label><input type="checkbox" value="Event #33: Veteran Women’s Doubles"> Event #33: Veteran Women’s Doubles</label>
+                    <label><input type="checkbox" value="Event #34: Veteran Men’s Doubles"> Event #34: Veteran Men’s Doubles</label>
+                </div>
                 
-                <div class="form-row" style="margin-top: 10px;">
+                <div class="form-row" style="margin-top: 15px;">
                     <div style="flex: 1;">
                         <label style="font-size: 12px; font-weight: bold;">Total Paid / Owed ($)</label>
                         <input type="number" id="manPaid" placeholder="0" value="0" required>
@@ -143,6 +271,40 @@
     </div>
 
     <script>
+        // ==========================================
+        // ADMIN LOGIN LOGIC
+        // ==========================================
+        function checkAdminLogin() {
+            const user = document.getElementById('adminUser').value;
+            const pass = document.getElementById('adminPass').value;
+            
+            if (user === 'GCTTA' && pass === 'TTgctta01') {
+                document.getElementById('adminLoginOverlay').style.display = 'none';
+            } else {
+                document.getElementById('adminLoginError').style.display = 'block';
+            }
+        }
+
+        // Tab Switcher Logic
+        function switchTab(tabName) {
+            if(tabName === 'players') {
+                document.getElementById('tabPlayers').classList.add('active');
+                document.getElementById('tabDiscounts').classList.remove('active');
+                document.getElementById('viewPlayers').style.display = 'block';
+                document.getElementById('viewDiscounts').style.display = 'none';
+                document.getElementById('btnManualEntry').style.display = 'inline-block';
+                document.getElementById('btnExport').style.display = 'inline-block';
+            } else {
+                document.getElementById('tabDiscounts').classList.add('active');
+                document.getElementById('tabPlayers').classList.remove('active');
+                document.getElementById('viewDiscounts').style.display = 'block';
+                document.getElementById('viewPlayers').style.display = 'none';
+                document.getElementById('btnManualEntry').style.display = 'none';
+                document.getElementById('btnExport').style.display = 'none';
+                loadDiscounts();
+            }
+        }
+
         // Load stats
         fetch('/api/admin/stats')
             .then(res => res.json())
@@ -152,7 +314,7 @@
                 document.getElementById('pendingPayments').innerText = data.pendingPayments;
             });
 
-        // Load table data
+        // Load table data (Players)
         fetch('/api/admin/registrations')
             .then(res => res.json())
             .then(data => {
@@ -171,7 +333,13 @@
                         partnersList = Object.entries(reg.doublesPartners).map(([event, partner]) => `${event}: ${partner}`).join('<br>');
                     }
                     
-                    const badgeClass = reg.paymentStatus === 'Paid' ? 'badge-paid' : 'badge-pending';
+                    let badgeClass = 'badge-pending';
+                    if (reg.paymentStatus.includes('Paid')) badgeClass = 'badge-paid';
+                    
+                    // Safely escape strings for the onclick function
+                    const safeFirst = reg.player.firstName.replace(/'/g, "\\'");
+                    const safeLast = reg.player.lastName.replace(/'/g, "\\'");
+                    const safeEmail = reg.player.email.replace(/'/g, "\\'");
                     
                     const row = `
                         <tr>
@@ -185,8 +353,8 @@
                             <td>
                                 <div class="action-btns">
                                     <button class="btn-resend" onclick="resendEmail('${reg.id}')">Resend Email</button>
-                                    <button class="btn-edit" onclick="alert('Edit logic goes here')">Edit Record</button>
-                                    <button class="btn-waive" onclick="alert('Waive fee logic goes here')">Waive Fee</button>
+                                    <button class="btn-edit" onclick="openEditModal('${reg.id}', '${safeFirst}', '${safeLast}', '${safeEmail}', ${reg.finalTotal}, '${reg.paymentStatus}')">Edit</button>
+                                    <button class="btn-waive" onclick="waiveFee('${reg.id}')">Waive Fee</button>
                                     <button class="btn-delete" onclick="deleteReg('${reg.id}')">Delete</button>
                                 </div>
                             </td>
@@ -196,6 +364,61 @@
                 });
             });
 
+        // Load table data (Discounts)
+        function loadDiscounts() {
+            fetch('/api/admin/discount-codes')
+                .then(res => res.json())
+                .then(data => {
+                    const tbody = document.getElementById('discountTableBody');
+                    tbody.innerHTML = '';
+                    
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 30px;">No discount codes generated yet.</td></tr>';
+                        return;
+                    }
+
+                    data.forEach(code => {
+                        const badgeClass = code.used ? 'badge-pending' : 'badge-paid';
+                        const statusText = code.used ? 'Used' : 'Active';
+                        
+                        let dateStr = "N/A";
+                        if (code.timestamp) {
+                            try {
+                                dateStr = new Date(code.timestamp._seconds * 1000).toLocaleString();
+                            } catch(e) {}
+                        }
+
+                        const row = `
+                            <tr>
+                                <td><span class="ref-code" style="font-size: 16px;">${code.code}</span></td>
+                                <td style="font-weight: bold; font-size: 16px;">$${parseFloat(code.discountAmount).toFixed(2)}</td>
+                                <td><span class="badge ${badgeClass}">${statusText}</span></td>
+                                <td style="color: #64748B;">${dateStr}</td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += row;
+                    });
+                });
+        }
+
+        // Generate a new discount code
+        function generateDiscountCode() {
+            const amount = document.getElementById('newDiscountAmount').value;
+            if(!amount || amount <= 0) return alert("Please enter a valid amount.");
+            
+            fetch('/api/admin/discount-codes', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({amount: parseFloat(amount)})
+            })
+            .then(res => res.json())
+            .then(res => {
+                alert(`New Code Generated: ${res.code} for $${res.amount}`);
+                loadDiscounts();
+            });
+        }
+
+        // Send Email Receipt
         function resendEmail(id) {
             if(confirm("Are you sure you want to resend the confirmation email to this player?")) {
                 fetch(`/api/admin/registrations/${id}/resend-email`, { method: 'POST' })
@@ -210,8 +433,79 @@
             }
         }
 
+        // Waive Fee Button Logic
+        function waiveFee(id) {
+            if(confirm("Are you sure you want to Waive the fee for this registration? This will mark their status as 'Paid (Waived)' and balance as $0.00.")) {
+                fetch(`/api/admin/registrations/${id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        finalTotal: 0,
+                        paymentStatus: "Paid (Waived)"
+                    })
+                })
+                .then(() => window.location.reload());
+            }
+        }
+
+        // Edit Modal Logic
+        function openEditModal(id, first, last, email, total, status) {
+            document.getElementById('editRegId').value = id;
+            document.getElementById('editFirst').value = first;
+            document.getElementById('editLast').value = last;
+            document.getElementById('editEmail').value = email;
+            document.getElementById('editTotal').value = total;
+            
+            // Standardize select options if it's a custom status
+            const statusSelect = document.getElementById('editStatus');
+            if(Array.from(statusSelect.options).some(opt => opt.value === status)) {
+                statusSelect.value = status;
+            } else {
+                statusSelect.value = 'Paid'; // Default fallback
+            }
+            
+            document.getElementById('editModal').style.display = 'flex';
+        }
+
+        function submitEdit(e) {
+            e.preventDefault();
+            const id = document.getElementById('editRegId').value;
+            const data = {
+                "player.firstName": document.getElementById('editFirst').value,
+                "player.lastName": document.getElementById('editLast').value,
+                "player.email": document.getElementById('editEmail').value,
+                "finalTotal": parseFloat(document.getElementById('editTotal').value),
+                "paymentStatus": document.getElementById('editStatus').value
+            };
+            
+            fetch(`/api/admin/registrations/${id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(res => {
+                if(res.status === 'updated') {
+                    window.location.reload();
+                } else {
+                    alert("Error updating record.");
+                }
+            });
+        }
+
+        // Submit Manual Registration Logic
         function submitManual(e) {
             e.preventDefault();
+            
+            const checkedBoxes = document.querySelectorAll('#manEventsContainer input[type="checkbox"]:checked');
+            const selectedEvents = Array.from(checkedBoxes).map(cb => cb.value);
+            const eventsText = selectedEvents.join(', ');
+
+            if (selectedEvents.length === 0) {
+                alert("Please select at least one event.");
+                return;
+            }
+
             const data = {
                 firstName: document.getElementById('manFirst').value,
                 lastName: document.getElementById('manLast').value,
@@ -220,7 +514,7 @@
                 nationalId: document.getElementById('manTta').value,
                 rcId: document.getElementById('manRc').value,
                 club: document.getElementById('manClub').value,
-                eventsText: document.getElementById('manEvents').value,
+                eventsText: eventsText,
                 totalPaid: document.getElementById('manPaid').value,
                 status: document.getElementById('manStatus').value
             };
@@ -240,6 +534,7 @@
             });
         }
 
+        // Delete Logic
         function deleteReg(id) {
             if(confirm("Are you sure you want to completely delete this registration?")) {
                 fetch(`/api/admin/registrations/${id}`, { method: 'DELETE' })
