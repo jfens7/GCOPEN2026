@@ -70,7 +70,6 @@ def generate_receipt_email(first_name, reg_id, events_str, partners_str, final_t
     paid_amount = float(final_total) if is_paid else 0.0
     owed_amount = 0.0 if is_paid else float(final_total)
     
-    # TTQ Levy is always $5.00. Events Paid = Total Paid - 5.00
     events_paid = max(0.0, paid_amount - 5.0) if paid_amount > 0 else 0.0
 
     owed_text = ""
@@ -662,7 +661,7 @@ def get_admin_stats():
         d = doc.to_dict()
         total_players += 1
         if 'Paid' in d.get('paymentStatus', ''):
-            total_revenue += d.get('finalTotal', 0)
+            total_revenue += float(d.get('finalTotal', 0))
         else:
             pending_payments += 1
             
@@ -755,13 +754,26 @@ def update_registration(reg_id):
     try:
         cell = sheet.find(reg_id)
         if cell:
-            if 'paymentStatus' in data:
-                sheet.update_cell(cell.row, 14, data['paymentStatus'])
-            if 'finalTotal' in data:
-                sheet.update_cell(cell.row, 13, data['finalTotal'])
+            row = cell.row
+            if 'player' in data:
+                p = data['player']
+                if 'firstName' in p: sheet.update_cell(row, 2, p['firstName'])
+                if 'lastName' in p: sheet.update_cell(row, 3, p['lastName'])
+                if 'email' in p: sheet.update_cell(row, 4, p['email'])
+                if 'phone' in p: sheet.update_cell(row, 5, p['phone'])
+                if 'nationalId' in p: sheet.update_cell(row, 6, p['nationalId'])
+                if 'club' in p: sheet.update_cell(row, 7, p['club'])
+                if 'rcId' in p: sheet.update_cell(row, 8, p['rcId'])
             if 'events' in data:
                 events_str = ", ".join([e['name'] for e in data['events']])
-                sheet.update_cell(cell.row, 9, events_str)
+                sheet.update_cell(row, 9, events_str)
+            if 'doublesPartners' in data:
+                partners_str = ", ".join([f"{k}: {v}" for k, v in data['doublesPartners'].items()])
+                sheet.update_cell(row, 10, partners_str)
+            if 'finalTotal' in data:
+                sheet.update_cell(row, 13, data['finalTotal'])
+            if 'paymentStatus' in data:
+                sheet.update_cell(row, 14, data['paymentStatus'])
     except Exception as e:
         print(f"GSheet Update Error: {e}")
             
