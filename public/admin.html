@@ -44,229 +44,232 @@
         .event-checkbox-list label { display: block; margin-bottom: 6px; cursor: pointer; }
     </style>
 </head>
-<body style="background-color: #F8FAFC;">
+<body style="background-color: #F8FAFC; margin: 0;">
     
-    <!-- ADMIN LOGIN OVERLAY -->
-    <div id="adminLoginOverlay" class="login-overlay" style="display: flex; z-index: 9999;">
-        <div class="login-box" style="text-align: center; width: 350px;">
+    <!-- ADMIN LOGIN OVERLAY (Solid Background) -->
+    <div id="adminLoginOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background-color: #F8FAFC; display: flex; justify-content: center; align-items: center; z-index: 9999;">
+        <div class="login-box" style="text-align: center; width: 350px; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
             <h2 style="margin-top: 0; color: var(--gctta-navy);">Admin Portal Login</h2>
             <p style="color: #64748B; font-size: 14px; margin-bottom: 20px;">Please enter your credentials.</p>
             
-            <input type="text" id="adminUser" placeholder="Username" style="width: 100%; margin-bottom: 10px; padding: 12px;">
-            <input type="password" id="adminPass" placeholder="Password" style="width: 100%; margin-bottom: 15px; padding: 12px;">
+            <input type="text" id="adminUser" placeholder="Username" style="width: 100%; margin-bottom: 10px; padding: 12px; border: 1px solid #CBD5E1; border-radius: 4px;">
+            <input type="password" id="adminPass" placeholder="Password" style="width: 100%; margin-bottom: 15px; padding: 12px; border: 1px solid #CBD5E1; border-radius: 4px;">
             
             <button class="btn-primary" style="width: 100%; padding: 12px;" onclick="checkAdminLogin()">Login</button>
             <p id="adminLoginError" style="color: #DC2626; display: none; margin-top: 10px; font-size: 13px; font-weight: bold;">Invalid Username or Password</p>
         </div>
     </div>
 
-    <nav class="navbar">
-        <a href="/" class="nav-brand"><span class="gc-badge">GCTTA</span> <span style="font-style: italic;">ADMIN PORTAL</span></a>
-        <div class="nav-links">
-            <a href="/">Home</a>
-            <a href="/registration">Registration</a>
-            <a href="/update.html">Update Registration</a>
-            <a href="/schedule">Schedule</a>
-            <a href="/admin" class="active" style="color: var(--gctta-gold);">Admin Portal</a>
-        </div>
-    </nav>
+    <!-- MAIN DASHBOARD CONTENT (Hidden until logged in) -->
+    <div id="adminDashboardContent" style="display: none;">
+        <nav class="navbar">
+            <a href="/" class="nav-brand"><span class="gc-badge">GCTTA</span> <span style="font-style: italic;">ADMIN PORTAL</span></a>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/registration">Registration</a>
+                <a href="/update.html">Update Registration</a>
+                <a href="/schedule">Schedule</a>
+                <a href="/admin" class="active" style="color: var(--gctta-gold);">Admin Portal</a>
+            </div>
+        </nav>
 
-    <div class="content-container" style="max-width: 1400px; margin-top: 40px;">
-        <div class="stats-container">
-            <div class="stat-card">
-                <h3>Total Revenue</h3>
-                <h1 id="totalRev">$0.00</h1>
-            </div>
-            <div class="stat-card">
-                <h3>Total Players</h3>
-                <h1 id="totalPlayers">0</h1>
-            </div>
-            <div class="stat-card">
-                <h3>Pending Payments</h3>
-                <h1 id="pendingPayments">0</h1>
-            </div>
-        </div>
-
-        <div class="admin-controls">
-            <div class="admin-tabs">
-                <button id="tabPlayers" class="active" onclick="switchTab('players')">Player Registrations</button>
-                <button id="tabDiscounts" onclick="switchTab('discounts')">Discount Codes</button>
-            </div>
-            <div>
-                <button id="btnManualEntry" class="btn-secondary-small" style="background: var(--gctta-gold); color: var(--gctta-navy); margin-right: 10px;" onclick="document.getElementById('manualModal').style.display='flex'">+ Add Manual Entry</button>
-                <button id="btnExport" class="btn-primary" style="padding: 10px 20px;">One-Click Zermelo CSV Export</button>
-            </div>
-        </div>
-
-        <!-- PLAYER REGISTRATIONS VIEW -->
-        <div id="viewPlayers" class="admin-table-container">
-            <h3 style="margin-top: 0; margin-bottom: 20px; color: var(--gctta-navy);">Recent Registrations</h3>
-            <input type="text" id="searchInput" placeholder="Search by name, email, or status..." style="width: 100%; padding: 12px; border: 1px solid #CBD5E1; border-radius: 6px; margin-bottom: 20px;">
-            
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th style="width: 15%;">Ref ID</th>
-                        <th style="width: 15%;">Player Name</th>
-                        <th style="width: 15%;">Email</th>
-                        <th style="width: 25%;">Events</th>
-                        <th style="width: 10%;">Partners</th>
-                        <th style="width: 10%;">Total Paid</th>
-                        <th style="width: 10%;">Status</th>
-                        <th style="width: 10%; text-align: center;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="adminTableBody">
-                    <tr>
-                        <td colspan="8" style="text-align: center; padding: 30px;">Loading registrations...</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- DISCOUNT CODES VIEW -->
-        <div id="viewDiscounts" class="admin-table-container" style="display: none;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h3 style="margin: 0; color: var(--gctta-navy);">Active & Used Discount Codes</h3>
-                
-                <div style="display: flex; gap: 10px;">
-                    <div style="position: relative;">
-                        <span style="position: absolute; left: 12px; top: 10px; font-weight: bold; color: #64748B;">$</span>
-                        <input type="number" id="newDiscountAmount" placeholder="Amount" value="5" style="padding: 10px 10px 10px 25px; width: 100px; border-radius: 6px; border: 1px solid #CBD5E1;">
-                    </div>
-                    <button class="btn-primary" onclick="generateDiscountCode()">Generate New Code</button>
+        <div class="content-container" style="max-width: 1400px; margin-top: 40px;">
+            <div class="stats-container">
+                <div class="stat-card">
+                    <h3>Total Revenue</h3>
+                    <h1 id="totalRev">$0.00</h1>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Players</h3>
+                    <h1 id="totalPlayers">0</h1>
+                </div>
+                <div class="stat-card">
+                    <h3>Pending Payments</h3>
+                    <h1 id="pendingPayments">0</h1>
                 </div>
             </div>
-            
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Code</th>
-                        <th>Discount Value</th>
-                        <th>Status</th>
-                        <th>Created At</th>
-                    </tr>
-                </thead>
-                <tbody id="discountTableBody">
-                    <tr>
-                        <td colspan="4" style="text-align: center; padding: 30px;">Loading codes...</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
 
-    <!-- EDIT RECORD MODAL -->
-    <div id="editModal" class="login-overlay" style="display: none;">
-        <div class="login-box" style="width: 500px; max-width: 90vw; text-align: left;">
-            <h2 style="margin-top: 0; color: var(--gctta-navy);">Edit Registration</h2>
-            <form id="editForm" onsubmit="submitEdit(event)">
-                <input type="hidden" id="editRegId">
-                <div class="form-row">
-                    <input type="text" id="editFirst" placeholder="First Name" required>
-                    <input type="text" id="editLast" placeholder="Last Name" required>
+            <div class="admin-controls">
+                <div class="admin-tabs">
+                    <button id="tabPlayers" class="active" onclick="switchTab('players')">Player Registrations</button>
+                    <button id="tabDiscounts" onclick="switchTab('discounts')">Discount Codes</button>
                 </div>
-                <input type="email" id="editEmail" placeholder="Email Address" style="width: 100%; margin-top: 10px;" required>
+                <div>
+                    <button id="btnManualEntry" class="btn-secondary-small" style="background: var(--gctta-gold); color: var(--gctta-navy); margin-right: 10px;" onclick="document.getElementById('manualModal').style.display='flex'">+ Add Manual Entry</button>
+                    <button id="btnExport" class="btn-primary" style="padding: 10px 20px;">One-Click Zermelo CSV Export</button>
+                </div>
+            </div>
+
+            <!-- PLAYER REGISTRATIONS VIEW -->
+            <div id="viewPlayers" class="admin-table-container">
+                <h3 style="margin-top: 0; margin-bottom: 20px; color: var(--gctta-navy);">Recent Registrations</h3>
+                <input type="text" id="searchInput" placeholder="Search by name, email, or status..." style="width: 100%; padding: 12px; border: 1px solid #CBD5E1; border-radius: 6px; margin-bottom: 20px;">
                 
-                <div class="form-row" style="margin-top: 15px;">
-                    <div style="flex: 1;">
-                        <label style="font-size: 12px; font-weight: bold;">Total Paid / Owed ($)</label>
-                        <input type="number" id="editTotal" required>
-                    </div>
-                    <div style="flex: 1;">
-                        <label style="font-size: 12px; font-weight: bold;">Payment Status</label>
-                        <select id="editStatus" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1;">
-                            <option value="Paid">Paid</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Paid (Waived)">Paid (Waived)</option>
-                        </select>
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 15%;">Ref ID</th>
+                            <th style="width: 15%;">Player Name</th>
+                            <th style="width: 15%;">Email</th>
+                            <th style="width: 25%;">Events</th>
+                            <th style="width: 10%;">Partners</th>
+                            <th style="width: 10%;">Total Paid</th>
+                            <th style="width: 10%;">Status</th>
+                            <th style="width: 10%; text-align: center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adminTableBody">
+                        <tr>
+                            <td colspan="8" style="text-align: center; padding: 30px;">Loading registrations...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- DISCOUNT CODES VIEW -->
+            <div id="viewDiscounts" class="admin-table-container" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0; color: var(--gctta-navy);">Active & Used Discount Codes</h3>
+                    
+                    <div style="display: flex; gap: 10px;">
+                        <div style="position: relative;">
+                            <span style="position: absolute; left: 12px; top: 10px; font-weight: bold; color: #64748B;">$</span>
+                            <input type="number" id="newDiscountAmount" placeholder="Amount" value="5" style="padding: 10px 10px 10px 25px; width: 100px; border-radius: 6px; border: 1px solid #CBD5E1;">
+                        </div>
+                        <button class="btn-primary" onclick="generateDiscountCode()">Generate New Code</button>
                     </div>
                 </div>
                 
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button type="submit" class="btn-primary" style="flex: 2;">Save Changes</button>
-                    <button type="button" class="btn-secondary-small" style="flex: 1; background: #64748B;" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
-                </div>
-            </form>
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Discount Value</th>
+                            <th>Status</th>
+                            <th>Created At</th>
+                        </tr>
+                    </thead>
+                    <tbody id="discountTableBody">
+                        <tr>
+                            <td colspan="4" style="text-align: center; padding: 30px;">Loading codes...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
-    </div>
 
-    <!-- MANUAL ENTRY MODAL -->
-    <div id="manualModal" class="login-overlay" style="display: none;">
-        <div class="login-box" style="width: 600px; max-width: 90vw; text-align: left;">
-            <h2 style="margin-top: 0; color: var(--gctta-navy);">Manual Override Entry</h2>
-            <form id="manualForm" onsubmit="submitManual(event)">
-                <div class="form-row">
-                    <input type="text" id="manFirst" placeholder="First Name" required>
-                    <input type="text" id="manLast" placeholder="Last Name" required>
-                </div>
-                <div class="form-row" style="margin-top: 10px;">
-                    <input type="email" id="manEmail" placeholder="Email Address">
-                    <input type="text" id="manPhone" placeholder="Phone">
-                </div>
-                <div class="form-row" style="margin-top: 10px;">
-                    <input type="text" id="manTta" placeholder="TTA ID (Optional)">
-                    <input type="text" id="manRc" placeholder="RC ID (Optional)">
-                </div>
-                <input type="text" id="manClub" placeholder="Club Name (Optional)" style="width: 100%; margin-top: 10px;">
-                
-                <h4 style="margin-bottom: 5px; margin-top: 15px;">Select Events</h4>
-                <div class="event-checkbox-list" id="manEventsContainer">
-                    <label><input type="checkbox" value="Event #1: Men’s Open Singles"> Event #1: Men’s Open Singles</label>
-                    <label><input type="checkbox" value="Event #2: Women’s Open Singles"> Event #2: Women’s Open Singles</label>
-                    <label><input type="checkbox" value="Event #3: Men’s Open Doubles"> Event #3: Men’s Open Doubles</label>
-                    <label><input type="checkbox" value="Event #4: Women’s Open Doubles"> Event #4: Women’s Open Doubles</label>
-                    <label><input type="checkbox" value="Event #5: Para Open Singles"> Event #5: Para Open Singles</label>
-                    <label><input type="checkbox" value="Event #6: Under 1700 Singles"> Event #6: Under 1700 Singles</label>
-                    <label><input type="checkbox" value="Event #7: Under 1400 Singles"> Event #7: Under 1400 Singles</label>
-                    <label><input type="checkbox" value="Event #8: Under 19 Boy’s Singles"> Event #8: Under 19 Boy’s Singles</label>
-                    <label><input type="checkbox" value="Event #9: Under 19 Girl’s Singles"> Event #9: Under 19 Girl’s Singles</label>
-                    <label><input type="checkbox" value="Event #10: Under 17 Boy’s Singles"> Event #10: Under 17 Boy’s Singles</label>
-                    <label><input type="checkbox" value="Event #11: Under 17 Girl’s Singles"> Event #11: Under 17 Girl’s Singles</label>
-                    <label><input type="checkbox" value="Event #12: Under 15 Boy’s Singles"> Event #12: Under 15 Boy’s Singles</label>
-                    <label><input type="checkbox" value="Event #13: Under 15 Girl’s Singles"> Event #13: Under 15 Girl’s Singles</label>
-                    <label><input type="checkbox" value="Event #14: Under 13 Boy’s Singles"> Event #14: Under 13 Boy’s Singles</label>
-                    <label><input type="checkbox" value="Event #15: Under 13 Girl’s Singles"> Event #15: Under 13 Girl’s Singles</label>
-                    <label><input type="checkbox" value="Event #16: Under 11 Boy’s Singles"> Event #16: Under 11 Boy’s Singles</label>
-                    <label><input type="checkbox" value="Event #17: Under 11 Girl’s Singles"> Event #17: Under 11 Girl’s Singles</label>
-                    <label><input type="checkbox" value="Event #18: Under 1200 Singles"> Event #18: Under 1200 Singles</label>
-                    <label><input type="checkbox" value="Event #19: Under 1000 Singles"> Event #19: Under 1000 Singles</label>
-                    <label><input type="checkbox" value="Event #20: Under 800 Singles"> Event #20: Under 800 Singles</label>
-                    <label><input type="checkbox" value="Event #21: Open Rating Doubles"> Event #21: Open Rating Doubles</label>
-                    <label><input type="checkbox" value="Event #22: Over 30 Men’s Singles"> Event #22: Over 30 Men’s Singles</label>
-                    <label><input type="checkbox" value="Event #23: Over 30 Women’s Singles"> Event #23: Over 30 Women’s Singles</label>
-                    <label><input type="checkbox" value="Event #24: Over 40 Men’s Singles"> Event #24: Over 40 Men’s Singles</label>
-                    <label><input type="checkbox" value="Event #25: Over 40 Women’s Singles"> Event #25: Over 40 Women’s Singles</label>
-                    <label><input type="checkbox" value="Event #26: Over 50 Men’s Singles"> Event #26: Over 50 Men’s Singles</label>
-                    <label><input type="checkbox" value="Event #27: Over 50 Women’s Singles"> Event #27: Over 50 Women’s Singles</label>
-                    <label><input type="checkbox" value="Event #28: Over 60 Men’s Singles"> Event #28: Over 60 Men’s Singles</label>
-                    <label><input type="checkbox" value="Event #29: Over 60 Women’s Singles"> Event #29: Over 60 Women’s Singles</label>
-                    <label><input type="checkbox" value="Event #30: Over 70 Men’s Singles"> Event #30: Over 70 Men’s Singles</label>
-                    <label><input type="checkbox" value="Event #31: Over 70 Women’s Singles"> Event #31: Over 70 Women’s Singles</label>
-                    <label><input type="checkbox" value="Event #32: Over 80 Singles"> Event #32: Over 80 Singles</label>
-                    <label><input type="checkbox" value="Event #33: Veteran Women’s Doubles"> Event #33: Veteran Women’s Doubles</label>
-                    <label><input type="checkbox" value="Event #34: Veteran Men’s Doubles"> Event #34: Veteran Men’s Doubles</label>
-                </div>
-                
-                <div class="form-row" style="margin-top: 15px;">
-                    <div style="flex: 1;">
-                        <label style="font-size: 12px; font-weight: bold;">Total Paid / Owed ($)</label>
-                        <input type="number" id="manPaid" placeholder="0" value="0" required>
+        <!-- EDIT RECORD MODAL -->
+        <div id="editModal" class="login-overlay" style="display: none;">
+            <div class="login-box" style="width: 500px; max-width: 90vw; text-align: left;">
+                <h2 style="margin-top: 0; color: var(--gctta-navy);">Edit Registration</h2>
+                <form id="editForm" onsubmit="submitEdit(event)">
+                    <input type="hidden" id="editRegId">
+                    <div class="form-row">
+                        <input type="text" id="editFirst" placeholder="First Name" required>
+                        <input type="text" id="editLast" placeholder="Last Name" required>
                     </div>
-                    <div style="flex: 1;">
-                        <label style="font-size: 12px; font-weight: bold;">Payment Status</label>
-                        <select id="manStatus" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1;">
-                            <option value="Paid">Paid (Cash/EFT)</option>
-                            <option value="Pending">Pending (Owes Money)</option>
-                        </select>
+                    <input type="email" id="editEmail" placeholder="Email Address" style="width: 100%; margin-top: 10px;" required>
+                    
+                    <div class="form-row" style="margin-top: 15px;">
+                        <div style="flex: 1;">
+                            <label style="font-size: 12px; font-weight: bold;">Total Paid / Owed ($)</label>
+                            <input type="number" id="editTotal" required>
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="font-size: 12px; font-weight: bold;">Payment Status</label>
+                            <select id="editStatus" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1;">
+                                <option value="Paid">Paid</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Paid (Waived)">Paid (Waived)</option>
+                            </select>
+                        </div>
                     </div>
-                </div>
-                
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button type="submit" class="btn-primary" style="flex: 2;">Save Entry</button>
-                    <button type="button" class="btn-secondary-small" style="flex: 1; background: #64748B;" onclick="document.getElementById('manualModal').style.display='none'">Cancel</button>
-                </div>
-            </form>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 20px;">
+                        <button type="submit" class="btn-primary" style="flex: 2;">Save Changes</button>
+                        <button type="button" class="btn-secondary-small" style="flex: 1; background: #64748B;" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- MANUAL ENTRY MODAL -->
+        <div id="manualModal" class="login-overlay" style="display: none;">
+            <div class="login-box" style="width: 600px; max-width: 90vw; text-align: left;">
+                <h2 style="margin-top: 0; color: var(--gctta-navy);">Manual Override Entry</h2>
+                <form id="manualForm" onsubmit="submitManual(event)">
+                    <div class="form-row">
+                        <input type="text" id="manFirst" placeholder="First Name" required>
+                        <input type="text" id="manLast" placeholder="Last Name" required>
+                    </div>
+                    <div class="form-row" style="margin-top: 10px;">
+                        <input type="email" id="manEmail" placeholder="Email Address">
+                        <input type="text" id="manPhone" placeholder="Phone">
+                    </div>
+                    <div class="form-row" style="margin-top: 10px;">
+                        <input type="text" id="manTta" placeholder="TTA ID (Optional)">
+                        <input type="text" id="manRc" placeholder="RC ID (Optional)">
+                    </div>
+                    <input type="text" id="manClub" placeholder="Club Name (Optional)" style="width: 100%; margin-top: 10px;">
+                    
+                    <h4 style="margin-bottom: 5px; margin-top: 15px;">Select Events</h4>
+                    <div class="event-checkbox-list" id="manEventsContainer">
+                        <label><input type="checkbox" value="Event #1: Men’s Open Singles"> Event #1: Men’s Open Singles</label>
+                        <label><input type="checkbox" value="Event #2: Women’s Open Singles"> Event #2: Women’s Open Singles</label>
+                        <label><input type="checkbox" value="Event #3: Men’s Open Doubles"> Event #3: Men’s Open Doubles</label>
+                        <label><input type="checkbox" value="Event #4: Women’s Open Doubles"> Event #4: Women’s Open Doubles</label>
+                        <label><input type="checkbox" value="Event #5: Para Open Singles"> Event #5: Para Open Singles</label>
+                        <label><input type="checkbox" value="Event #6: Under 1700 Singles"> Event #6: Under 1700 Singles</label>
+                        <label><input type="checkbox" value="Event #7: Under 1400 Singles"> Event #7: Under 1400 Singles</label>
+                        <label><input type="checkbox" value="Event #8: Under 19 Boy’s Singles"> Event #8: Under 19 Boy’s Singles</label>
+                        <label><input type="checkbox" value="Event #9: Under 19 Girl’s Singles"> Event #9: Under 19 Girl’s Singles</label>
+                        <label><input type="checkbox" value="Event #10: Under 17 Boy’s Singles"> Event #10: Under 17 Boy’s Singles</label>
+                        <label><input type="checkbox" value="Event #11: Under 17 Girl’s Singles"> Event #11: Under 17 Girl’s Singles</label>
+                        <label><input type="checkbox" value="Event #12: Under 15 Boy’s Singles"> Event #12: Under 15 Boy’s Singles</label>
+                        <label><input type="checkbox" value="Event #13: Under 15 Girl’s Singles"> Event #13: Under 15 Girl’s Singles</label>
+                        <label><input type="checkbox" value="Event #14: Under 13 Boy’s Singles"> Event #14: Under 13 Boy’s Singles</label>
+                        <label><input type="checkbox" value="Event #15: Under 13 Girl’s Singles"> Event #15: Under 13 Girl’s Singles</label>
+                        <label><input type="checkbox" value="Event #16: Under 11 Boy’s Singles"> Event #16: Under 11 Boy’s Singles</label>
+                        <label><input type="checkbox" value="Event #17: Under 11 Girl’s Singles"> Event #17: Under 11 Girl’s Singles</label>
+                        <label><input type="checkbox" value="Event #18: Under 1200 Singles"> Event #18: Under 1200 Singles</label>
+                        <label><input type="checkbox" value="Event #19: Under 1000 Singles"> Event #19: Under 1000 Singles</label>
+                        <label><input type="checkbox" value="Event #20: Under 800 Singles"> Event #20: Under 800 Singles</label>
+                        <label><input type="checkbox" value="Event #21: Open Rating Doubles"> Event #21: Open Rating Doubles</label>
+                        <label><input type="checkbox" value="Event #22: Over 30 Men’s Singles"> Event #22: Over 30 Men’s Singles</label>
+                        <label><input type="checkbox" value="Event #23: Over 30 Women’s Singles"> Event #23: Over 30 Women’s Singles</label>
+                        <label><input type="checkbox" value="Event #24: Over 40 Men’s Singles"> Event #24: Over 40 Men’s Singles</label>
+                        <label><input type="checkbox" value="Event #25: Over 40 Women’s Singles"> Event #25: Over 40 Women’s Singles</label>
+                        <label><input type="checkbox" value="Event #26: Over 50 Men’s Singles"> Event #26: Over 50 Men’s Singles</label>
+                        <label><input type="checkbox" value="Event #27: Over 50 Women’s Singles"> Event #27: Over 50 Women’s Singles</label>
+                        <label><input type="checkbox" value="Event #28: Over 60 Men’s Singles"> Event #28: Over 60 Men’s Singles</label>
+                        <label><input type="checkbox" value="Event #29: Over 60 Women’s Singles"> Event #29: Over 60 Women’s Singles</label>
+                        <label><input type="checkbox" value="Event #30: Over 70 Men’s Singles"> Event #30: Over 70 Men’s Singles</label>
+                        <label><input type="checkbox" value="Event #31: Over 70 Women’s Singles"> Event #31: Over 70 Women’s Singles</label>
+                        <label><input type="checkbox" value="Event #32: Over 80 Singles"> Event #32: Over 80 Singles</label>
+                        <label><input type="checkbox" value="Event #33: Veteran Women’s Doubles"> Event #33: Veteran Women’s Doubles</label>
+                        <label><input type="checkbox" value="Event #34: Veteran Men’s Doubles"> Event #34: Veteran Men’s Doubles</label>
+                    </div>
+                    
+                    <div class="form-row" style="margin-top: 15px;">
+                        <div style="flex: 1;">
+                            <label style="font-size: 12px; font-weight: bold;">Total Paid / Owed ($)</label>
+                            <input type="number" id="manPaid" placeholder="0" value="0" required>
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="font-size: 12px; font-weight: bold;">Payment Status</label>
+                            <select id="manStatus" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1;">
+                                <option value="Paid">Paid (Cash/EFT)</option>
+                                <option value="Pending">Pending (Owes Money)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 20px;">
+                        <button type="submit" class="btn-primary" style="flex: 2;">Save Entry</button>
+                        <button type="button" class="btn-secondary-small" style="flex: 1; background: #64748B;" onclick="document.getElementById('manualModal').style.display='none'">Cancel</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -280,9 +283,75 @@
             
             if (user === 'GCTTA' && pass === 'TTgctta01') {
                 document.getElementById('adminLoginOverlay').style.display = 'none';
+                document.getElementById('adminDashboardContent').style.display = 'block';
+                loadDashboardData(); // Only fetch data AFTER successful login
             } else {
                 document.getElementById('adminLoginError').style.display = 'block';
             }
+        }
+
+        // ==========================================
+        // DASHBOARD LOGIC
+        // ==========================================
+        function loadDashboardData() {
+            // Load stats
+            fetch('/api/admin/stats')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('totalRev').innerText = '$' + data.totalRevenue.toFixed(2);
+                    document.getElementById('totalPlayers').innerText = data.totalPlayers;
+                    document.getElementById('pendingPayments').innerText = data.pendingPayments;
+                });
+
+            // Load table data (Players)
+            fetch('/api/admin/registrations')
+                .then(res => res.json())
+                .then(data => {
+                    const tbody = document.getElementById('adminTableBody');
+                    tbody.innerHTML = '';
+                    
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 30px;">No registrations yet.</td></tr>';
+                        return;
+                    }
+
+                    data.forEach(reg => {
+                        const eventsList = reg.events.map(e => e.name).join('<br>');
+                        let partnersList = '';
+                        if (reg.doublesPartners) {
+                            partnersList = Object.entries(reg.doublesPartners).map(([event, partner]) => `${event}: ${partner}`).join('<br>');
+                        }
+                        
+                        let badgeClass = 'badge-pending';
+                        if (reg.paymentStatus.includes('Paid')) badgeClass = 'badge-paid';
+                        
+                        // Safely escape strings for the onclick function
+                        const safeFirst = reg.player.firstName.replace(/'/g, "\\'");
+                        const safeLast = reg.player.lastName.replace(/'/g, "\\'");
+                        const safeEmail = reg.player.email.replace(/'/g, "\\'");
+                        
+                        const row = `
+                            <tr>
+                                <td><span class="ref-code">${reg.id}</span></td>
+                                <td style="font-weight: bold;">${reg.player.firstName} ${reg.player.lastName}</td>
+                                <td>${reg.player.email}</td>
+                                <td style="font-size: 12px;">${eventsList}</td>
+                                <td style="font-size: 12px;">${partnersList}</td>
+                                <td style="font-weight: bold;">$${parseFloat(reg.finalTotal).toFixed(2)}</td>
+                                <td><span class="badge ${badgeClass}">${reg.paymentStatus}</span></td>
+                                <td>
+                                    <div class="action-btns">
+                                        <button class="btn-resend" onclick="resendEmail('${reg.id}')">Resend Email</button>
+                                        <button class="btn-edit" onclick="openEditModal('${reg.id}', '${safeFirst}', '${safeLast}', '${safeEmail}', ${reg.finalTotal}, '${reg.paymentStatus}')">Edit</button>
+                                        <button class="btn-waive" onclick="waiveFee('${reg.id}')">Waive Fee</button>
+                                        <button class="btn-delete" onclick="deleteReg('${reg.id}')">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += row;
+                    });
+                });
         }
 
         // Tab Switcher Logic
@@ -304,65 +373,6 @@
                 loadDiscounts();
             }
         }
-
-        // Load stats
-        fetch('/api/admin/stats')
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById('totalRev').innerText = '$' + data.totalRevenue.toFixed(2);
-                document.getElementById('totalPlayers').innerText = data.totalPlayers;
-                document.getElementById('pendingPayments').innerText = data.pendingPayments;
-            });
-
-        // Load table data (Players)
-        fetch('/api/admin/registrations')
-            .then(res => res.json())
-            .then(data => {
-                const tbody = document.getElementById('adminTableBody');
-                tbody.innerHTML = '';
-                
-                if (data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 30px;">No registrations yet.</td></tr>';
-                    return;
-                }
-
-                data.forEach(reg => {
-                    const eventsList = reg.events.map(e => e.name).join('<br>');
-                    let partnersList = '';
-                    if (reg.doublesPartners) {
-                        partnersList = Object.entries(reg.doublesPartners).map(([event, partner]) => `${event}: ${partner}`).join('<br>');
-                    }
-                    
-                    let badgeClass = 'badge-pending';
-                    if (reg.paymentStatus.includes('Paid')) badgeClass = 'badge-paid';
-                    
-                    // Safely escape strings for the onclick function
-                    const safeFirst = reg.player.firstName.replace(/'/g, "\\'");
-                    const safeLast = reg.player.lastName.replace(/'/g, "\\'");
-                    const safeEmail = reg.player.email.replace(/'/g, "\\'");
-                    
-                    const row = `
-                        <tr>
-                            <td><span class="ref-code">${reg.id}</span></td>
-                            <td style="font-weight: bold;">${reg.player.firstName} ${reg.player.lastName}</td>
-                            <td>${reg.player.email}</td>
-                            <td style="font-size: 12px;">${eventsList}</td>
-                            <td style="font-size: 12px;">${partnersList}</td>
-                            <td style="font-weight: bold;">$${parseFloat(reg.finalTotal).toFixed(2)}</td>
-                            <td><span class="badge ${badgeClass}">${reg.paymentStatus}</span></td>
-                            <td>
-                                <div class="action-btns">
-                                    <button class="btn-resend" onclick="resendEmail('${reg.id}')">Resend Email</button>
-                                    <button class="btn-edit" onclick="openEditModal('${reg.id}', '${safeFirst}', '${safeLast}', '${safeEmail}', ${reg.finalTotal}, '${reg.paymentStatus}')">Edit</button>
-                                    <button class="btn-waive" onclick="waiveFee('${reg.id}')">Waive Fee</button>
-                                    <button class="btn-delete" onclick="deleteReg('${reg.id}')">Delete</button>
-                                </div>
-                            </td>
-                        </tr>
-                    `;
-                    tbody.innerHTML += row;
-                });
-            });
 
         // Load table data (Discounts)
         function loadDiscounts() {
@@ -456,12 +466,11 @@
             document.getElementById('editEmail').value = email;
             document.getElementById('editTotal').value = total;
             
-            // Standardize select options if it's a custom status
             const statusSelect = document.getElementById('editStatus');
             if(Array.from(statusSelect.options).some(opt => opt.value === status)) {
                 statusSelect.value = status;
             } else {
-                statusSelect.value = 'Paid'; // Default fallback
+                statusSelect.value = 'Paid';
             }
             
             document.getElementById('editModal').style.display = 'flex';

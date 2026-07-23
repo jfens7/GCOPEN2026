@@ -65,6 +65,34 @@ def send_email(to_email, subject, body):
         print(f"CRITICAL EMAIL ERROR - Failed to send to {to_email}: {str(e)}")
         return False
 
+def generate_receipt_email(first_name, reg_id, events_str, partners_str, final_total, status):
+    is_paid = ('Paid' in status) 
+    paid_amount = float(final_total) if is_paid else 0.0
+    owed_amount = 0.0 if is_paid else float(final_total)
+    
+    # TTQ Levy is always $5.00. Events Paid = Total Paid - 5.00
+    events_paid = max(0.0, paid_amount - 5.0) if paid_amount > 0 else 0.0
+
+    owed_text = ""
+    if owed_amount > 0:
+        owed_text = "<p><em>*Note: You can pay your outstanding balance online at any time using the <strong>Update Registration</strong> tab on the website, or pay via Cash/EFT on arrival.</em></p>"
+
+    return f"""<p>Hi {first_name},</p>
+    <p>Your registration for the 2026 Gold Coast Open Table Tennis Championships has been recorded!</p>
+    <p><strong>Registration Reference ID: {reg_id}</strong> (Please keep this safe. You will need it to update your entry).</p>
+    <p><strong>Events:</strong> {events_str}<br>
+    <strong>Doubles Partners:</strong> {partners_str}</p>
+    
+    <p><strong>Total Paid (Events):</strong> ${events_paid:.2f}<br>
+    <strong>Total Owed:</strong> ${owed_amount:.2f}<br>
+    <strong>TTQ Tournament Levy:</strong> $5.00</p>
+    
+    {owed_text}
+    
+    <p>Please contact the Tournament Director for any updates or changes to your entry via email - <a href="mailto:admin@goldcoasttabletennis.org.au">admin@goldcoasttabletennis.org.au</a></p>
+    <p>See you at the tournament!</p>
+    <p><strong>2026 Gold Coast Open</strong></p>"""
+
 # ==========================================
 # PAGE ROUTING
 # ==========================================
@@ -375,15 +403,9 @@ def register():
         
         events_str = ", ".join([e['name'] for e in events])
         partners_str = ", ".join([f"{k}: {v}" for k, v in doubles_partners.items()])
-        email_body = f"""<p>Hi {player_details['firstName']},</p>
-        <p>Your registration for the 2026 Gold Coast Open Table Tennis Championships has been saved!</p>
-        <p><strong>Registration Reference ID: {registration_id}</strong> (Please keep this safe)</p>
-        <p><strong>Events:</strong> {events_str}<br>
-        <strong>Doubles Partners:</strong> {partners_str}<br>
-        <strong>Total Due:</strong> ${final_total}</p>
-        <p>Please remember to pay your outstanding balance on arrival (Cash or EFT).</p>
-        <p>See you at the tournament!</p>"""
-        send_email(player_details['email'], "Tournament Registration (Pay Later)", email_body)
+        
+        email_body = generate_receipt_email(player_details['firstName'], registration_id, events_str, partners_str, final_total, "Pending")
+        send_email(player_details['email'], "Tournament Registration (Pending Payment)", email_body)
         
         admin_body = f"<p>New PAY LATER Registration:<br>Player: {player_details['firstName']} {player_details['lastName']}<br>Ref ID: {registration_id}<br>Total Due: ${final_total}<br>Events: {events_str}</p>"
         send_email(ADMIN_EMAIL, "New Tournament Registration (Pay Later)", admin_body)
@@ -434,14 +456,7 @@ def payment_success():
             events_str = ", ".join([e['name'] for e in record['events']])
             partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
 
-            email_body = f"""<p>Hi {record['player']['firstName']},</p>
-            <p>Your registration for the 2026 Gold Coast Open Table Tennis Championships is confirmed!</p>
-            <p><strong>Registration Reference ID: {reg_id}</strong> (Please keep this safe)</p>
-            <p><strong>Events:</strong> {events_str}<br>
-            <strong>Doubles Partners:</strong> {partners_str}<br>
-            <strong>TTQ Levy:</strong> $5.00<br>
-            <strong>Total Paid:</strong> ${record['finalTotal']}</p>
-            <p>See you at the tournament!</p>"""
+            email_body = generate_receipt_email(record['player']['firstName'], reg_id, events_str, partners_str, record['finalTotal'], "Paid")
             send_email(record['player']['email'], "Tournament Registration Confirmation", email_body)
             
             admin_body = f"<p>New Paid Registration:<br>Player: {record['player']['firstName']} {record['player']['lastName']}<br>Ref ID: {reg_id}<br>Total: ${record['finalTotal']}<br>Events: {events_str}<br>Partners: {partners_str}</p>"
@@ -603,15 +618,16 @@ def update_success():
                 except Exception as e:
                     print("Sheet update error:", e)
                     
-                email_body = f"<p>Your registration update has been confirmed! Your new total is ${new_final}.</p>"
+                email_body = generate_receipt_email(record['player']['firstName'], reg_id, events_str, partners_str, new_final, "Paid")
                 send_email(record['player']['email'], "Registration Update Confirmed", email_body)
                 
             elif float(record.get('balanceDue', 0)) > 0:
                 old_total = float(record.get('finalTotal', 0))
                 balance = float(record.get('balanceDue', 0))
+                new_total = old_total + balance
                 
                 doc_ref.update({
-                    "finalTotal": old_total + balance,
+                    "finalTotal": new_total,
                     "paymentStatus": "Paid",
                     "balanceDue": 0
                 })
@@ -619,12 +635,14 @@ def update_success():
                 try:
                     cell = sheet.find(reg_id)
                     if cell:
-                        sheet.update_cell(cell.row, 13, old_total + balance)
+                        sheet.update_cell(cell.row, 13, new_total)
                         sheet.update_cell(cell.row, 14, "Paid")
                 except Exception as e:
                     print("Sheet update error:", e)
                     
-                email_body = "<p>Your outstanding balance has been paid successfully.</p>"
+                events_str = ", ".join([e['name'] for e in record.get('events', [])])
+                partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
+                email_body = generate_receipt_email(record['player']['firstName'], reg_id, events_str, partners_str, new_total, "Paid")
                 send_email(record['player']['email'], "Balance Payment Confirmed", email_body)
 
     return redirect(f"/success.html?reg_id={reg_id}&updated=true")
@@ -643,7 +661,7 @@ def get_admin_stats():
     for doc in docs:
         d = doc.to_dict()
         total_players += 1
-        if d.get('paymentStatus') == 'Paid':
+        if 'Paid' in d.get('paymentStatus', ''):
             total_revenue += d.get('finalTotal', 0)
         else:
             pending_payments += 1
@@ -677,15 +695,9 @@ def admin_resend_email(reg_id):
     events_str = ", ".join([e['name'] for e in record.get('events', [])])
     partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
     final_total = record.get('finalTotal', 0)
+    status = record.get('paymentStatus', 'Pending')
     
-    email_body = f"""<p>Hi {record['player']['firstName']},</p>
-    <p>Your registration for the 2026 Gold Coast Open Table Tennis Championships is confirmed!</p>
-    <p><strong>Registration Reference ID: {reg_id}</strong> (Please keep this safe)</p>
-    <p><strong>Events:</strong> {events_str}<br>
-    <strong>Doubles Partners:</strong> {partners_str}<br>
-    <strong>Total Paid / Due:</strong> ${final_total}</p>
-    <p>See you at the tournament!</p>"""
-    
+    email_body = generate_receipt_email(record['player']['firstName'], reg_id, events_str, partners_str, final_total, status)
     success = send_email(record['player']['email'], "Tournament Registration Confirmation (Resent)", email_body)
     
     if success:
