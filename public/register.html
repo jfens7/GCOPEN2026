@@ -39,7 +39,10 @@
         <form id="registrationForm">
             <!-- STEP 1: Personal Details -->
             <div id="step1">
-                <h2 style="color: var(--gctta-navy); margin-top:0;">Player Registration Details</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="color: var(--gctta-navy); margin: 0;">Player Registration Details</h2>
+                    <button type="button" class="btn-secondary-small" style="background: #EF4444; color: white; border: none; font-size: 12px; padding: 6px 12px;" onclick="clearProgress()">Start Over (Clear Form)</button>
+                </div>
                 
                 <div class="form-group" style="background: #EBF4FF; padding: 15px; border-radius: 8px; border: 1px solid #BAE6FD;">
                     <label style="color: var(--gctta-navy);">Have a National Member ID?</label>
@@ -237,7 +240,7 @@
     <script src="app.js"></script>
     <script>
         function nextStep() {
-            // 1. Force the browser to check if all required fields in Step 1 are filled
+            // Force the browser to check if all required fields in Step 1 are filled
             const step1 = document.getElementById('step1');
             const inputs = step1.querySelectorAll('input, select');
             let isValid = true;
@@ -246,14 +249,12 @@
                 if (!inputs[i].checkValidity()) {
                     inputs[i].reportValidity(); // This pops up the "Please fill out this field" warning
                     isValid = false;
-                    break; // Stop at the first empty field
+                    break; 
                 }
             }
             
-            // 2. If anything is empty, stop the function and don't go to the next page
             if (!isValid) return;
 
-            // 3. If everything is filled out, proceed to Step 2
             document.getElementById('step1').style.display = 'none';
             document.getElementById('step2').style.display = 'block';
             if (typeof validateEligibility === "function") validateEligibility();
@@ -296,6 +297,81 @@
                 if (overlay) overlay.style.display = 'none';
             } else {
                 document.getElementById('bypassError').style.display = 'block';
+            }
+        }
+
+        // ==========================================
+        // AUTO-SAVE PROGRESS (Local Storage)
+        // ==========================================
+        document.addEventListener("DOMContentLoaded", () => {
+            const form = document.getElementById('registrationForm');
+            if (!form) return;
+
+            // Function to save an input
+            const saveInput = (el) => {
+                if (!el.id && !el.name) return; // Skip if no identifier
+                
+                const key = el.type === 'radio' ? `gco_${el.name}_${el.value}` : `gco_${el.id || el.name}`;
+                
+                if (el.type === 'checkbox') {
+                    localStorage.setItem(key, el.checked);
+                } else if (el.type === 'radio') {
+                    if (el.checked) {
+                        // Clear others in group
+                        form.querySelectorAll(`input[name="${el.name}"]`).forEach(r => {
+                            localStorage.removeItem(`gco_${r.name}_${r.value}`);
+                        });
+                        localStorage.setItem(key, 'true');
+                    }
+                } else {
+                    localStorage.setItem(key, el.value);
+                }
+            };
+
+            // Attach listeners to all current AND future inputs 
+            form.addEventListener('input', (e) => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+                    saveInput(e.target);
+                }
+            });
+            form.addEventListener('change', (e) => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+                    saveInput(e.target);
+                }
+            });
+
+            // Restore data on load
+            const allInputs = form.querySelectorAll('input, select, textarea');
+            allInputs.forEach(input => {
+                if (!input.id && !input.name) return;
+                const key = input.type === 'radio' ? `gco_${input.name}_${input.value}` : `gco_${input.id || input.name}`;
+                const savedValue = localStorage.getItem(key);
+                
+                if (savedValue !== null) {
+                    if (input.type === 'checkbox' || input.type === 'radio') {
+                        input.checked = (savedValue === 'true');
+                    } else {
+                        input.value = savedValue;
+                    }
+                }
+            });
+
+            // Make sure dynamic UI (like RC Profile checkbox or Club selection) matches restored values
+            setTimeout(() => {
+                if (typeof toggleRcProfile === 'function') toggleRcProfile();
+                if (typeof toggleClubOther === 'function') toggleClubOther();
+            }, 100);
+        });
+
+        // Easily wipe data to register a second child
+        function clearProgress() {
+            if(confirm("Are you sure you want to clear the form and start over?")) {
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('gco_')) {
+                        localStorage.removeItem(key);
+                    }
+                });
+                window.location.reload();
             }
         }
     </script>

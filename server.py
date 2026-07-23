@@ -48,7 +48,7 @@ client = gspread.authorize(gs_creds)
 sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1EJ5lEZs4eIkAUmYIbpssjhMTkJjWWsA5B2-cHO36gyA/edit?gid=0#gid=0").sheet1
 
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", "noreply@goldcoastopen.com")
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "your_actual_email@gmail.com")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "jakobwill7@gmail.com")
 
 def send_email(to_email, subject, body):
     try:
@@ -58,9 +58,12 @@ def send_email(to_email, subject, body):
             "subject": subject,
             "html": body,
         }
-        resend.Emails.send(params)
+        response = resend.Emails.send(params)
+        print(f"Email sent successfully to {to_email}. Resend ID: {response}")
+        return True
     except Exception as e:
-        print(f"Failed to send email: {e}")
+        print(f"CRITICAL EMAIL ERROR - Failed to send to {to_email}: {str(e)}")
+        return False
 
 # ==========================================
 # PAGE ROUTING
@@ -362,9 +365,7 @@ def register():
             ttq_levy, discount_amount, final_total, "Pending"
         ]
         
-        # BULLETPROOF FIX: Force exactly into Row 2 (under headers) and push others down
         sheet.insert_row(row, 2)
-        
     except Exception as e:
         print(f"GSheet Insert Error: {e}")
 
@@ -662,6 +663,77 @@ def get_registrations():
         data['id'] = doc.id
         registrations.append(data)
     return jsonify(registrations)
+
+@app.route('/api/admin/registrations/<reg_id>/resend-email', methods=['POST'])
+def admin_resend_email(reg_id):
+    doc_ref = db.collection('registrations').document(reg_id)
+    doc = doc_ref.get()
+    
+    if not doc.exists:
+        return jsonify({"error": "Registration not found"}), 404
+        
+    record = doc.to_dict()
+    
+    events_str = ", ".join([e['name'] for e in record.get('events', [])])
+    partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
+    final_total = record.get('finalTotal', 0)
+    
+    email_body = f"""<p>Hi {record['player']['firstName']},</p>
+    <p>Your registration for the 2026 Gold Coast Open Table Tennis Championships is confirmed!</p>
+    <p><strong>Registration Reference ID: {reg_id}</strong> (Please keep this safe)</p>
+    <p><strong>Events:</strong> {events_str}<br>
+    <strong>Doubles Partners:</strong> {partners_str}<br>
+    <strong>Total Paid / Due:</strong> ${final_total}</p>
+    <p>See you at the tournament!</p>"""
+    
+    success = send_email(record['player']['email'], "Tournament Registration Confirmation (Resent)", email_body)
+    
+    if success:
+        return jsonify({"status": "success"})
+    else:
+        return jsonify({"error": "Failed to send email. Check Render logs."}), 500
+
+@app.route('/api/admin/manual-register', methods=['POST'])
+def manual_register():
+    data = request.json
+    
+    registration_data = {
+        "player": {
+            "firstName": data.get('firstName', ''),
+            "lastName": data.get('lastName', ''),
+            "email": data.get('email', ''),
+            "phone": data.get('phone', ''),
+            "nationalId": data.get('nationalId', 'N/A'),
+            "rcId": data.get('rcId', 'N/A'),
+            "club": data.get('club', 'N/A')
+        },
+        "events": [{"name": data.get('eventsText', '')}],
+        "doublesPartners": {},
+        "baseTotal": float(data.get('totalPaid', 0)),
+        "ttqLevy": 0,
+        "discountCode": "MANUAL",
+        "discountAmount": 0,
+        "finalTotal": float(data.get('totalPaid', 0)),
+        "paymentStatus": data.get('status', 'Paid'),
+        "timestamp": firestore.SERVER_TIMESTAMP
+    }
+    
+    doc_ref = db.collection('registrations').document()
+    doc_ref.set(registration_data)
+    reg_id = doc_ref.id
+
+    try:
+        row = [
+            reg_id, data.get('firstName', ''), data.get('lastName', ''), data.get('email', ''),
+            data.get('phone', ''), data.get('nationalId', 'N/A'), data.get('club', 'N/A'),
+            data.get('rcId', 'N/A'), data.get('eventsText', ''), "", 
+            0, 0, float(data.get('totalPaid', 0)), data.get('status', 'Paid')
+        ]
+        sheet.insert_row(row, 2)
+    except Exception as e:
+        print(f"Manual GSheet Insert Error: {e}")
+        
+    return jsonify({"status": "success", "id": reg_id})
 
 @app.route('/api/admin/registrations/<reg_id>', methods=['PUT'])
 def update_registration(reg_id):
