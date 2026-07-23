@@ -24,7 +24,14 @@ CORS(app)
 # Use environment variables for all sensitive keys in production
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
 resend.api_key = os.getenv("RESEND_API_KEY", "")
-BASE_URL = os.getenv("BASE_URL", "https://gcopen.com") 
+
+# Safety Net: Ensure the BASE_URL is perfectly formatted for Stripe
+raw_url = os.getenv("BASE_URL", "https://goldcoastopen.com").strip()
+if not raw_url.startswith("http"):
+    BASE_URL = f"https://{raw_url}"
+else:
+    BASE_URL = raw_url
+BASE_URL = BASE_URL.rstrip("/") # Stripe hates trailing slashes
 
 # Helper function to find JSON credentials locally or on Render
 def get_secret_path(filename):
@@ -43,7 +50,7 @@ gs_creds = ServiceAccountCredentials.from_json_keyfile_name(get_secret_path("gc-
 client = gspread.authorize(gs_creds)
 sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1EJ5lEZs4eIkAUmYIbpssjhMTkJjWWsA5B2-cHO36gyA/edit?gid=0#gid=0").sheet1
 
-SENDER_EMAIL = os.getenv("SENDER_EMAIL", "noreply@gcopen.com")
+SENDER_EMAIL = os.getenv("SENDER_EMAIL", "noreply@goldcoastopen.com")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "your_actual_email@gmail.com")
 
 def send_email(to_email, subject, body):

@@ -237,10 +237,28 @@
     <script src="app.js"></script>
     <script>
         function nextStep() {
+            // 1. Force the browser to check if all required fields in Step 1 are filled
+            const step1 = document.getElementById('step1');
+            const inputs = step1.querySelectorAll('input, select');
+            let isValid = true;
+            
+            for (let i = 0; i < inputs.length; i++) {
+                if (!inputs[i].checkValidity()) {
+                    inputs[i].reportValidity(); // This pops up the "Please fill out this field" warning
+                    isValid = false;
+                    break; // Stop at the first empty field
+                }
+            }
+            
+            // 2. If anything is empty, stop the function and don't go to the next page
+            if (!isValid) return;
+
+            // 3. If everything is filled out, proceed to Step 2
             document.getElementById('step1').style.display = 'none';
             document.getElementById('step2').style.display = 'block';
             if (typeof validateEligibility === "function") validateEligibility();
         }
+
         function prevStep() {
             document.getElementById('step2').style.display = 'none';
             document.getElementById('step1').style.display = 'block';
@@ -258,7 +276,7 @@
             const el = document.getElementById('registerCountdown');
             
             if (distance < 0) {
-                overlay.style.display = 'none'; // Auto unlock when time hits!
+                if (overlay) overlay.style.display = 'none'; // Auto unlock when time hits!
                 return;
             }
             
@@ -275,7 +293,7 @@
         function checkBypass() {
             const code = document.getElementById('bypassCode').value;
             if (code === 'gctta01') {
-                overlay.style.display = 'none';
+                if (overlay) overlay.style.display = 'none';
             } else {
                 document.getElementById('bypassError').style.display = 'block';
             }
