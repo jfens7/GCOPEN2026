@@ -11,78 +11,72 @@
         .stat-card h3 { margin-top: 0; color: #64748B; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
         .stat-card h1 { margin: 10px 0 0 0; color: var(--gctta-navy); font-size: 36px; }
         
-        .admin-controls { display: flex; justify-content: space-between; border-bottom: 2px solid #E2E8F0; padding-bottom: 15px; margin-bottom: 20px; align-items: center; }
+        .admin-controls { display: flex; justify-content: space-between; border-bottom: 2px solid #E2E8F0; padding-bottom: 15px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; gap: 15px; }
         .admin-tabs button { background: none; border: none; font-size: 18px; font-weight: bold; color: #94A3B8; padding: 10px 20px; cursor: pointer; }
         .admin-tabs button.active { color: var(--gctta-navy); border-bottom: 3px solid var(--gctta-gold); }
         
-        .admin-table-container { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .admin-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        .admin-table th { background: var(--gctta-navy); color: white; padding: 15px; text-align: left; font-size: 14px; }
-        .admin-table td { padding: 15px; border-bottom: 1px solid #E2E8F0; font-size: 14px; color: #334155; vertical-align: middle; }
+        .admin-table-container { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow-x: auto; }
+        .admin-table { width: 100%; border-collapse: collapse; margin-top: 15px; min-width: 1200px; }
+        .admin-table th { background: var(--gctta-navy); color: white; padding: 15px; text-align: left; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .admin-table td { padding: 15px; border-bottom: 1px solid #E2E8F0; font-size: 13px; color: #334155; vertical-align: middle; }
         
         .ref-code { font-family: monospace; background: #F1F5F9; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #0F172A; }
         
-        .badge { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block; text-align: center; }
+        .badge { padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; display: inline-block; text-align: center; text-transform: uppercase; }
         .badge-paid { background: #DCFCE7; color: #166534; }
         .badge-pending { background: #FEF08A; color: #854D0E; }
         
         .action-btns { display: flex; flex-direction: column; gap: 5px; }
-        .btn-edit { background: var(--gctta-navy); color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
-        .btn-waive { background: #64748B; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
-        .btn-delete { background: #DC2626; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
-        .btn-resend { background: var(--gctta-gold); color: var(--gctta-navy); border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
-        .btn-sync { background: #0284C7; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
+        .action-btns button { border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; width: 100%; text-align: center; }
+        .btn-view { background: #10B981; color: white; }
+        .btn-edit { background: var(--gctta-navy); color: white; }
+        .btn-sync { background: #0284C7; color: white; }
+        .btn-resend { background: var(--gctta-gold); color: var(--gctta-navy); }
+        .btn-waive { background: #64748B; color: white; }
+        .btn-delete { background: #DC2626; color: white; }
 
-        .event-checkbox-list {
-            max-height: 160px;
-            overflow-y: auto;
-            border: 1px solid #CBD5E1;
-            padding: 10px;
-            border-radius: 4px;
-            font-size: 13px;
-            background: #F8FAFC;
-        }
-        .event-checkbox-list label { display: block; margin-bottom: 6px; cursor: pointer; }
+        .event-checkbox-list { max-height: 250px; overflow-y: auto; border: 1px solid #CBD5E1; padding: 15px; border-radius: 4px; font-size: 13px; background: #F8FAFC; }
+        .event-checkbox-list label { display: block; margin-bottom: 8px; cursor: pointer; }
         
-        .full-width-text {
-            width: 100%;
-            padding: 10px;
-            border-radius: 4px;
-            border: 1px solid #CBD5E1;
-            font-size: 13px;
-        }
+        .full-width-text { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1; font-size: 13px; font-family: inherit; }
+        
+        /* Scrollbar styling for modals */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 </head>
 <body style="background-color: #F8FAFC; margin: 0;">
     
     <!-- ADMIN LOGIN OVERLAY -->
     <div id="adminLoginOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background-color: #F8FAFC; display: flex; justify-content: center; align-items: center; z-index: 9999;">
-        <div class="login-box" style="text-align: center; width: 350px; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+        <div class="login-box" style="text-align: center; width: 350px; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
             <h2 style="margin-top: 0; color: var(--gctta-navy);">Admin Portal Login</h2>
-            <p style="color: #64748B; font-size: 14px; margin-bottom: 20px;">Please enter your credentials.</p>
-            
-            <input type="text" id="adminUser" placeholder="Username" style="width: 100%; margin-bottom: 10px; padding: 12px; border: 1px solid #CBD5E1; border-radius: 4px;">
-            <input type="password" id="adminPass" placeholder="Password" style="width: 100%; margin-bottom: 15px; padding: 12px; border: 1px solid #CBD5E1; border-radius: 4px;">
-            
+            <p style="color: #64748B; font-size: 14px; margin-bottom: 25px;">Please enter your credentials.</p>
+            <input type="text" id="adminUser" placeholder="Username" style="width: 100%; margin-bottom: 15px; padding: 12px; border: 1px solid #CBD5E1; border-radius: 4px; box-sizing: border-box;">
+            <input type="password" id="adminPass" placeholder="Password" style="width: 100%; margin-bottom: 20px; padding: 12px; border: 1px solid #CBD5E1; border-radius: 4px; box-sizing: border-box;">
             <button class="btn-primary" style="width: 100%; padding: 12px;" onclick="checkAdminLogin()">Login</button>
-            <p id="adminLoginError" style="color: #DC2626; display: none; margin-top: 10px; font-size: 13px; font-weight: bold;">Invalid Username or Password</p>
+            <p id="adminLoginError" style="color: #DC2626; display: none; margin-top: 15px; font-size: 13px; font-weight: bold;">Invalid Username or Password</p>
         </div>
     </div>
 
     <!-- MAIN DASHBOARD CONTENT -->
     <div id="adminDashboardContent" style="display: none;">
         <nav class="navbar">
-            <a href="/" class="nav-brand"><span class="gc-badge">GCTTA</span> <span style="font-style: italic;">ADMIN PORTAL</span></a>
-            <div class="nav-links">
-                <a href="/">Home</a>
-                <a href="/registration">Registration</a>
-                <a href="/update.html">Update Registration</a>
-                <a href="/schedule">Schedule</a>
-                <a href="#" onclick="logoutAdmin()" style="color: #DC2626; font-weight: bold;">Logout</a>
+            <div class="nav-container" style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0 20px;">
+                <a href="/" class="nav-brand" style="text-decoration: none; color: inherit;"><span class="gc-badge">GCTTA</span> <span style="font-style: italic;">ADMIN PORTAL</span></a>
+                <div class="nav-links" style="display: flex; gap: 20px;">
+                    <a href="/" style="text-decoration: none; color: var(--gctta-navy); font-weight: bold;">Home</a>
+                    <a href="/registration" style="text-decoration: none; color: var(--gctta-navy); font-weight: bold;">Registration</a>
+                    <a href="/update.html" style="text-decoration: none; color: var(--gctta-navy); font-weight: bold;">Update Registration</a>
+                    <a href="/schedule" style="text-decoration: none; color: var(--gctta-navy); font-weight: bold;">Schedule</a>
+                    <a href="#" onclick="logoutAdmin()" style="text-decoration: none; color: #DC2626; font-weight: bold;">Logout</a>
+                </div>
             </div>
         </nav>
 
-        <div class="content-container" style="max-width: 1400px; margin-top: 40px;">
+        <div class="content-container" style="max-width: 1500px; margin: 40px auto; padding: 0 20px;">
             <div class="stats-container">
                 <div class="stat-card">
                     <h3>Total Revenue</h3>
@@ -103,53 +97,54 @@
                     <button id="tabPlayers" class="active" onclick="switchTab('players')">Player Registrations</button>
                     <button id="tabDiscounts" onclick="switchTab('discounts')">Discount Codes</button>
                 </div>
-                <div>
-                    <button id="btnRebuildSheet" class="btn-secondary-small" style="background: #DC2626; color: white; margin-right: 10px;" onclick="rebuildSheet()">⚠️ Rebuild Entire Sheet</button>
-                    <button id="btnManualEntry" class="btn-secondary-small" style="background: var(--gctta-gold); color: var(--gctta-navy); margin-right: 10px;" onclick="document.getElementById('manualModal').style.display='flex'">+ Add Manual Entry</button>
-                    <button id="btnExport" class="btn-primary" style="padding: 10px 20px;">One-Click Zermelo CSV Export</button>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button id="btnBulkFix" class="btn-secondary-small" style="background: #0284C7; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="bulkFixRc()">🔍 Auto-Fetch RC IDs & Ratings</button>
+                    <button id="btnRebuildSheet" class="btn-secondary-small" style="background: #DC2626; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="rebuildSheet()">⚠️ Rebuild Entire Sheet</button>
+                    <button id="btnManualEntry" class="btn-secondary-small" style="background: var(--gctta-gold); color: var(--gctta-navy); padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="document.getElementById('manualModal').style.display='flex'">+ Add Manual Entry</button>
+                    <button id="btnExport" class="btn-primary" style="padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="exportZermeloCSV()">One-Click Zermelo CSV Export</button>
                 </div>
             </div>
 
             <!-- PLAYER REGISTRATIONS VIEW -->
             <div id="viewPlayers" class="admin-table-container">
                 <h3 style="margin-top: 0; margin-bottom: 20px; color: var(--gctta-navy);">Recent Registrations</h3>
-                <input type="text" id="searchInput" placeholder="Search by name, email, or status..." style="width: 100%; padding: 12px; border: 1px solid #CBD5E1; border-radius: 6px; margin-bottom: 20px;">
+                <input type="text" id="searchInput" placeholder="Search by name, email, or status..." style="width: 100%; padding: 12px; border: 1px solid #CBD5E1; border-radius: 6px; margin-bottom: 20px; box-sizing: border-box;" onkeyup="filterTable()">
                 
-                <table class="admin-table">
+                <table class="admin-table" id="registrationsTable">
                     <thead>
                         <tr>
-                            <th style="width: 10%;">Ref ID</th>
-                            <th style="width: 15%;">Player Name</th>
-                            <th style="width: 10%;">DOB</th>
-                            <th style="width: 25%;">Events</th>
-                            <th style="width: 10%;">Partners</th>
-                            <th style="width: 10%;">Total Paid</th>
-                            <th style="width: 10%;">Status</th>
-                            <th style="width: 10%; text-align: center;">Actions</th>
+                            <th style="width: 8%;">Ref ID</th>
+                            <th style="width: 12%;">Player Name</th>
+                            <th style="width: 8%;">DOB</th>
+                            <th style="width: 6%;">Gender</th>
+                            <th style="width: 8%;">Rating</th>
+                            <th style="width: 20%;">Events</th>
+                            <th style="width: 15%;">Partners</th>
+                            <th style="width: 8%;">Total Paid</th>
+                            <th style="width: 7%;">Status</th>
+                            <th style="width: 8%; text-align: center;">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="adminTableBody">
-                        <tr>
-                            <td colspan="8" style="text-align: center; padding: 30px;">Loading registrations...</td>
-                        </tr>
+                        <tr><td colspan="10" style="text-align: center; padding: 30px;">Loading registrations...</td></tr>
                     </tbody>
                 </table>
             </div>
 
             <!-- DISCOUNT CODES VIEW -->
             <div id="viewDiscounts" class="admin-table-container" style="display: none;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
                     <h3 style="margin: 0; color: var(--gctta-navy);">Active & Used Discount Codes</h3>
                     
-                    <div style="display: flex; gap: 10px; align-items: center;">
+                    <div style="display: flex; gap: 15px; align-items: center; background: #F1F5F9; padding: 15px; border-radius: 6px;">
                         <label style="display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: bold; color: var(--gctta-navy); cursor: pointer;">
                             <input type="checkbox" id="newDiscountPerm"> Permanent (Multi-Use)
                         </label>
-                        <div style="position: relative; margin-left: 10px;">
+                        <div style="position: relative;">
                             <span style="position: absolute; left: 12px; top: 10px; font-weight: bold; color: #64748B;">$</span>
                             <input type="number" id="newDiscountAmount" placeholder="Amount" value="5" style="padding: 10px 10px 10px 25px; width: 100px; border-radius: 6px; border: 1px solid #CBD5E1;">
                         </div>
-                        <button class="btn-primary" onclick="generateDiscountCode()">Generate New Code</button>
+                        <button class="btn-primary" style="padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer;" onclick="generateDiscountCode()">Generate New Code</button>
                     </div>
                 </div>
                 
@@ -172,88 +167,106 @@
             </div>
         </div>
 
+        <!-- FULL VIEW DETAILS MODAL -->
+        <div id="viewModal" class="login-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 10000;">
+            <div class="login-box" style="width: 800px; max-width: 95vw; max-height: 90vh; overflow-y: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+               <div style="display:flex; justify-content: space-between; align-items:center;">
+                   <h2 style="margin: 0; color: var(--gctta-navy);">Player Summary</h2>
+                   <button onclick="document.getElementById('viewModal').style.display='none'" style="background:none; border:none; font-size:28px; cursor:pointer; color: #64748B; padding: 0;">&times;</button>
+               </div>
+               <hr style="border: none; border-top: 1px solid #E2E8F0; margin: 15px 0;">
+               <div id="viewContent">
+                   <!-- Populated by JS -->
+               </div>
+               <div style="margin-top: 25px; text-align: right; border-top: 1px solid #E2E8F0; padding-top: 15px;">
+                    <button type="button" style="background: #64748B; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;" onclick="document.getElementById('viewModal').style.display='none'">Close</button>
+               </div>
+            </div>
+        </div>
+
         <!-- FULL EDIT RECORD MODAL -->
-        <div id="editModal" class="login-overlay" style="display: none;">
-            <div class="login-box" style="width: 650px; max-width: 90vw; max-height: 90vh; overflow-y: auto; text-align: left;">
-                <h2 style="margin-top: 0; color: var(--gctta-navy);">Full Edit Registration</h2>
+        <div id="editModal" class="login-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 10000;">
+            <div class="login-box" style="width: 750px; max-width: 95vw; max-height: 90vh; overflow-y: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+                <h2 style="margin-top: 0; color: var(--gctta-navy); border-bottom: 2px solid var(--gctta-gold); padding-bottom: 10px;">Full Edit Registration</h2>
                 <form id="editForm" onsubmit="submitEdit(event)">
                     <input type="hidden" id="editRegId">
                     
-                    <h4 style="margin-bottom: 5px; margin-top: 0;">Player Details</h4>
-                    <div class="form-row">
-                        <input type="text" id="editFirst" placeholder="First Name" required>
-                        <input type="text" id="editLast" placeholder="Last Name" required>
+                    <h4 style="margin-bottom: 10px; margin-top: 15px; color: var(--gctta-navy);">Player Details</h4>
+                    <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                        <input type="text" id="editFirst" placeholder="First Name" required style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
+                        <input type="text" id="editLast" placeholder="Last Name" required style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
                     </div>
-                    <div class="form-row" style="margin-top: 10px;">
-                        <input type="email" id="editEmail" placeholder="Email Address" required>
-                        <input type="text" id="editPhone" placeholder="Phone">
+                    <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                        <input type="email" id="editEmail" placeholder="Email Address" required style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
+                        <input type="text" id="editPhone" placeholder="Phone" style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
                     </div>
-                    <div class="form-row" style="margin-top: 10px;">
-                        <input type="text" id="editDob" placeholder="DOB (DD/MM/YYYY)" style="flex: 1;" required>
-                        <select id="editGender" style="flex: 1; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1;">
+                    <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                        <input type="text" id="editDob" placeholder="DOB (DD/MM/YYYY)" required style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
+                        <select id="editGender" style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px; background: white;">
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
                         </select>
-                        <input type="text" id="editTta" placeholder="TTA ID" style="flex: 1;">
+                        <input type="text" id="editTta" placeholder="TTA ID" style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
                     </div>
-                    <div class="form-row" style="margin-top: 10px;">
-                        <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
-                            <input type="text" id="editRc" placeholder="RC ID" style="flex: 1;">
-                            <label style="font-size: 11px; font-weight: bold; cursor: pointer; white-space: nowrap;"><input type="checkbox" id="editNeverPlayed"> Never Played</label>
-                        </div>
-                        <input type="text" id="editClub" placeholder="Club Name" style="flex: 1;">
+                    <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: center;">
+                        <input type="text" id="editRc" placeholder="RC ID" style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
+                        <input type="text" id="editRcRating" placeholder="RC Rating" style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
+                        <input type="text" id="editClub" placeholder="Club Name" style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
+                        <label style="font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                            <input type="checkbox" id="editNeverPlayed"> Never Played
+                        </label>
                     </div>
                     
-                    <h4 style="margin-bottom: 5px; margin-top: 15px;">Select Events</h4>
+                    <h4 style="margin-bottom: 10px; color: var(--gctta-navy); border-top: 1px solid #E2E8F0; padding-top: 15px;">Select Events</h4>
                     <div class="event-checkbox-list" id="editEventsContainer">
-                        <label><input type="checkbox" value="Event #1: Men’s Open Singles"> Event #1: Men’s Open Singles</label>
-                        <label><input type="checkbox" value="Event #2: Women’s Open Singles"> Event #2: Women’s Open Singles</label>
-                        <label><input type="checkbox" value="Event #3: Men’s Open Doubles"> Event #3: Men’s Open Doubles</label>
-                        <label><input type="checkbox" value="Event #4: Women’s Open Doubles"> Event #4: Women’s Open Doubles</label>
-                        <label><input type="checkbox" value="Event #5: Para Open Singles"> Event #5: Para Open Singles</label>
-                        <label><input type="checkbox" value="Event #6: Under 1700 Singles"> Event #6: Under 1700 Singles</label>
-                        <label><input type="checkbox" value="Event #7: Under 1400 Singles"> Event #7: Under 1400 Singles</label>
-                        <label><input type="checkbox" value="Event #8: Under 19 Boy’s Singles"> Event #8: Under 19 Boy’s Singles</label>
-                        <label><input type="checkbox" value="Event #9: Under 19 Girl’s Singles"> Event #9: Under 19 Girl’s Singles</label>
-                        <label><input type="checkbox" value="Event #10: Under 17 Boy’s Singles"> Event #10: Under 17 Boy’s Singles</label>
-                        <label><input type="checkbox" value="Event #11: Under 17 Girl’s Singles"> Event #11: Under 17 Girl’s Singles</label>
-                        <label><input type="checkbox" value="Event #12: Under 15 Boy’s Singles"> Event #12: Under 15 Boy’s Singles</label>
-                        <label><input type="checkbox" value="Event #13: Under 15 Girl’s Singles"> Event #13: Under 15 Girl’s Singles</label>
-                        <label><input type="checkbox" value="Event #14: Under 13 Boy’s Singles"> Event #14: Under 13 Boy’s Singles</label>
-                        <label><input type="checkbox" value="Event #15: Under 13 Girl’s Singles"> Event #15: Under 13 Girl’s Singles</label>
-                        <label><input type="checkbox" value="Event #16: Under 11 Boy’s Singles"> Event #16: Under 11 Boy’s Singles</label>
-                        <label><input type="checkbox" value="Event #17: Under 11 Girl’s Singles"> Event #17: Under 11 Girl’s Singles</label>
-                        <label><input type="checkbox" value="Event #18: Under 1200 Singles"> Event #18: Under 1200 Singles</label>
-                        <label><input type="checkbox" value="Event #19: Under 1000 Singles"> Event #19: Under 1000 Singles</label>
-                        <label><input type="checkbox" value="Event #20: Under 800 Singles"> Event #20: Under 800 Singles</label>
-                        <label><input type="checkbox" value="Event #21: Open Rating Doubles"> Event #21: Open Rating Doubles</label>
-                        <label><input type="checkbox" value="Event #22: Over 30 Men’s Singles"> Event #22: Over 30 Men’s Singles</label>
-                        <label><input type="checkbox" value="Event #23: Over 30 Women’s Singles"> Event #23: Over 30 Women’s Singles</label>
-                        <label><input type="checkbox" value="Event #24: Over 40 Men’s Singles"> Event #24: Over 40 Men’s Singles</label>
-                        <label><input type="checkbox" value="Event #25: Over 40 Women’s Singles"> Event #25: Over 40 Women’s Singles</label>
-                        <label><input type="checkbox" value="Event #26: Over 50 Men’s Singles"> Event #26: Over 50 Men’s Singles</label>
-                        <label><input type="checkbox" value="Event #27: Over 50 Women’s Singles"> Event #27: Over 50 Women’s Singles</label>
-                        <label><input type="checkbox" value="Event #28: Over 60 Men’s Singles"> Event #28: Over 60 Men’s Singles</label>
-                        <label><input type="checkbox" value="Event #29: Over 60 Women’s Singles"> Event #29: Over 60 Women’s Singles</label>
-                        <label><input type="checkbox" value="Event #30: Over 70 Men’s Singles"> Event #30: Over 70 Men’s Singles</label>
-                        <label><input type="checkbox" value="Event #31: Over 70 Women’s Singles"> Event #31: Over 70 Women’s Singles</label>
-                        <label><input type="checkbox" value="Event #32: Over 80 Singles"> Event #32: Over 80 Singles</label>
-                        <label><input type="checkbox" value="Event #33: Veteran Women’s Doubles"> Event #33: Veteran Women’s Doubles</label>
-                        <label><input type="checkbox" value="Event #34: Veteran Men’s Doubles"> Event #34: Veteran Men’s Doubles</label>
+                        <label><input type="checkbox" value='{"id":1, "name":"Event #1: Men’s Open Singles", "price":25}'> Event #1: Men’s Open Singles</label>
+                        <label><input type="checkbox" value='{"id":2, "name":"Event #2: Women’s Open Singles", "price":20}'> Event #2: Women’s Open Singles</label>
+                        <label><input type="checkbox" value='{"id":3, "name":"Event #3: Men’s Open Doubles", "price":12}'> Event #3: Men’s Open Doubles</label>
+                        <label><input type="checkbox" value='{"id":4, "name":"Event #4: Women’s Open Doubles", "price":12}'> Event #4: Women’s Open Doubles</label>
+                        <label><input type="checkbox" value='{"id":5, "name":"Event #5: Para Open Singles", "price":10}'> Event #5: Para Open Singles</label>
+                        <label><input type="checkbox" value='{"id":6, "name":"Event #6: Under 1700 Singles", "price":15}'> Event #6: Under 1700 Singles</label>
+                        <label><input type="checkbox" value='{"id":7, "name":"Event #7: Under 1400 Singles", "price":15}'> Event #7: Under 1400 Singles</label>
+                        <label><input type="checkbox" value='{"id":8, "name":"Event #8: Under 19 Boy’s Singles", "price":10}'> Event #8: Under 19 Boy’s Singles</label>
+                        <label><input type="checkbox" value='{"id":9, "name":"Event #9: Under 19 Girl’s Singles", "price":10}'> Event #9: Under 19 Girl’s Singles</label>
+                        <label><input type="checkbox" value='{"id":10, "name":"Event #10: Under 17 Boy’s Singles", "price":10}'> Event #10: Under 17 Boy’s Singles</label>
+                        <label><input type="checkbox" value='{"id":11, "name":"Event #11: Under 17 Girl’s Singles", "price":10}'> Event #11: Under 17 Girl’s Singles</label>
+                        <label><input type="checkbox" value='{"id":12, "name":"Event #12: Under 15 Boy’s Singles", "price":10}'> Event #12: Under 15 Boy’s Singles</label>
+                        <label><input type="checkbox" value='{"id":13, "name":"Event #13: Under 15 Girl’s Singles", "price":10}'> Event #13: Under 15 Girl’s Singles</label>
+                        <label><input type="checkbox" value='{"id":14, "name":"Event #14: Under 13 Boy’s Singles", "price":10}'> Event #14: Under 13 Boy’s Singles</label>
+                        <label><input type="checkbox" value='{"id":15, "name":"Event #15: Under 13 Girl’s Singles", "price":10}'> Event #15: Under 13 Girl’s Singles</label>
+                        <label><input type="checkbox" value='{"id":16, "name":"Event #16: Under 11 Boy’s Singles", "price":10}'> Event #16: Under 11 Boy’s Singles</label>
+                        <label><input type="checkbox" value='{"id":17, "name":"Event #17: Under 11 Girl’s Singles", "price":10}'> Event #17: Under 11 Girl’s Singles</label>
+                        <label><input type="checkbox" value='{"id":18, "name":"Event #18: Under 1200 Singles", "price":15}'> Event #18: Under 1200 Singles</label>
+                        <label><input type="checkbox" value='{"id":19, "name":"Event #19: Under 1000 Singles", "price":15}'> Event #19: Under 1000 Singles</label>
+                        <label><input type="checkbox" value='{"id":20, "name":"Event #20: Under 800 Singles", "price":12}'> Event #20: Under 800 Singles</label>
+                        <label><input type="checkbox" value='{"id":21, "name":"Event #21: Open Rating Doubles", "price":10}'> Event #21: Open Rating Doubles</label>
+                        <label><input type="checkbox" value='{"id":22, "name":"Event #22: Over 30 Men’s Singles", "price":15}'> Event #22: Over 30 Men’s Singles</label>
+                        <label><input type="checkbox" value='{"id":23, "name":"Event #23: Over 30 Women’s Singles", "price":15}'> Event #23: Over 30 Women’s Singles</label>
+                        <label><input type="checkbox" value='{"id":24, "name":"Event #24: Over 40 Men’s Singles", "price":15}'> Event #24: Over 40 Men’s Singles</label>
+                        <label><input type="checkbox" value='{"id":25, "name":"Event #25: Over 40 Women’s Singles", "price":15}'> Event #25: Over 40 Women’s Singles</label>
+                        <label><input type="checkbox" value='{"id":26, "name":"Event #26: Over 50 Men’s Singles", "price":15}'> Event #26: Over 50 Men’s Singles</label>
+                        <label><input type="checkbox" value='{"id":27, "name":"Event #27: Over 50 Women’s Singles", "price":15}'> Event #27: Over 50 Women’s Singles</label>
+                        <label><input type="checkbox" value='{"id":28, "name":"Event #28: Over 60 Men’s Singles", "price":12}'> Event #28: Over 60 Men’s Singles</label>
+                        <label><input type="checkbox" value='{"id":29, "name":"Event #29: Over 60 Women’s Singles", "price":12}'> Event #29: Over 60 Women’s Singles</label>
+                        <label><input type="checkbox" value='{"id":30, "name":"Event #30: Over 70 Men’s Singles", "price":10}'> Event #30: Over 70 Men’s Singles</label>
+                        <label><input type="checkbox" value='{"id":31, "name":"Event #31: Over 70 Women’s Singles", "price":10}'> Event #31: Over 70 Women’s Singles</label>
+                        <label><input type="checkbox" value='{"id":32, "name":"Event #32: Over 80 Singles", "price":10}'> Event #32: Over 80 Singles</label>
+                        <label><input type="checkbox" value='{"id":33, "name":"Event #33: Veteran Women’s Doubles", "price":10}'> Event #33: Veteran Women’s Doubles</label>
+                        <label><input type="checkbox" value='{"id":34, "name":"Event #34: Veteran Men’s Doubles", "price":10}'> Event #34: Veteran Men’s Doubles</label>
                     </div>
                     
-                    <h4 style="margin-bottom: 5px; margin-top: 10px;">Doubles Partners (Format -> Event Name: Partner Name)</h4>
-                    <textarea id="editPartners" class="full-width-text" rows="2" placeholder="e.g. Event #3: Men's Open Doubles: Lukas Kozak"></textarea>
+                    <h4 style="margin-bottom: 10px; margin-top: 20px; color: var(--gctta-navy);">Doubles Partners (Format -> Event Name: Partner Name)</h4>
+                    <textarea id="editPartners" class="full-width-text" rows="3" placeholder="e.g. Event #3: Men's Open Doubles: Lukas Kozak"></textarea>
                     
-                    <h4 style="margin-bottom: 5px; margin-top: 15px;">Payment Details</h4>
-                    <div class="form-row">
+                    <h4 style="margin-bottom: 10px; margin-top: 20px; color: var(--gctta-navy); border-top: 1px solid #E2E8F0; padding-top: 15px;">Payment Details</h4>
+                    <div style="display: flex; gap: 15px; margin-bottom: 10px;">
                         <div style="flex: 1;">
-                            <label style="font-size: 12px; font-weight: bold;">Total Paid / Owed ($)</label>
-                            <input type="number" id="editTotal" required>
+                            <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Total Paid / Owed ($)</label>
+                            <input type="number" id="editTotal" required style="width: 100%; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px; box-sizing: border-box;">
                         </div>
                         <div style="flex: 1;">
-                            <label style="font-size: 12px; font-weight: bold;">Payment Status</label>
-                            <select id="editStatus" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1;">
+                            <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Payment Status</label>
+                            <select id="editStatus" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1; box-sizing: border-box; background: white;">
                                 <option value="Paid">Paid</option>
                                 <option value="Pending">Pending</option>
                                 <option value="Paid (Waived)">Paid (Waived)</option>
@@ -261,98 +274,101 @@
                         </div>
                     </div>
                     
-                    <div style="display: flex; gap: 10px; margin-top: 20px;">
-                        <button type="submit" class="btn-primary" style="flex: 2;">Save Full Overwrite</button>
-                        <button type="button" class="btn-secondary-small" style="flex: 1; background: #64748B;" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
+                    <div style="display: flex; gap: 15px; margin-top: 25px;">
+                        <button type="submit" style="flex: 2; background: var(--gctta-gold); color: var(--gctta-navy); font-weight: bold; border: none; padding: 12px; border-radius: 4px; cursor: pointer;">Save Full Overwrite</button>
+                        <button type="button" style="flex: 1; background: #64748B; color: white; font-weight: bold; border: none; padding: 12px; border-radius: 4px; cursor: pointer;" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
                     </div>
                 </form>
             </div>
         </div>
-
+        
         <!-- MANUAL ENTRY MODAL -->
-        <div id="manualModal" class="login-overlay" style="display: none;">
-            <div class="login-box" style="width: 600px; max-width: 90vw; max-height: 90vh; overflow-y: auto; text-align: left;">
-                <h2 style="margin-top: 0; color: var(--gctta-navy);">Manual Override Entry</h2>
+        <div id="manualModal" class="login-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 10000;">
+            <div class="login-box" style="width: 750px; max-width: 95vw; max-height: 90vh; overflow-y: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+                <h2 style="margin-top: 0; color: var(--gctta-navy); border-bottom: 2px solid var(--gctta-gold); padding-bottom: 10px;">Manual Override Entry</h2>
                 <form id="manualForm" onsubmit="submitManual(event)">
-                    <div class="form-row">
-                        <input type="text" id="manFirst" placeholder="First Name" required>
-                        <input type="text" id="manLast" placeholder="Last Name" required>
+                    
+                    <h4 style="margin-bottom: 10px; margin-top: 15px; color: var(--gctta-navy);">Player Details</h4>
+                    <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                        <input type="text" id="manFirst" placeholder="First Name" required style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
+                        <input type="text" id="manLast" placeholder="Last Name" required style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
                     </div>
-                    <div class="form-row" style="margin-top: 10px;">
-                        <input type="email" id="manEmail" placeholder="Email Address">
-                        <input type="text" id="manPhone" placeholder="Phone">
+                    <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                        <input type="email" id="manEmail" placeholder="Email Address" style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
+                        <input type="text" id="manPhone" placeholder="Phone" style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
                     </div>
-                    <div class="form-row" style="margin-top: 10px;">
-                        <input type="text" id="manDob" placeholder="DOB (DD/MM/YYYY)" style="flex: 1;" required>
-                        <select id="manGender" style="flex: 1; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1;">
+                    <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                        <input type="text" id="manDob" placeholder="DOB (DD/MM/YYYY)" required style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
+                        <select id="manGender" style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px; background: white;">
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
                         </select>
-                        <input type="text" id="manTta" placeholder="TTA ID (Optional)" style="flex: 1;">
+                        <input type="text" id="manTta" placeholder="TTA ID (Optional)" style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
                     </div>
-                    <div class="form-row" style="margin-top: 10px;">
-                        <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
-                            <input type="text" id="manRc" placeholder="RC ID (Optional)" style="flex: 1;">
-                            <label style="font-size: 11px; font-weight: bold; cursor: pointer; white-space: nowrap;"><input type="checkbox" id="manNeverPlayed"> Never Played</label>
-                        </div>
-                        <input type="text" id="manClub" placeholder="Club Name (Optional)" style="flex: 1;">
+                    <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: center;">
+                        <input type="text" id="manRc" placeholder="RC ID (Optional)" style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
+                        <input type="text" id="manClub" placeholder="Club Name (Optional)" style="flex: 1; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px;">
+                        <label style="font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                            <input type="checkbox" id="manNeverPlayed"> Never Played
+                        </label>
                     </div>
                     
-                    <h4 style="margin-bottom: 5px; margin-top: 15px;">Select Events</h4>
+                    <h4 style="margin-bottom: 10px; color: var(--gctta-navy); border-top: 1px solid #E2E8F0; padding-top: 15px;">Select Events</h4>
                     <div class="event-checkbox-list" id="manEventsContainer">
-                        <label><input type="checkbox" value="Event #1: Men’s Open Singles"> Event #1: Men’s Open Singles</label>
-                        <label><input type="checkbox" value="Event #2: Women’s Open Singles"> Event #2: Women’s Open Singles</label>
-                        <label><input type="checkbox" value="Event #3: Men’s Open Doubles"> Event #3: Men’s Open Doubles</label>
-                        <label><input type="checkbox" value="Event #4: Women’s Open Doubles"> Event #4: Women’s Open Doubles</label>
-                        <label><input type="checkbox" value="Event #5: Para Open Singles"> Event #5: Para Open Singles</label>
-                        <label><input type="checkbox" value="Event #6: Under 1700 Singles"> Event #6: Under 1700 Singles</label>
-                        <label><input type="checkbox" value="Event #7: Under 1400 Singles"> Event #7: Under 1400 Singles</label>
-                        <label><input type="checkbox" value="Event #8: Under 19 Boy’s Singles"> Event #8: Under 19 Boy’s Singles</label>
-                        <label><input type="checkbox" value="Event #9: Under 19 Girl’s Singles"> Event #9: Under 19 Girl’s Singles</label>
-                        <label><input type="checkbox" value="Event #10: Under 17 Boy’s Singles"> Event #10: Under 17 Boy’s Singles</label>
-                        <label><input type="checkbox" value="Event #11: Under 17 Girl’s Singles"> Event #11: Under 17 Girl’s Singles</label>
-                        <label><input type="checkbox" value="Event #12: Under 15 Boy’s Singles"> Event #12: Under 15 Boy’s Singles</label>
-                        <label><input type="checkbox" value="Event #13: Under 15 Girl’s Singles"> Event #13: Under 15 Girl’s Singles</label>
-                        <label><input type="checkbox" value="Event #14: Under 13 Boy’s Singles"> Event #14: Under 13 Boy’s Singles</label>
-                        <label><input type="checkbox" value="Event #15: Under 13 Girl’s Singles"> Event #15: Under 13 Girl’s Singles</label>
-                        <label><input type="checkbox" value="Event #16: Under 11 Boy’s Singles"> Event #16: Under 11 Boy’s Singles</label>
-                        <label><input type="checkbox" value="Event #17: Under 11 Girl’s Singles"> Event #17: Under 11 Girl’s Singles</label>
-                        <label><input type="checkbox" value="Event #18: Under 1200 Singles"> Event #18: Under 1200 Singles</label>
-                        <label><input type="checkbox" value="Event #19: Under 1000 Singles"> Event #19: Under 1000 Singles</label>
-                        <label><input type="checkbox" value="Event #20: Under 800 Singles"> Event #20: Under 800 Singles</label>
-                        <label><input type="checkbox" value="Event #21: Open Rating Doubles"> Event #21: Open Rating Doubles</label>
-                        <label><input type="checkbox" value="Event #22: Over 30 Men’s Singles"> Event #22: Over 30 Men’s Singles</label>
-                        <label><input type="checkbox" value="Event #23: Over 30 Women’s Singles"> Event #23: Over 30 Women’s Singles</label>
-                        <label><input type="checkbox" value="Event #24: Over 40 Men’s Singles"> Event #24: Over 40 Men’s Singles</label>
-                        <label><input type="checkbox" value="Event #25: Over 40 Women’s Singles"> Event #25: Over 40 Women’s Singles</label>
-                        <label><input type="checkbox" value="Event #26: Over 50 Men’s Singles"> Event #26: Over 50 Men’s Singles</label>
-                        <label><input type="checkbox" value="Event #27: Over 50 Women’s Singles"> Event #27: Over 50 Women’s Singles</label>
-                        <label><input type="checkbox" value="Event #28: Over 60 Men’s Singles"> Event #28: Over 60 Men’s Singles</label>
-                        <label><input type="checkbox" value="Event #29: Over 60 Women’s Singles"> Event #29: Over 60 Women’s Singles</label>
-                        <label><input type="checkbox" value="Event #30: Over 70 Men’s Singles"> Event #30: Over 70 Men’s Singles</label>
-                        <label><input type="checkbox" value="Event #31: Over 70 Women’s Singles"> Event #31: Over 70 Women’s Singles</label>
-                        <label><input type="checkbox" value="Event #32: Over 80 Singles"> Event #32: Over 80 Singles</label>
-                        <label><input type="checkbox" value="Event #33: Veteran Women’s Doubles"> Event #33: Veteran Women’s Doubles</label>
-                        <label><input type="checkbox" value="Event #34: Veteran Men’s Doubles"> Event #34: Veteran Men’s Doubles</label>
+                        <label><input type="checkbox" value='{"id":1, "name":"Event #1: Men’s Open Singles", "price":25}'> Event #1: Men’s Open Singles</label>
+                        <label><input type="checkbox" value='{"id":2, "name":"Event #2: Women’s Open Singles", "price":20}'> Event #2: Women’s Open Singles</label>
+                        <label><input type="checkbox" value='{"id":3, "name":"Event #3: Men’s Open Doubles", "price":12}'> Event #3: Men’s Open Doubles</label>
+                        <label><input type="checkbox" value='{"id":4, "name":"Event #4: Women’s Open Doubles", "price":12}'> Event #4: Women’s Open Doubles</label>
+                        <label><input type="checkbox" value='{"id":5, "name":"Event #5: Para Open Singles", "price":10}'> Event #5: Para Open Singles</label>
+                        <label><input type="checkbox" value='{"id":6, "name":"Event #6: Under 1700 Singles", "price":15}'> Event #6: Under 1700 Singles</label>
+                        <label><input type="checkbox" value='{"id":7, "name":"Event #7: Under 1400 Singles", "price":15}'> Event #7: Under 1400 Singles</label>
+                        <label><input type="checkbox" value='{"id":8, "name":"Event #8: Under 19 Boy’s Singles", "price":10}'> Event #8: Under 19 Boy’s Singles</label>
+                        <label><input type="checkbox" value='{"id":9, "name":"Event #9: Under 19 Girl’s Singles", "price":10}'> Event #9: Under 19 Girl’s Singles</label>
+                        <label><input type="checkbox" value='{"id":10, "name":"Event #10: Under 17 Boy’s Singles", "price":10}'> Event #10: Under 17 Boy’s Singles</label>
+                        <label><input type="checkbox" value='{"id":11, "name":"Event #11: Under 17 Girl’s Singles", "price":10}'> Event #11: Under 17 Girl’s Singles</label>
+                        <label><input type="checkbox" value='{"id":12, "name":"Event #12: Under 15 Boy’s Singles", "price":10}'> Event #12: Under 15 Boy’s Singles</label>
+                        <label><input type="checkbox" value='{"id":13, "name":"Event #13: Under 15 Girl’s Singles", "price":10}'> Event #13: Under 15 Girl’s Singles</label>
+                        <label><input type="checkbox" value='{"id":14, "name":"Event #14: Under 13 Boy’s Singles", "price":10}'> Event #14: Under 13 Boy’s Singles</label>
+                        <label><input type="checkbox" value='{"id":15, "name":"Event #15: Under 13 Girl’s Singles", "price":10}'> Event #15: Under 13 Girl’s Singles</label>
+                        <label><input type="checkbox" value='{"id":16, "name":"Event #16: Under 11 Boy’s Singles", "price":10}'> Event #16: Under 11 Boy’s Singles</label>
+                        <label><input type="checkbox" value='{"id":17, "name":"Event #17: Under 11 Girl’s Singles", "price":10}'> Event #17: Under 11 Girl’s Singles</label>
+                        <label><input type="checkbox" value='{"id":18, "name":"Event #18: Under 1200 Singles", "price":15}'> Event #18: Under 1200 Singles</label>
+                        <label><input type="checkbox" value='{"id":19, "name":"Event #19: Under 1000 Singles", "price":15}'> Event #19: Under 1000 Singles</label>
+                        <label><input type="checkbox" value='{"id":20, "name":"Event #20: Under 800 Singles", "price":12}'> Event #20: Under 800 Singles</label>
+                        <label><input type="checkbox" value='{"id":21, "name":"Event #21: Open Rating Doubles", "price":10}'> Event #21: Open Rating Doubles</label>
+                        <label><input type="checkbox" value='{"id":22, "name":"Event #22: Over 30 Men’s Singles", "price":15}'> Event #22: Over 30 Men’s Singles</label>
+                        <label><input type="checkbox" value='{"id":23, "name":"Event #23: Over 30 Women’s Singles", "price":15}'> Event #23: Over 30 Women’s Singles</label>
+                        <label><input type="checkbox" value='{"id":24, "name":"Event #24: Over 40 Men’s Singles", "price":15}'> Event #24: Over 40 Men’s Singles</label>
+                        <label><input type="checkbox" value='{"id":25, "name":"Event #25: Over 40 Women’s Singles", "price":15}'> Event #25: Over 40 Women’s Singles</label>
+                        <label><input type="checkbox" value='{"id":26, "name":"Event #26: Over 50 Men’s Singles", "price":15}'> Event #26: Over 50 Men’s Singles</label>
+                        <label><input type="checkbox" value='{"id":27, "name":"Event #27: Over 50 Women’s Singles", "price":15}'> Event #27: Over 50 Women’s Singles</label>
+                        <label><input type="checkbox" value='{"id":28, "name":"Event #28: Over 60 Men’s Singles", "price":12}'> Event #28: Over 60 Men’s Singles</label>
+                        <label><input type="checkbox" value='{"id":29, "name":"Event #29: Over 60 Women’s Singles", "price":12}'> Event #29: Over 60 Women’s Singles</label>
+                        <label><input type="checkbox" value='{"id":30, "name":"Event #30: Over 70 Men’s Singles", "price":10}'> Event #30: Over 70 Men’s Singles</label>
+                        <label><input type="checkbox" value='{"id":31, "name":"Event #31: Over 70 Women’s Singles", "price":10}'> Event #31: Over 70 Women’s Singles</label>
+                        <label><input type="checkbox" value='{"id":32, "name":"Event #32: Over 80 Singles", "price":10}'> Event #32: Over 80 Singles</label>
+                        <label><input type="checkbox" value='{"id":33, "name":"Event #33: Veteran Women’s Doubles", "price":10}'> Event #33: Veteran Women’s Doubles</label>
+                        <label><input type="checkbox" value='{"id":34, "name":"Event #34: Veteran Men’s Doubles", "price":10}'> Event #34: Veteran Men’s Doubles</label>
                     </div>
                     
-                    <div class="form-row" style="margin-top: 15px;">
+                    <h4 style="margin-bottom: 10px; margin-top: 20px; color: var(--gctta-navy); border-top: 1px solid #E2E8F0; padding-top: 15px;">Payment Details</h4>
+                    <div style="display: flex; gap: 15px; margin-bottom: 10px;">
                         <div style="flex: 1;">
-                            <label style="font-size: 12px; font-weight: bold;">Total Paid / Owed ($)</label>
-                            <input type="number" id="manPaid" placeholder="0" value="0" required>
+                            <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Total Paid / Owed ($)</label>
+                            <input type="number" id="manPaid" placeholder="0" value="0" required style="width: 100%; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px; box-sizing: border-box;">
                         </div>
                         <div style="flex: 1;">
-                            <label style="font-size: 12px; font-weight: bold;">Payment Status</label>
-                            <select id="manStatus" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1;">
+                            <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Payment Status</label>
+                            <select id="manStatus" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1; box-sizing: border-box; background: white;">
                                 <option value="Paid">Paid (Cash/EFT)</option>
                                 <option value="Pending">Pending (Owes Money)</option>
                             </select>
                         </div>
                     </div>
                     
-                    <div style="display: flex; gap: 10px; margin-top: 20px;">
-                        <button type="submit" class="btn-primary" style="flex: 2;">Save Entry</button>
-                        <button type="button" class="btn-secondary-small" style="flex: 1; background: #64748B;" onclick="document.getElementById('manualModal').style.display='none'">Cancel</button>
+                    <div style="display: flex; gap: 15px; margin-top: 25px;">
+                        <button type="submit" style="flex: 2; background: var(--gctta-navy); color: white; font-weight: bold; border: none; padding: 12px; border-radius: 4px; cursor: pointer;">Save Manual Entry</button>
+                        <button type="button" style="flex: 1; background: #64748B; color: white; font-weight: bold; border: none; padding: 12px; border-radius: 4px; cursor: pointer;" onclick="document.getElementById('manualModal').style.display='none'">Cancel</button>
                     </div>
                 </form>
             </div>
@@ -393,7 +409,7 @@
         }
 
         // ==========================================
-        // DASHBOARD LOGIC
+        // DASHBOARD & DATA LOGIC
         // ==========================================
         function loadDashboardData() {
             fetch('/api/admin/stats')
@@ -408,47 +424,63 @@
                 .then(res => res.json())
                 .then(data => {
                     allRegistrations = data; 
-                    const tbody = document.getElementById('adminTableBody');
-                    tbody.innerHTML = '';
-                    
-                    if (data.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 30px;">No registrations yet.</td></tr>';
-                        return;
-                    }
-
-                    data.forEach(reg => {
-                        const eventsList = reg.events ? reg.events.map(e => e.name).join('<br>') : '';
-                        let partnersList = '';
-                        if (reg.doublesPartners) {
-                            partnersList = Object.entries(reg.doublesPartners).map(([event, partner]) => `${event}: ${partner}`).join('<br>');
-                        }
-                        
-                        let badgeClass = 'badge-pending';
-                        if (reg.paymentStatus && reg.paymentStatus.includes('Paid')) badgeClass = 'badge-paid';
-
-                        const row = `
-                            <tr>
-                                <td><span class="ref-code">${reg.id}</span></td>
-                                <td style="font-weight: bold;">${reg.player.firstName} ${reg.player.lastName}</td>
-                                <td style="color: #64748B;">${reg.player.dob || 'N/A'}</td>
-                                <td style="font-size: 12px;">${eventsList}</td>
-                                <td style="font-size: 12px;">${partnersList}</td>
-                                <td style="font-weight: bold;">$${parseFloat(reg.finalTotal || 0).toFixed(2)}</td>
-                                <td><span class="badge ${badgeClass}">${reg.paymentStatus}</span></td>
-                                <td>
-                                    <div class="action-btns">
-                                        <button class="btn-sync" onclick="resyncSheet('${reg.id}')">Resync / Fix</button>
-                                        <button class="btn-resend" onclick="resendEmail('${reg.id}')">Resend Email</button>
-                                        <button class="btn-edit" onclick="openEditModal('${reg.id}')">Edit</button>
-                                        <button class="btn-waive" onclick="waiveFee('${reg.id}')">Waive Fee</button>
-                                        <button class="btn-delete" onclick="deleteReg('${reg.id}')">Delete</button>
-                                    </div>
-                                </td>
-                            </tr>
-                        `;
-                        tbody.innerHTML += row;
-                    });
+                    renderTable(data);
                 });
+        }
+
+        function renderTable(dataArray) {
+            const tbody = document.getElementById('adminTableBody');
+            tbody.innerHTML = '';
+            
+            if (dataArray.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 30px;">No registrations found.</td></tr>';
+                return;
+            }
+
+            dataArray.forEach(reg => {
+                const eventsList = reg.events ? reg.events.map(e => e.name).join('<br>') : '';
+                let partnersList = '';
+                if (reg.doublesPartners) {
+                    partnersList = Object.entries(reg.doublesPartners).map(([event, partner]) => `${event}: ${partner}`).join('<br>');
+                }
+                
+                let badgeClass = 'badge-pending';
+                if (reg.paymentStatus && reg.paymentStatus.includes('Paid')) badgeClass = 'badge-paid';
+
+                const row = `
+                    <tr>
+                        <td><span class="ref-code">${reg.id}</span></td>
+                        <td style="font-weight: bold;">${reg.player.firstName} ${reg.player.lastName}</td>
+                        <td style="color: #64748B;">${reg.player.dob || 'N/A'}</td>
+                        <td style="color: #64748B; font-weight: bold;">${reg.player.gender || 'N/A'}</td>
+                        <td style="color: #B45309; font-weight: bold; font-size: 14px;">${reg.player.rcRating || 'N/A'}</td>
+                        <td style="font-size: 11px; line-height: 1.4;">${eventsList}</td>
+                        <td style="font-size: 11px; line-height: 1.4; color: #0F172A;">${partnersList}</td>
+                        <td style="font-weight: bold;">$${parseFloat(reg.finalTotal || 0).toFixed(2)}</td>
+                        <td><span class="badge ${badgeClass}">${reg.paymentStatus}</span></td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn-view" onclick="openViewModal('${reg.id}')">View</button>
+                                <button class="btn-edit" onclick="openEditModal('${reg.id}')">Edit</button>
+                                <button class="btn-sync" onclick="resyncSheet('${reg.id}')">Resync/Fix</button>
+                                <button class="btn-resend" onclick="resendEmail('${reg.id}')">Resend Email</button>
+                                <button class="btn-waive" onclick="waiveFee('${reg.id}')">Waive Fee</button>
+                                <button class="btn-delete" onclick="deleteReg('${reg.id}')">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function filterTable() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = allRegistrations.filter(r => {
+                const searchString = `${r.id} ${r.player.firstName} ${r.player.lastName} ${r.player.email} ${r.paymentStatus}`.toLowerCase();
+                return searchString.includes(query);
+            });
+            renderTable(filtered);
         }
 
         function switchTab(tabName) {
@@ -457,26 +489,116 @@
                 document.getElementById('tabDiscounts').classList.remove('active');
                 document.getElementById('viewPlayers').style.display = 'block';
                 document.getElementById('viewDiscounts').style.display = 'none';
-                document.getElementById('btnManualEntry').style.display = 'inline-block';
+                
+                // Show Player action buttons
+                document.getElementById('btnBulkFix').style.display = 'inline-block';
                 document.getElementById('btnRebuildSheet').style.display = 'inline-block';
+                document.getElementById('btnManualEntry').style.display = 'inline-block';
                 document.getElementById('btnExport').style.display = 'inline-block';
             } else {
                 document.getElementById('tabDiscounts').classList.add('active');
                 document.getElementById('tabPlayers').classList.remove('active');
                 document.getElementById('viewDiscounts').style.display = 'block';
                 document.getElementById('viewPlayers').style.display = 'none';
-                document.getElementById('btnManualEntry').style.display = 'none';
+                
+                // Hide Player action buttons
+                document.getElementById('btnBulkFix').style.display = 'none';
                 document.getElementById('btnRebuildSheet').style.display = 'none';
+                document.getElementById('btnManualEntry').style.display = 'none';
                 document.getElementById('btnExport').style.display = 'none';
+                
                 loadDiscounts();
             }
         }
 
         // ==========================================
-        // REBUILD GOOGLE SHEET FROM FIREBASE
+        // EXPORT CSV LOGIC
         // ==========================================
+        function exportZermeloCSV() {
+            if(allRegistrations.length === 0) {
+                alert("No data to export.");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,";
+            
+            // Zermelo standard headers + our custom data
+            const headers = [
+                "Ref ID", "First Name", "Last Name", "Email", "Phone", "DOB", "Gender", 
+                "TTA ID", "Club", "RC ID", "RC Rating", "Never Played", "Events", 
+                "Partners", "TTQ Levy", "Discount", "Total Paid", "Status", "Registered At"
+            ];
+            csvContent += headers.join(",") + "\r\n";
+
+            allRegistrations.forEach(reg => {
+                const p = reg.player;
+                const eventsStr = reg.events ? reg.events.map(e => e.name).join(' | ') : '';
+                const partnersStr = reg.doublesPartners ? Object.entries(reg.doublesPartners).map(([e, pt]) => `${e}: ${pt}`).join(' | ') : '';
+                
+                const row = [
+                    reg.id,
+                    `"${p.firstName || ''}"`,
+                    `"${p.lastName || ''}"`,
+                    `"${p.email || ''}"`,
+                    `"${p.phone || ''}"`,
+                    `"${p.dob || ''}"`,
+                    `"${p.gender || ''}"`,
+                    `"${p.nationalId || ''}"`,
+                    `"${p.club || ''}"`,
+                    `"${p.rcId || ''}"`,
+                    `"${p.rcRating || ''}"`,
+                    p.neverPlayed ? 'TRUE' : 'FALSE',
+                    `"${eventsStr}"`,
+                    `"${partnersStr}"`,
+                    reg.ttqLevy || 5,
+                    reg.discountAmount || 0,
+                    reg.finalTotal || 0,
+                    reg.paymentStatus || 'Pending',
+                    `"${reg.registeredAt || ''}"`
+                ];
+                csvContent += row.join(",") + "\r\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Gold_Coast_Open_Registrations_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // ==========================================
+        // BULK FIX & REBUILD ACTIONS
+        // ==========================================
+        function bulkFixRc() {
+            if(confirm("This will query Ratings Central for every player using their exact TTA ID, update their missing RC IDs and live Ratings, and rebuild the Google Sheet. This may take a minute. Proceed?")) {
+                const btn = document.getElementById('btnBulkFix');
+                btn.textContent = "Querying Ratings Central...";
+                btn.disabled = true;
+
+                fetch('/api/admin/bulk-fix-rc', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.status === 'success') {
+                        alert(`Finished! Auto-updated ${data.updatedCount} players. Sheet rebuilt with ${data.totalRows} rows.`);
+                        window.location.reload();
+                    } else {
+                        alert("Error running bulk query.");
+                        btn.textContent = "🔍 Auto-Fetch RC IDs & Ratings";
+                        btn.disabled = false;
+                    }
+                })
+                .catch(() => {
+                    alert("Error running bulk query.");
+                    btn.textContent = "🔍 Auto-Fetch RC IDs & Ratings";
+                    btn.disabled = false;
+                });
+            }
+        }
+
         function rebuildSheet() {
-            if(confirm("⚠️ WARNING: This will completely wipe Google Sheets Rows 2-1000 and rebuild it from the Firebase Database. Make sure your Row 1 headers A through S are perfectly correct! Proceed?")) {
+            if(confirm("⚠️ WARNING: This will completely wipe Google Sheets Rows 2-1000 and rebuild it from the Firebase Database. Make sure your Row 1 headers A through T are perfectly correct! Proceed?")) {
                 fetch('/api/admin/rebuild-sheet', { method: 'POST' })
                 .then(res => res.json())
                 .then(data => {
@@ -487,6 +609,295 @@
                     }
                 });
             }
+        }
+
+        // ==========================================
+        // INDIVIDUAL ROW ACTIONS
+        // ==========================================
+        function resyncSheet(id) {
+            if(confirm("Force sync this registration to Google Sheets and auto-find missing RC ID?")) {
+                fetch(`/api/admin/registrations/${id}/resync`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.status === 'success') {
+                        alert('Successfully synced to Google Sheet!' + (data.newRcId !== 'N/A' && data.newRcId !== '' ? ' Found RC ID: ' + data.newRcId : ''));
+                        window.location.reload();
+                    } else {
+                        alert('Error syncing: ' + data.error);
+                    }
+                });
+            }
+        }
+
+        function resendEmail(id) {
+            if(confirm("Are you sure you want to resend the confirmation email to this player?")) {
+                fetch(`/api/admin/registrations/${id}/resend-email`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.status === 'success') {
+                        alert('Email sent successfully!');
+                    } else {
+                        alert('Failed to send email. Check Render logs.');
+                    }
+                });
+            }
+        }
+
+        function waiveFee(id) {
+            if(confirm("Are you sure you want to Waive the fee for this registration? This will mark their status as 'Paid (Waived)' and balance as $0.00.")) {
+                fetch(`/api/admin/registrations/${id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        finalTotal: 0,
+                        paymentStatus: "Paid (Waived)"
+                    })
+                })
+                .then(() => window.location.reload());
+            }
+        }
+
+        function deleteReg(id) {
+            if(confirm("CRITICAL WARNING: Are you sure you want to completely delete this registration from the database and Google Sheet?")) {
+                fetch(`/api/admin/registrations/${id}`, { method: 'DELETE' })
+                .then(() => window.location.reload());
+            }
+        }
+
+        // ==========================================
+        // VIEW SUMMARY MODAL
+        // ==========================================
+        async function openViewModal(id) {
+            const reg = allRegistrations.find(r => r.id === id);
+            if (!reg) return;
+
+            const content = document.getElementById('viewContent');
+            document.getElementById('viewModal').style.display = 'flex';
+
+            let liveRating = reg.player.rcRating && reg.player.rcRating !== 'N/A' ? reg.player.rcRating : 'Fetching...';
+            let liveRcId = reg.player.rcId || 'N/A';
+
+            // Attempt a live fetch if the DB rating is blank but they have an RC ID
+            if (liveRating === 'Fetching...' && liveRcId !== 'N/A' && liveRcId !== 'Never Played') {
+                try {
+                    const res = await fetch(`/api/ratings-central/search?query=${liveRcId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.players && data.players.length > 0) {
+                            liveRating = data.players[0].rating;
+                        } else {
+                            liveRating = 'Not Found';
+                        }
+                    }
+                } catch(e) {
+                    liveRating = 'Fetch Error';
+                }
+            } else if (reg.player.neverPlayed) {
+                liveRating = 'Never Played (Unrated)';
+            } else if (liveRating === 'Fetching...') {
+                liveRating = 'N/A';
+            }
+
+            const eventsList = reg.events && reg.events.length > 0 
+                ? reg.events.map(e => `<li style="margin-bottom:6px; padding-bottom: 6px; border-bottom: 1px dashed #E2E8F0;">${e.name}</li>`).join('') 
+                : '<li>No events selected</li>';
+                
+            let partnersList = '<li>None required</li>';
+            if (reg.doublesPartners && Object.keys(reg.doublesPartners).length > 0) {
+                partnersList = Object.entries(reg.doublesPartners).map(([k,v]) => `<li style="margin-bottom:6px; padding-bottom: 6px; border-bottom: 1px dashed #E2E8F0;"><b style="color: var(--gctta-navy);">${k}:</b> ${v}</li>`).join('');
+            }
+
+            content.innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; font-size: 14px; color: #334155;">
+                    <div style="background: #F8FAFC; padding: 20px; border-radius: 6px; border: 1px solid #E2E8F0;">
+                        <h4 style="margin-top: 0; color: var(--gctta-navy); border-bottom: 2px solid var(--gctta-gold); padding-bottom: 5px;">Personal Details</h4>
+                        <p style="margin: 8px 0;"><strong>Name:</strong> ${reg.player.firstName} ${reg.player.lastName}</p>
+                        <p style="margin: 8px 0;"><strong>Email:</strong> ${reg.player.email}</p>
+                        <p style="margin: 8px 0;"><strong>Phone:</strong> ${reg.player.phone}</p>
+                        <p style="margin: 8px 0;"><strong>DOB:</strong> ${reg.player.dob}</p>
+                        <p style="margin: 8px 0;"><strong>Gender:</strong> ${reg.player.gender}</p>
+                        <p style="margin: 8px 0;"><strong>Club:</strong> ${reg.player.club}</p>
+                    </div>
+                    <div style="background: #F8FAFC; padding: 20px; border-radius: 6px; border: 1px solid #E2E8F0;">
+                        <h4 style="margin-top: 0; color: var(--gctta-navy); border-bottom: 2px solid var(--gctta-gold); padding-bottom: 5px;">Registration Info</h4>
+                        <p style="margin: 8px 0;"><strong>TTA ID:</strong> ${reg.player.nationalId}</p>
+                        <p style="margin: 8px 0;"><strong>RC ID:</strong> ${liveRcId}</p>
+                        <div style="background: #FEF3C7; padding: 12px; border-left: 4px solid #D97706; margin: 15px 0; border-radius: 4px;">
+                            <strong style="color: #92400E; display: block; margin-bottom: 4px;">Ratings Central Rating:</strong> 
+                            <span style="font-size: 20px; font-weight: bold; color: #B45309;">${liveRating}</span>
+                        </div>
+                        <p style="margin: 8px 0;"><strong>Registered:</strong> ${reg.registeredAt || 'N/A'}</p>
+                        <p style="margin: 8px 0;"><strong>Status:</strong> <span class="badge ${reg.paymentStatus === 'Paid' ? 'badge-paid' : 'badge-pending'}">${reg.paymentStatus}</span></p>
+                        <p style="margin: 8px 0;"><strong>Total Paid:</strong> $${parseFloat(reg.finalTotal || 0).toFixed(2)}</p>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 25px;">
+                    <h4 style="margin-bottom: 10px; color: var(--gctta-navy); border-bottom: 2px solid var(--gctta-gold); padding-bottom: 5px;">Events Entered</h4>
+                    <ul style="margin-top: 0; padding-left: 0; list-style-type: none; color: #475569; font-size: 13px;">${eventsList}</ul>
+                </div>
+                
+                <div style="margin-top: 25px;">
+                    <h4 style="margin-bottom: 10px; color: var(--gctta-navy); border-bottom: 2px solid var(--gctta-gold); padding-bottom: 5px;">Doubles Partners</h4>
+                    <ul style="margin-top: 0; padding-left: 0; list-style-type: none; color: #475569; font-size: 13px;">${partnersList}</ul>
+                </div>
+            `;
+        }
+
+        // ==========================================
+        // EDIT MODAL LOGIC
+        // ==========================================
+        function openEditModal(id) {
+            const reg = allRegistrations.find(r => r.id === id);
+            if (!reg) return;
+
+            document.getElementById('editRegId').value = reg.id;
+            document.getElementById('editFirst').value = reg.player.firstName || '';
+            document.getElementById('editLast').value = reg.player.lastName || '';
+            document.getElementById('editEmail').value = reg.player.email || '';
+            document.getElementById('editPhone').value = reg.player.phone || '';
+            document.getElementById('editDob').value = reg.player.dob || '';
+            
+            const genderSelect = document.getElementById('editGender');
+            if(reg.player.gender === 'Female') genderSelect.value = 'Female';
+            else genderSelect.value = 'Male';
+            
+            document.getElementById('editTta').value = reg.player.nationalId || '';
+            
+            const isNeverPlayed = reg.player.neverPlayed || (reg.player.rcId && reg.player.rcId.toLowerCase() === 'never played');
+            document.getElementById('editNeverPlayed').checked = isNeverPlayed;
+            document.getElementById('editRc').value = isNeverPlayed ? '' : (reg.player.rcId || '');
+            document.getElementById('editRcRating').value = reg.player.rcRating || '';
+            
+            document.getElementById('editClub').value = reg.player.club || '';
+            
+            document.querySelectorAll('#editEventsContainer input[type="checkbox"]').forEach(cb => cb.checked = false);
+            if (reg.events) {
+                const eventNames = reg.events.map(e => e.name);
+                document.querySelectorAll('#editEventsContainer input[type="checkbox"]').forEach(cb => {
+                    const cbData = JSON.parse(cb.value);
+                    if (eventNames.includes(cbData.name)) cb.checked = true;
+                });
+            }
+            
+            let partnersStr = '';
+            if (reg.doublesPartners) {
+                partnersStr = Object.entries(reg.doublesPartners).map(([k, v]) => `${k}: ${v}`).join(', ');
+            }
+            document.getElementById('editPartners').value = partnersStr;
+            
+            document.getElementById('editTotal').value = reg.finalTotal || 0;
+            const statusSelect = document.getElementById('editStatus');
+            if(Array.from(statusSelect.options).some(opt => opt.value === reg.paymentStatus)) {
+                statusSelect.value = reg.paymentStatus;
+            } else {
+                statusSelect.value = 'Paid';
+            }
+            
+            document.getElementById('editModal').style.display = 'flex';
+        }
+
+        function submitEdit(e) {
+            e.preventDefault();
+            const id = document.getElementById('editRegId').value;
+            
+            const checkedBoxes = document.querySelectorAll('#editEventsContainer input[type="checkbox"]:checked');
+            const eventsArr = Array.from(checkedBoxes).map(cb => JSON.parse(cb.value));
+
+            const partnersText = document.getElementById('editPartners').value;
+            const partnersObj = {};
+            if(partnersText.trim() !== "") {
+                partnersText.split(',').forEach(pair => {
+                    const parts = pair.split(':');
+                    if(parts.length >= 2) {
+                        const key = parts.slice(0, -1).join(':').trim(); 
+                        const val = parts[parts.length - 1].trim();
+                        if(key && val) partnersObj[key] = val;
+                    }
+                });
+            }
+
+            const isNeverPlayed = document.getElementById('editNeverPlayed').checked;
+            const rcVal = isNeverPlayed ? 'Never Played' : document.getElementById('editRc').value;
+
+            const data = {
+                "player": {
+                    "firstName": document.getElementById('editFirst').value,
+                    "lastName": document.getElementById('editLast').value,
+                    "email": document.getElementById('editEmail').value,
+                    "phone": document.getElementById('editPhone').value,
+                    "dob": document.getElementById('editDob').value,
+                    "gender": document.getElementById('editGender').value,
+                    "nationalId": document.getElementById('editTta').value,
+                    "rcId": rcVal,
+                    "rcRating": document.getElementById('editRcRating').value,
+                    "neverPlayed": isNeverPlayed,
+                    "club": document.getElementById('editClub').value
+                },
+                "events": eventsArr,
+                "doublesPartners": partnersObj,
+                "finalTotal": parseFloat(document.getElementById('editTotal').value),
+                "paymentStatus": document.getElementById('editStatus').value
+            };
+            
+            fetch(`/api/admin/registrations/${id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(res => {
+                if(res.status === 'updated') {
+                    window.location.reload();
+                } else {
+                    alert("Error updating record.");
+                }
+            });
+        }
+
+        // ==========================================
+        // MANUAL ENTRY LOGIC
+        // ==========================================
+        function submitManual(e) {
+            e.preventDefault();
+            
+            const checkedBoxes = document.querySelectorAll('#manEventsContainer input[type="checkbox"]:checked');
+            const selectedEvents = Array.from(checkedBoxes).map(cb => JSON.parse(cb.value));
+
+            if (selectedEvents.length === 0) {
+                alert("Please select at least one event.");
+                return;
+            }
+
+            const data = {
+                firstName: document.getElementById('manFirst').value,
+                lastName: document.getElementById('manLast').value,
+                email: document.getElementById('manEmail').value,
+                phone: document.getElementById('manPhone').value,
+                dob: document.getElementById('manDob').value,
+                gender: document.getElementById('manGender').value,
+                nationalId: document.getElementById('manTta').value,
+                rcId: document.getElementById('manRc').value,
+                neverPlayed: document.getElementById('manNeverPlayed').checked,
+                club: document.getElementById('manClub').value,
+                events: selectedEvents,
+                totalPaid: document.getElementById('manPaid').value,
+                status: document.getElementById('manStatus').value
+            };
+            
+            fetch('/api/admin/manual-register', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(res => {
+                if(res.status === 'success') {
+                    window.location.reload();
+                } else {
+                    alert("Error saving manual entry");
+                }
+            });
         }
 
         // ==========================================
@@ -516,11 +927,11 @@
                             } catch(e) {}
                         }
 
-                        const usedAction = code.used ? `<button class="btn-secondary-small" style="padding: 4px 8px; font-size: 11px;" onclick="updateDiscountCode('${code.id}', {used: false})">Reactivate Code</button>` 
-                                                     : `<button class="btn-secondary-small" style="background: #DC2626; color: white; border: none; padding: 4px 8px; font-size: 11px;" onclick="updateDiscountCode('${code.id}', {used: true})">Expire Now</button>`;
+                        const usedAction = code.used ? `<button style="background: #E2E8F0; color: #334155; padding: 4px 8px; font-size: 11px; border: none; border-radius: 4px; cursor: pointer;" onclick="updateDiscountCode('${code.id}', {used: false})">Reactivate Code</button>` 
+                                                     : `<button style="background: #DC2626; color: white; padding: 4px 8px; font-size: 11px; border: none; border-radius: 4px; cursor: pointer;" onclick="updateDiscountCode('${code.id}', {used: true})">Expire Now</button>`;
                         
-                        const permAction = code.isPermanent ? `<button class="btn-secondary-small" style="background: #64748B; color: white; border: none; padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="updateDiscountCode('${code.id}', {isPermanent: false})">Make 1-Time Use</button>` 
-                                                            : `<button class="btn-secondary-small" style="padding: 4px 8px; font-size: 11px; margin-top: 4px;" onclick="updateDiscountCode('${code.id}', {isPermanent: true})">Make Permanent</button>`;
+                        const permAction = code.isPermanent ? `<button style="background: #64748B; color: white; border: none; padding: 4px 8px; font-size: 11px; margin-top: 4px; border-radius: 4px; cursor: pointer;" onclick="updateDiscountCode('${code.id}', {isPermanent: false})">Make 1-Time Use</button>` 
+                                                            : `<button style="background: #E2E8F0; color: #334155; border: none; padding: 4px 8px; font-size: 11px; margin-top: 4px; border-radius: 4px; cursor: pointer;" onclick="updateDiscountCode('${code.id}', {isPermanent: true})">Make Permanent</button>`;
 
                         const row = `
                             <tr>
@@ -565,203 +976,6 @@
                 body: JSON.stringify(dataObj)
             })
             .then(() => loadDiscounts());
-        }
-
-        function resendEmail(id) {
-            if(confirm("Are you sure you want to resend the confirmation email to this player?")) {
-                fetch(`/api/admin/registrations/${id}/resend-email`, { method: 'POST' })
-                .then(res => res.json())
-                .then(data => {
-                    if(data.status === 'success') {
-                        alert('Email sent successfully!');
-                    } else {
-                        alert('Failed to send email. Check Render logs.');
-                    }
-                });
-            }
-        }
-
-        function resyncSheet(id) {
-            if(confirm("Force sync this registration to Google Sheets and auto-find missing RC ID?")) {
-                fetch(`/api/admin/registrations/${id}/resync`, { method: 'POST' })
-                .then(res => res.json())
-                .then(data => {
-                    if(data.status === 'success') {
-                        alert('Successfully synced to Google Sheet!' + (data.newRcId !== 'N/A' && data.newRcId !== '' ? ' Found RC ID: ' + data.newRcId : ''));
-                        window.location.reload();
-                    } else {
-                        alert('Error syncing: ' + data.error);
-                    }
-                });
-            }
-        }
-
-        function waiveFee(id) {
-            if(confirm("Are you sure you want to Waive the fee for this registration? This will mark their status as 'Paid (Waived)' and balance as $0.00.")) {
-                fetch(`/api/admin/registrations/${id}`, {
-                    method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        finalTotal: 0,
-                        paymentStatus: "Paid (Waived)"
-                    })
-                })
-                .then(() => window.location.reload());
-            }
-        }
-
-        // ==========================================
-        // FULL EDIT LOGIC
-        // ==========================================
-        function openEditModal(id) {
-            const reg = allRegistrations.find(r => r.id === id);
-            if (!reg) return;
-
-            document.getElementById('editRegId').value = reg.id;
-            
-            document.getElementById('editFirst').value = reg.player.firstName || '';
-            document.getElementById('editLast').value = reg.player.lastName || '';
-            document.getElementById('editEmail').value = reg.player.email || '';
-            document.getElementById('editPhone').value = reg.player.phone || '';
-            document.getElementById('editDob').value = reg.player.dob || '';
-            document.getElementById('editGender').value = reg.player.gender || 'Male';
-            document.getElementById('editTta').value = reg.player.nationalId || '';
-            
-            const isNeverPlayed = reg.player.neverPlayed || (reg.player.rcId && reg.player.rcId.toLowerCase() === 'never played');
-            document.getElementById('editNeverPlayed').checked = isNeverPlayed;
-            document.getElementById('editRc').value = isNeverPlayed ? '' : (reg.player.rcId || '');
-            
-            document.getElementById('editClub').value = reg.player.club || '';
-            
-            document.querySelectorAll('#editEventsContainer input[type="checkbox"]').forEach(cb => cb.checked = false);
-            if (reg.events) {
-                const eventNames = reg.events.map(e => e.name);
-                document.querySelectorAll('#editEventsContainer input[type="checkbox"]').forEach(cb => {
-                    if (eventNames.includes(cb.value)) cb.checked = true;
-                });
-            }
-            
-            let partnersStr = '';
-            if (reg.doublesPartners) {
-                partnersStr = Object.entries(reg.doublesPartners).map(([k, v]) => `${k}: ${v}`).join(', ');
-            }
-            document.getElementById('editPartners').value = partnersStr;
-            
-            document.getElementById('editTotal').value = reg.finalTotal || 0;
-            const statusSelect = document.getElementById('editStatus');
-            if(Array.from(statusSelect.options).some(opt => opt.value === reg.paymentStatus)) {
-                statusSelect.value = reg.paymentStatus;
-            } else {
-                statusSelect.value = 'Paid';
-            }
-            
-            document.getElementById('editModal').style.display = 'flex';
-        }
-
-        function submitEdit(e) {
-            e.preventDefault();
-            const id = document.getElementById('editRegId').value;
-            
-            const checkedBoxes = document.querySelectorAll('#editEventsContainer input[type="checkbox"]:checked');
-            const eventsArr = Array.from(checkedBoxes).map(cb => ({name: cb.value}));
-
-            const partnersText = document.getElementById('editPartners').value;
-            const partnersObj = {};
-            if(partnersText.trim() !== "") {
-                partnersText.split(',').forEach(pair => {
-                    const parts = pair.split(':');
-                    if(parts.length >= 2) {
-                        const key = parts.slice(0, -1).join(':').trim(); 
-                        const val = parts[parts.length - 1].trim();
-                        if(key && val) partnersObj[key] = val;
-                    }
-                });
-            }
-
-            const isNeverPlayed = document.getElementById('editNeverPlayed').checked;
-            const rcVal = isNeverPlayed ? 'Never Played' : document.getElementById('editRc').value;
-
-            const data = {
-                "player": {
-                    "firstName": document.getElementById('editFirst').value,
-                    "lastName": document.getElementById('editLast').value,
-                    "email": document.getElementById('editEmail').value,
-                    "phone": document.getElementById('editPhone').value,
-                    "dob": document.getElementById('editDob').value,
-                    "gender": document.getElementById('editGender').value,
-                    "nationalId": document.getElementById('editTta').value,
-                    "rcId": rcVal,
-                    "neverPlayed": isNeverPlayed,
-                    "club": document.getElementById('editClub').value
-                },
-                "events": eventsArr,
-                "doublesPartners": partnersObj,
-                "finalTotal": parseFloat(document.getElementById('editTotal').value),
-                "paymentStatus": document.getElementById('editStatus').value
-            };
-            
-            fetch(`/api/admin/registrations/${id}`, {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            })
-            .then(res => res.json())
-            .then(res => {
-                if(res.status === 'updated') {
-                    window.location.reload();
-                } else {
-                    alert("Error updating record.");
-                }
-            });
-        }
-
-        function submitManual(e) {
-            e.preventDefault();
-            
-            const checkedBoxes = document.querySelectorAll('#manEventsContainer input[type="checkbox"]:checked');
-            const selectedEvents = Array.from(checkedBoxes).map(cb => ({name: cb.value}));
-
-            if (selectedEvents.length === 0) {
-                alert("Please select at least one event.");
-                return;
-            }
-
-            const data = {
-                firstName: document.getElementById('manFirst').value,
-                lastName: document.getElementById('manLast').value,
-                email: document.getElementById('manEmail').value,
-                phone: document.getElementById('manPhone').value,
-                dob: document.getElementById('manDob').value,
-                gender: document.getElementById('manGender').value,
-                nationalId: document.getElementById('manTta').value,
-                rcId: document.getElementById('manRc').value,
-                neverPlayed: document.getElementById('manNeverPlayed').checked,
-                club: document.getElementById('manClub').value,
-                events: selectedEvents,
-                totalPaid: document.getElementById('manPaid').value,
-                status: document.getElementById('manStatus').value
-            };
-            
-            fetch('/api/admin/manual-register', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            })
-            .then(res => res.json())
-            .then(res => {
-                if(res.status === 'success') {
-                    window.location.reload();
-                } else {
-                    alert("Error saving manual entry");
-                }
-            });
-        }
-
-        function deleteReg(id) {
-            if(confirm("Are you sure you want to completely delete this registration?")) {
-                fetch(`/api/admin/registrations/${id}`, { method: 'DELETE' })
-                .then(() => window.location.reload());
-            }
         }
     </script>
 </body>

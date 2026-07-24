@@ -12,7 +12,8 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 async function lookupRegistration() {
-    const email = document.getElementById('lookupEmail').value.trim();
+    // Force lowercase and strip spaces to prevent accidental login errors
+    const email = document.getElementById('lookupEmail').value.trim().toLowerCase();
     const nationalId = document.getElementById('lookupTtaId').value.trim();
     const errorEl = document.getElementById('lookupError');
     const btn = document.getElementById('findRegBtn');
