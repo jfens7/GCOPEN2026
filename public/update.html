@@ -25,13 +25,13 @@
             <p>Enter your details below to add events or pay an outstanding balance.</p>
             
             <div class="form-group">
-                <label>Email Address</label>
-                <input type="email" id="lookupEmail" required>
+                <label>TTA Member Number</label>
+                <input type="text" id="lookupTtaId" placeholder="e.g. 21252" required>
             </div>
             <div class="form-group">
                 <label>Date of Birth</label>
-                <input type="text" id="lookupDob" placeholder="YYYY" required>
-                <small style="color: #64748B;">Enter your birth year (e.g., 1985)</small>
+                <input type="text" id="lookupDob" placeholder="DD/MM/YYYY" required>
+                <small style="color: #64748B;">Enter your full Date of Birth exactly as registered</small>
             </div>
             <button class="btn-primary btn-block" id="findRegBtn">Find Registration</button>
             <p id="lookupError" style="color:red; display:none; margin-top:10px;"></p>

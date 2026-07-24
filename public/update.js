@@ -7,13 +7,13 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 async function lookupRegistration() {
-    const email = document.getElementById('lookupEmail').value;
-    const dob = document.getElementById('lookupDob').value;
+    const nationalId = document.getElementById('lookupTtaId').value.trim();
+    const dob = document.getElementById('lookupDob').value.trim();
     const errorEl = document.getElementById('lookupError');
     const btn = document.getElementById('findRegBtn');
 
-    if (!email || !dob) {
-        errorEl.textContent = "Please enter both Email and DOB (Year).";
+    if (!nationalId || !dob) {
+        errorEl.textContent = "Please enter both your TTA Member Number and DOB.";
         errorEl.style.display = "block";
         return;
     }
@@ -26,7 +26,7 @@ async function lookupRegistration() {
         const response = await fetch(`${API_BASE}/registration/lookup`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, dob })
+            body: JSON.stringify({ nationalId: nationalId, dob: dob })
         });
         
         if (response.ok) {
@@ -112,7 +112,6 @@ function calculateUpdateTotals() {
     const payBtn = document.getElementById('payDifferenceBtn');
     
     if (difference <= 0 && newFinalTotal !== oldFinalTotal) {
-        // Less events or same amount but changed events (we only allow adds online realistically without admin help if diff is <= 0)
         warningEl.style.display = "block";
         payBtn.disabled = true;
     } else if (difference <= 0 && newFinalTotal === oldFinalTotal) {
@@ -123,7 +122,6 @@ function calculateUpdateTotals() {
         payBtn.disabled = false;
     }
 
-    // Handle Doubles partners
     const partnerSection = document.getElementById('doublesPartnerSectionUpdate');
     const partnerInputs = document.getElementById('partnerInputsUpdate');
     partnerInputs.innerHTML = '';
@@ -132,7 +130,7 @@ function calculateUpdateTotals() {
     selectedEvents.forEach(ev => {
         if (ev.name.toLowerCase().includes('doubles')) {
             needsPartner = true;
-            let savedPartner = (currentReg.doublesPartners && currentReg.doublesPartners[ev.id]) ? currentReg.doublesPartners[ev.id] : "";
+            let savedPartner = (currentReg.doublesPartners && currentReg.doublesPartners[ev.name]) ? currentReg.doublesPartners[ev.name] : "";
             partnerInputs.innerHTML += `
                 <div class="form-group" style="margin-bottom: 10px;">
                     <label style="font-size: 13px;">Partner for ${ev.name}</label>
@@ -155,7 +153,7 @@ async function processUpdateAndPay() {
     selectedEvents.forEach(ev => {
         if (ev.name.toLowerCase().includes('doubles')) {
             const el = document.getElementById(`partner_update_${ev.id}`);
-            if (el) doublesPartners[ev.id] = el.value;
+            if (el) doublesPartners[ev.name] = el.value;
         }
     });
 

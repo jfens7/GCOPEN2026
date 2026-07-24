@@ -427,7 +427,7 @@ def register():
         
         row = [
             registration_id, player_details['firstName'], player_details['lastName'], player_details['email'],
-            player_details['phone'], player_details['nationalId'], player_details['club'],
+            player_details['phone'], player_details.get('dob', 'N/A'), player_details['nationalId'], player_details['club'],
             rc_val, str(never_played).upper(), events_str, partners_str, 
             ttq_levy, discount_amount, final_total, "Paid" if final_total == 0 else "Pending",
             registered_at, paid_at
@@ -495,8 +495,8 @@ def payment_success():
             try:
                 cell = sheet.find(reg_id)
                 if cell:
-                    sheet.update_cell(cell.row, 15, "Paid") 
-                    sheet.update_cell(cell.row, 17, paid_at)
+                    sheet.update_cell(cell.row, 16, "Paid") 
+                    sheet.update_cell(cell.row, 18, paid_at)
             except Exception as e:
                 print(f"GSheet Update Error: {e}")
 
@@ -519,19 +519,19 @@ def payment_success():
 @app.route('/api/registration/lookup', methods=['POST'])
 def lookup_reg():
     data = request.json
-    email_input = data.get('email', '').strip().lower()
-    dob = data.get('dob', '').strip()
+    nat_id_input = data.get('nationalId', '').strip()
+    dob_input = data.get('dob', '').strip()
     
-    docs = db.collection('registrations').where(filter=FieldFilter('player.dob', '==', dob)).stream()
+    docs = db.collection('registrations').where(filter=FieldFilter('player.nationalId', '==', nat_id_input)).stream()
     registrations = []
     for doc in docs:
         doc_dict = doc.to_dict()
-        doc_email = doc_dict.get('player', {}).get('email', '').strip().lower()
-        if doc_email == email_input:
+        doc_dob = doc_dict.get('player', {}).get('dob', '').strip()
+        if doc_dob == dob_input:
             registrations.append(doc_dict | {"id": doc.id})
             
     if not registrations:
-        return jsonify({"error": "No registration found with this Email and DOB."}), 404
+        return jsonify({"error": "No registration found with this TTA Member Number and Date of Birth."}), 404
         
     return jsonify(registrations[0])
 
@@ -660,11 +660,11 @@ def update_success():
                     if cell:
                         events_str = ", ".join([e['name'] for e in new_events])
                         partners_str = ", ".join([f"{k}: {v}" for k, v in new_partners.items()])
-                        sheet.update_cell(cell.row, 10, events_str)
-                        sheet.update_cell(cell.row, 11, partners_str)
-                        sheet.update_cell(cell.row, 14, new_final)
-                        sheet.update_cell(cell.row, 15, "Paid")
-                        sheet.update_cell(cell.row, 17, paid_at)
+                        sheet.update_cell(cell.row, 11, events_str)
+                        sheet.update_cell(cell.row, 12, partners_str)
+                        sheet.update_cell(cell.row, 15, new_final)
+                        sheet.update_cell(cell.row, 16, "Paid")
+                        sheet.update_cell(cell.row, 18, paid_at)
                 except Exception as e:
                     print("Sheet update error:", e)
                     
@@ -686,9 +686,9 @@ def update_success():
                 try:
                     cell = sheet.find(reg_id)
                     if cell:
-                        sheet.update_cell(cell.row, 14, new_total)
-                        sheet.update_cell(cell.row, 15, "Paid")
-                        sheet.update_cell(cell.row, 17, paid_at)
+                        sheet.update_cell(cell.row, 15, new_total)
+                        sheet.update_cell(cell.row, 16, "Paid")
+                        sheet.update_cell(cell.row, 18, paid_at)
                 except Exception as e:
                     print("Sheet update error:", e)
                     
@@ -787,6 +787,7 @@ def admin_resync(reg_id):
         p.get('lastName', ''), 
         p.get('email', ''),
         p.get('phone', ''), 
+        p.get('dob', 'N/A'),
         p.get('nationalId', 'N/A'), 
         p.get('club', 'N/A'),
         p.get('rcId', 'N/A'), 
@@ -804,7 +805,7 @@ def admin_resync(reg_id):
     try:
         cell = sheet.find(reg_id)
         if cell:
-            cell_list = sheet.range(f"A{cell.row}:Q{cell.row}")
+            cell_list = sheet.range(f"A{cell.row}:R{cell.row}")
             for i, val in enumerate(row_data):
                 cell_list[i].value = str(val)
             sheet.update_cells(cell_list)
@@ -833,6 +834,7 @@ def manual_register():
             "lastName": data.get('lastName', ''),
             "email": data.get('email', ''),
             "phone": data.get('phone', ''),
+            "dob": data.get('dob', 'N/A'),
             "nationalId": data.get('nationalId', 'N/A'),
             "rcId": rc_val,
             "club": data.get('club', 'N/A'),
@@ -859,7 +861,7 @@ def manual_register():
         events_str = ", ".join([e['name'] for e in data.get('events', [])])
         row = [
             reg_id, data.get('firstName', ''), data.get('lastName', ''), data.get('email', ''),
-            data.get('phone', ''), data.get('nationalId', 'N/A'), data.get('club', 'N/A'),
+            data.get('phone', ''), data.get('dob', 'N/A'), data.get('nationalId', 'N/A'), data.get('club', 'N/A'),
             rc_val, str(never_played).upper(), events_str, "", 
             0, 0, float(data.get('totalPaid', 0)), data.get('status', 'Paid'),
             registered_at, paid_at
@@ -902,6 +904,7 @@ def update_registration(reg_id):
                 p.get('lastName', ''), 
                 p.get('email', ''),
                 p.get('phone', ''), 
+                p.get('dob', 'N/A'),
                 p.get('nationalId', 'N/A'), 
                 p.get('club', 'N/A'),
                 p.get('rcId', 'N/A'), 
@@ -916,7 +919,7 @@ def update_registration(reg_id):
                 doc.get('paidAt', 'N/A')
             ]
             
-            cell_list = sheet.range(f"A{cell.row}:Q{cell.row}")
+            cell_list = sheet.range(f"A{cell.row}:R{cell.row}")
             for i, val in enumerate(updated_row):
                 cell_list[i].value = str(val)
             sheet.update_cells(cell_list)

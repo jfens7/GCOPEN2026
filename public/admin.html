@@ -117,13 +117,13 @@
                 <table class="admin-table">
                     <thead>
                         <tr>
-                            <th style="width: 12%;">Ref ID</th>
-                            <th style="width: 12%;">Player Name</th>
-                            <th style="width: 10%;">RC ID</th>
+                            <th style="width: 10%;">Ref ID</th>
+                            <th style="width: 15%;">Player Name</th>
+                            <th style="width: 10%;">DOB</th>
                             <th style="width: 25%;">Events</th>
-                            <th style="width: 12%;">Partners</th>
+                            <th style="width: 10%;">Partners</th>
                             <th style="width: 10%;">Total Paid</th>
-                            <th style="width: 9%;">Status</th>
+                            <th style="width: 10%;">Status</th>
                             <th style="width: 10%; text-align: center;">Actions</th>
                         </tr>
                     </thead>
@@ -188,13 +188,16 @@
                         <input type="text" id="editPhone" placeholder="Phone">
                     </div>
                     <div class="form-row" style="margin-top: 10px;">
+                        <input type="text" id="editDob" placeholder="DOB (DD/MM/YYYY)" required>
                         <input type="text" id="editTta" placeholder="TTA ID">
+                    </div>
+                    <div class="form-row" style="margin-top: 10px;">
                         <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
                             <input type="text" id="editRc" placeholder="RC ID" style="flex: 1;">
                             <label style="font-size: 11px; font-weight: bold; cursor: pointer; white-space: nowrap;"><input type="checkbox" id="editNeverPlayed"> Never Played</label>
                         </div>
+                        <input type="text" id="editClub" placeholder="Club Name" style="flex: 1;">
                     </div>
-                    <input type="text" id="editClub" placeholder="Club Name" style="width: 100%; margin-top: 10px;">
                     
                     <h4 style="margin-bottom: 5px; margin-top: 15px;">Select Events</h4>
                     <div class="event-checkbox-list" id="editEventsContainer">
@@ -275,13 +278,16 @@
                         <input type="text" id="manPhone" placeholder="Phone">
                     </div>
                     <div class="form-row" style="margin-top: 10px;">
+                        <input type="text" id="manDob" placeholder="DOB (DD/MM/YYYY)" required>
                         <input type="text" id="manTta" placeholder="TTA ID (Optional)">
+                    </div>
+                    <div class="form-row" style="margin-top: 10px;">
                         <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
                             <input type="text" id="manRc" placeholder="RC ID (Optional)" style="flex: 1;">
                             <label style="font-size: 11px; font-weight: bold; cursor: pointer; white-space: nowrap;"><input type="checkbox" id="manNeverPlayed"> Never Played</label>
                         </div>
+                        <input type="text" id="manClub" placeholder="Club Name (Optional)" style="flex: 1;">
                     </div>
-                    <input type="text" id="manClub" placeholder="Club Name (Optional)" style="width: 100%; margin-top: 10px;">
                     
                     <h4 style="margin-bottom: 5px; margin-top: 15px;">Select Events</h4>
                     <div class="event-checkbox-list" id="manEventsContainer">
@@ -411,23 +417,18 @@
                         let badgeClass = 'badge-pending';
                         if (reg.paymentStatus && reg.paymentStatus.includes('Paid')) badgeClass = 'badge-paid';
 
-                        let rcDisplay = reg.player.rcId || '';
-                        if (reg.player.neverPlayed || rcDisplay.toLowerCase() === 'never played') {
-                            rcDisplay = '<span class="badge badge-pending">Never Played</span>';
-                        }
-                        
                         const row = `
                             <tr>
                                 <td><span class="ref-code">${reg.id}</span></td>
                                 <td style="font-weight: bold;">${reg.player.firstName} ${reg.player.lastName}</td>
-                                <td>${rcDisplay}</td>
+                                <td style="color: #64748B;">${reg.player.dob || 'N/A'}</td>
                                 <td style="font-size: 12px;">${eventsList}</td>
                                 <td style="font-size: 12px;">${partnersList}</td>
                                 <td style="font-weight: bold;">$${parseFloat(reg.finalTotal || 0).toFixed(2)}</td>
                                 <td><span class="badge ${badgeClass}">${reg.paymentStatus}</span></td>
                                 <td>
                                     <div class="action-btns">
-                                        <button class="btn-sync" onclick="resyncSheet('${reg.id}')">Resync & Fix RC</button>
+                                        <button class="btn-sync" onclick="resyncSheet('${reg.id}')">Resync / Fix</button>
                                         <button class="btn-resend" onclick="resendEmail('${reg.id}')">Resend Email</button>
                                         <button class="btn-edit" onclick="openEditModal('${reg.id}')">Edit</button>
                                         <button class="btn-waive" onclick="waiveFee('${reg.id}')">Waive Fee</button>
@@ -441,7 +442,6 @@
                 });
         }
 
-        // Tab Switcher Logic
         function switchTab(tabName) {
             if(tabName === 'players') {
                 document.getElementById('tabPlayers').classList.add('active');
@@ -595,6 +595,7 @@
             document.getElementById('editLast').value = reg.player.lastName || '';
             document.getElementById('editEmail').value = reg.player.email || '';
             document.getElementById('editPhone').value = reg.player.phone || '';
+            document.getElementById('editDob').value = reg.player.dob || '';
             document.getElementById('editTta').value = reg.player.nationalId || '';
             
             const isNeverPlayed = reg.player.neverPlayed || (reg.player.rcId && reg.player.rcId.toLowerCase() === 'never played');
@@ -657,6 +658,7 @@
                     "lastName": document.getElementById('editLast').value,
                     "email": document.getElementById('editEmail').value,
                     "phone": document.getElementById('editPhone').value,
+                    "dob": document.getElementById('editDob').value,
                     "nationalId": document.getElementById('editTta').value,
                     "rcId": rcVal,
                     "neverPlayed": isNeverPlayed,
@@ -699,6 +701,7 @@
                 lastName: document.getElementById('manLast').value,
                 email: document.getElementById('manEmail').value,
                 phone: document.getElementById('manPhone').value,
+                dob: document.getElementById('manDob').value,
                 nationalId: document.getElementById('manTta').value,
                 rcId: document.getElementById('manRc').value,
                 neverPlayed: document.getElementById('manNeverPlayed').checked,
