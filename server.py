@@ -2,6 +2,8 @@ import os
 import string
 import random
 import re
+from datetime import datetime
+import pytz
 from flask import Flask, request, jsonify, send_from_directory, redirect
 from flask_cors import CORS
 import firebase_admin
@@ -50,6 +52,10 @@ sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1EJ5lEZs4eIkA
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", "noreply@goldcoastopen.com")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "jakobwill7@gmail.com")
 
+def get_local_now_str():
+    brisbane_tz = pytz.timezone('Australia/Brisbane')
+    return datetime.now(brisbane_tz).strftime('%Y-%m-%d %H:%M:%S')
+
 def send_email(to_email, subject, body):
     try:
         params: resend.Emails.SendParams = {
@@ -93,19 +99,9 @@ def generate_receipt_email(first_name, reg_id, events_str, partners_str, final_t
     <p><strong>2026 Gold Coast Open</strong></p>"""
 
 def find_missing_rc(nat_id, first, last):
-    """Fallback scraper to auto-locate RC ID if a player didn't provide one"""
+    """Fallback scraper to auto-locate RC ID purely by exact name match"""
     headers = {"User-Agent": "Mozilla/5.0"}
     
-    # 1. First, check if their TTA ID perfectly matches an RC ID
-    if nat_id and nat_id.isdigit():
-        try:
-            rc_url = f"https://www.ratingscentral.com/PlayerList.php?PlayerID={nat_id}&PlayerSport=1"
-            resp = requests.get(rc_url, headers=headers, timeout=5)
-            if "Bordered" in resp.text: 
-                return nat_id
-        except: pass
-        
-    # 2. If not, scrape by their First & Last name
     try:
         name_query = f"{last.strip()}, {first.strip()}"
         rc_url = f"https://www.ratingscentral.com/PlayerList.php?PlayerName={requests.utils.quote(name_query)}&PlayerSport=1"
@@ -403,6 +399,8 @@ def register():
         final_total = 0
 
     player_details['neverPlayed'] = never_played
+    registered_at = get_local_now_str()
+    paid_at = registered_at if final_total == 0 else "N/A"
 
     registration_data = {
         "player": player_details,
@@ -413,7 +411,9 @@ def register():
         "discountCode": discount_code,
         "discountAmount": discount_amount,
         "finalTotal": final_total,
-        "paymentStatus": "Pending",
+        "paymentStatus": "Paid" if final_total == 0 else "Pending",
+        "registeredAt": registered_at,
+        "paidAt": paid_at,
         "timestamp": firestore.SERVER_TIMESTAMP
     }
     
@@ -429,7 +429,8 @@ def register():
             registration_id, player_details['firstName'], player_details['lastName'], player_details['email'],
             player_details['phone'], player_details['nationalId'], player_details['club'],
             rc_val, str(never_played).upper(), events_str, partners_str, 
-            ttq_levy, discount_amount, final_total, "Pending"
+            ttq_levy, discount_amount, final_total, "Paid" if final_total == 0 else "Pending",
+            registered_at, paid_at
         ]
         
         sheet.insert_row(row, 2)
@@ -475,7 +476,11 @@ def register():
 def payment_success():
     reg_id = request.args.get('reg_id')
     if reg_id:
-        db.collection('registrations').document(reg_id).update({"paymentStatus": "Paid"})
+        paid_at = get_local_now_str()
+        db.collection('registrations').document(reg_id).update({
+            "paymentStatus": "Paid",
+            "paidAt": paid_at
+        })
         doc = db.collection('registrations').document(reg_id).get()
         if doc.exists:
             record = doc.to_dict()
@@ -491,6 +496,7 @@ def payment_success():
                 cell = sheet.find(reg_id)
                 if cell:
                     sheet.update_cell(cell.row, 15, "Paid") 
+                    sheet.update_cell(cell.row, 17, paid_at)
             except Exception as e:
                 print(f"GSheet Update Error: {e}")
 
@@ -631,6 +637,7 @@ def update_success():
         doc = doc_ref.get()
         if doc.exists:
             record = doc.to_dict()
+            paid_at = get_local_now_str()
             
             if 'pendingUpdate' in record:
                 update_data = record['pendingUpdate']
@@ -643,6 +650,7 @@ def update_success():
                     "doublesPartners": new_partners,
                     "finalTotal": new_final,
                     "paymentStatus": "Paid",
+                    "paidAt": paid_at,
                     "balanceDue": 0,
                     "pendingUpdate": firestore.DELETE_FIELD
                 })
@@ -656,6 +664,7 @@ def update_success():
                         sheet.update_cell(cell.row, 11, partners_str)
                         sheet.update_cell(cell.row, 14, new_final)
                         sheet.update_cell(cell.row, 15, "Paid")
+                        sheet.update_cell(cell.row, 17, paid_at)
                 except Exception as e:
                     print("Sheet update error:", e)
                     
@@ -670,6 +679,7 @@ def update_success():
                 doc_ref.update({
                     "finalTotal": new_total,
                     "paymentStatus": "Paid",
+                    "paidAt": paid_at,
                     "balanceDue": 0
                 })
                 
@@ -678,6 +688,7 @@ def update_success():
                     if cell:
                         sheet.update_cell(cell.row, 14, new_total)
                         sheet.update_cell(cell.row, 15, "Paid")
+                        sheet.update_cell(cell.row, 17, paid_at)
                 except Exception as e:
                     print("Sheet update error:", e)
                     
@@ -748,7 +759,7 @@ def admin_resend_email(reg_id):
 
 @app.route('/api/admin/registrations/<reg_id>/resync', methods=['POST'])
 def admin_resync(reg_id):
-    """Forces a sync to Google Sheets and auto-finds missing RC IDs"""
+    """Forces a sync to Google Sheets and auto-finds missing RC IDs by Name"""
     doc_ref = db.collection('registrations').document(reg_id)
     doc = doc_ref.get()
     if not doc.exists:
@@ -760,7 +771,6 @@ def admin_resync(reg_id):
     rc_val = p.get('rcId', '').strip()
     never_played = p.get('neverPlayed', False)
     
-    # Auto-Find Missing RC ID
     if not never_played and (not rc_val or rc_val.lower() == 'n/a'):
         found_rc = find_missing_rc(p.get('nationalId', ''), p.get('firstName', ''), p.get('lastName', ''))
         if found_rc and found_rc != "N/A":
@@ -786,13 +796,15 @@ def admin_resync(reg_id):
         record.get('ttqLevy', 5.0), 
         record.get('discountAmount', 0),
         record.get('finalTotal', 0), 
-        record.get('paymentStatus', 'Pending')
+        record.get('paymentStatus', 'Pending'),
+        record.get('registeredAt', 'N/A'),
+        record.get('paidAt', 'N/A')
     ]
     
     try:
         cell = sheet.find(reg_id)
         if cell:
-            cell_list = sheet.range(f"A{cell.row}:O{cell.row}")
+            cell_list = sheet.range(f"A{cell.row}:Q{cell.row}")
             for i, val in enumerate(row_data):
                 cell_list[i].value = str(val)
             sheet.update_cells(cell_list)
@@ -811,6 +823,9 @@ def manual_register():
     never_played = data.get('neverPlayed', False)
     if never_played:
         rc_val = "Never Played"
+
+    registered_at = get_local_now_str()
+    paid_at = registered_at if data.get('status') == 'Paid' else 'N/A'
 
     registration_data = {
         "player": {
@@ -831,6 +846,8 @@ def manual_register():
         "discountAmount": 0,
         "finalTotal": float(data.get('totalPaid', 0)),
         "paymentStatus": data.get('status', 'Paid'),
+        "registeredAt": registered_at,
+        "paidAt": paid_at,
         "timestamp": firestore.SERVER_TIMESTAMP
     }
     
@@ -844,7 +861,8 @@ def manual_register():
             reg_id, data.get('firstName', ''), data.get('lastName', ''), data.get('email', ''),
             data.get('phone', ''), data.get('nationalId', 'N/A'), data.get('club', 'N/A'),
             rc_val, str(never_played).upper(), events_str, "", 
-            0, 0, float(data.get('totalPaid', 0)), data.get('status', 'Paid')
+            0, 0, float(data.get('totalPaid', 0)), data.get('status', 'Paid'),
+            registered_at, paid_at
         ]
         sheet.insert_row(row, 2)
     except Exception as e:
@@ -863,7 +881,10 @@ def update_registration(reg_id):
     if 'events' in data: update_payload['events'] = data['events']
     if 'doublesPartners' in data: update_payload['doublesPartners'] = data['doublesPartners']
     if 'finalTotal' in data: update_payload['finalTotal'] = data['finalTotal']
-    if 'paymentStatus' in data: update_payload['paymentStatus'] = data['paymentStatus']
+    if 'paymentStatus' in data: 
+        update_payload['paymentStatus'] = data['paymentStatus']
+        if 'Paid' in data['paymentStatus']:
+            update_payload['paidAt'] = get_local_now_str()
 
     db.collection('registrations').document(reg_id).update(update_payload)
     doc = db.collection('registrations').document(reg_id).get().to_dict()
@@ -890,10 +911,12 @@ def update_registration(reg_id):
                 doc.get('ttqLevy', 5.0), 
                 doc.get('discountAmount', 0),
                 doc.get('finalTotal', 0), 
-                doc.get('paymentStatus', 'Pending')
+                doc.get('paymentStatus', 'Pending'),
+                doc.get('registeredAt', 'N/A'),
+                doc.get('paidAt', 'N/A')
             ]
             
-            cell_list = sheet.range(f"A{cell.row}:O{cell.row}")
+            cell_list = sheet.range(f"A{cell.row}:Q{cell.row}")
             for i, val in enumerate(updated_row):
                 cell_list[i].value = str(val)
             sheet.update_cells(cell_list)

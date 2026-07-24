@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registration | 2026 Gold Coast Open</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        .rc-card-selected {
+            border: 2px solid var(--gctta-gold) !important;
+            background-color: #FEF9C3 !important;
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar">
@@ -103,9 +109,9 @@
 
                 <div class="form-group" style="background: #F8FAFC; padding: 20px; border-radius: 8px; border: 1px solid #E2E8F0;">
                     <label>Ratings Central Profile</label>
-                    <p style="color: #DC2626; font-weight: 900; font-size: 14px; text-transform: uppercase; margin-top: 0; margin-bottom: 10px;">THIS IS NOT YOUR RATING, USE THE FIND FEATURE</p>
+                    <p style="color: #DC2626; font-weight: 900; font-size: 14px; text-transform: uppercase; margin-top: 0; margin-bottom: 10px;">Select your profile below or check 'Never Played'</p>
                     <div class="form-row">
-                        <input type="text" id="rcProfile" placeholder="Enter Name or RC ID" style="flex: 2;" required>
+                        <input type="text" id="rcProfile" placeholder="Enter Name or RC ID" style="flex: 2;" required readonly>
                         <button type="button" id="lookupRcBtn" class="lookup-btn">FIND PROFILE</button>
                     </div>
                     <div id="rcLookupResults"></div>
@@ -239,19 +245,57 @@
 
     <script src="app.js"></script>
     <script>
+        let rcProfileConfirmed = false;
+        let rcDebounceTimer = null;
+
         function toggleRcProfile() {
             const box = document.getElementById('neverPlayedBox');
             const rcInput = document.getElementById('rcProfile');
             if (box.checked) {
                 rcInput.value = 'Never Played';
-                rcInput.readOnly = true;
                 rcInput.style.backgroundColor = '#E2E8F0';
+                rcProfileConfirmed = true;
             } else {
                 rcInput.value = '';
-                rcInput.readOnly = false;
                 rcInput.style.backgroundColor = '';
+                rcProfileConfirmed = false;
+                autoSearchRc();
             }
         }
+
+        // AUTO SEARCH RATINGS CENTRAL AS SOON AS FIRST & LAST NAME ARE TYPED
+        function autoSearchRc() {
+            const first = document.getElementById('firstName').value.trim();
+            const last = document.getElementById('lastName').value.trim();
+            const neverPlayed = document.getElementById('neverPlayedBox').checked;
+
+            if (neverPlayed) return;
+
+            if (first.length >= 2 && last.length >= 2) {
+                clearTimeout(rcDebounceTimer);
+                rcDebounceTimer = setTimeout(() => {
+                    const rcInput = document.getElementById('rcProfile');
+                    rcInput.value = `${last}, ${first}`;
+                    rcProfileConfirmed = false; // Must re-confirm selection
+                    
+                    const rcBtn = document.getElementById('lookupRcBtn');
+                    if (rcBtn) rcBtn.click();
+                }, 700);
+            }
+        }
+
+        document.getElementById('firstName').addEventListener('input', autoSearchRc);
+        document.getElementById('lastName').addEventListener('input', autoSearchRc);
+
+        // Listen for user selecting a result card from RC lookup
+        document.getElementById('rcLookupResults').addEventListener('click', (e) => {
+            const card = e.target.closest('.rc-card') || e.target.closest('tr') || e.target.closest('div');
+            if (card) {
+                document.querySelectorAll('.rc-card').forEach(c => c.classList.remove('rc-card-selected'));
+                card.classList.add('rc-card-selected');
+                rcProfileConfirmed = true;
+            }
+        });
 
         function nextStep() {
             const step1 = document.getElementById('step1');
@@ -266,13 +310,12 @@
                 }
             }
             
-            // STRICT RC VALIDATION LOCK
             const rcInput = document.getElementById('rcProfile').value.trim();
             const neverPlayed = document.getElementById('neverPlayedBox').checked;
             
-            if (rcInput === "" && !neverPlayed) {
-                alert("Action Required: You must either find your Ratings Central Profile ID or strictly check the 'I have never played' box at the bottom of Step 1.");
-                document.getElementById('rcProfile').focus();
+            if (!neverPlayed && (!rcProfileConfirmed || rcInput === "")) {
+                alert("Action Required: Ratings Central search ran automatically for your name. You MUST click to select your profile box from the search results, or check 'I have never played a rated tournament'.");
+                document.getElementById('rcLookupResults').scrollIntoView({ behavior: 'smooth' });
                 return;
             }
 
@@ -288,9 +331,7 @@
             document.getElementById('step1').style.display = 'block';
         }
 
-        // ==========================================
-        // COUNTDOWN & ADMIN BYPASS LOGIC
-        // ==========================================
+        // COUNTDOWN LOGIC
         const targetTimeReg = new Date('July 23, 2026 19:00:00').getTime();
         const overlay = document.getElementById('countdownOverlay');
         
@@ -323,9 +364,7 @@
             }
         }
 
-        // ==========================================
         // AUTO-SAVE PROGRESS (Local Storage)
-        // ==========================================
         document.addEventListener("DOMContentLoaded", () => {
             const form = document.getElementById('registrationForm');
             if (!form) return;
@@ -392,23 +431,10 @@
             }
         }
 
-        // ==========================================
-        // AUTO-SYNC TTA ID TO RATINGS CENTRAL
-        // ==========================================
         document.getElementById('autoFillByIdBtn').addEventListener('click', () => {
-            const ttaId = document.getElementById('nationalId').value.trim();
-            const rcInput = document.getElementById('rcProfile');
-            
-            // In Australia, TTA ID and RC ID are almost always the same number!
-            if (ttaId && /^\d+$/.test(ttaId)) {
-                rcInput.value = ttaId;
-                
-                // Give the TTA lookup a second to finish, then automatically fire the RC lookup
-                setTimeout(() => {
-                    const rcBtn = document.getElementById('lookupRcBtn');
-                    if(rcBtn) rcBtn.click();
-                }, 1000);
-            }
+            setTimeout(() => {
+                autoSearchRc();
+            }, 2500); 
         });
     </script>
 </body>
