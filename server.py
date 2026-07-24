@@ -92,6 +92,38 @@ def generate_receipt_email(first_name, reg_id, events_str, partners_str, final_t
     <p>See you at the tournament!</p>
     <p><strong>2026 Gold Coast Open</strong></p>"""
 
+def find_missing_rc(nat_id, first, last):
+    """Fallback scraper to auto-locate RC ID if a player didn't provide one"""
+    headers = {"User-Agent": "Mozilla/5.0"}
+    
+    # 1. First, check if their TTA ID perfectly matches an RC ID
+    if nat_id and nat_id.isdigit():
+        try:
+            rc_url = f"https://www.ratingscentral.com/PlayerList.php?PlayerID={nat_id}&PlayerSport=1"
+            resp = requests.get(rc_url, headers=headers, timeout=5)
+            if "Bordered" in resp.text: 
+                return nat_id
+        except: pass
+        
+    # 2. If not, scrape by their First & Last name
+    try:
+        name_query = f"{last.strip()}, {first.strip()}"
+        rc_url = f"https://www.ratingscentral.com/PlayerList.php?PlayerName={requests.utils.quote(name_query)}&PlayerSport=1"
+        resp = requests.get(rc_url, headers=headers, timeout=5)
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        table = soup.find('table', class_='Bordered')
+        if table:
+            tbody = table.find('tbody') or table
+            for tr in tbody.find_all('tr'):
+                tds = tr.find_all('td')
+                if len(tds) == 5:
+                    return tds[3].get_text(strip=True)
+                elif len(tds) == 4:
+                    return tds[2].get_text(strip=True)
+    except: pass
+    
+    return "N/A"
+
 # ==========================================
 # PAGE ROUTING
 # ==========================================
@@ -714,6 +746,63 @@ def admin_resend_email(reg_id):
     else:
         return jsonify({"error": "Failed to send email. Check Render logs."}), 500
 
+@app.route('/api/admin/registrations/<reg_id>/resync', methods=['POST'])
+def admin_resync(reg_id):
+    """Forces a sync to Google Sheets and auto-finds missing RC IDs"""
+    doc_ref = db.collection('registrations').document(reg_id)
+    doc = doc_ref.get()
+    if not doc.exists:
+        return jsonify({"error": "Registration not found"}), 404
+        
+    record = doc.to_dict()
+    p = record.get('player', {})
+    
+    rc_val = p.get('rcId', '').strip()
+    never_played = p.get('neverPlayed', False)
+    
+    # Auto-Find Missing RC ID
+    if not never_played and (not rc_val or rc_val.lower() == 'n/a'):
+        found_rc = find_missing_rc(p.get('nationalId', ''), p.get('firstName', ''), p.get('lastName', ''))
+        if found_rc and found_rc != "N/A":
+            p['rcId'] = found_rc
+            doc_ref.update({"player.rcId": found_rc})
+            record['player']['rcId'] = found_rc
+            
+    events_str = ", ".join([e['name'] for e in record.get('events', [])])
+    partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
+    
+    row_data = [
+        reg_id, 
+        p.get('firstName', ''), 
+        p.get('lastName', ''), 
+        p.get('email', ''),
+        p.get('phone', ''), 
+        p.get('nationalId', 'N/A'), 
+        p.get('club', 'N/A'),
+        p.get('rcId', 'N/A'), 
+        str(p.get('neverPlayed', False)).upper(),
+        events_str, 
+        partners_str, 
+        record.get('ttqLevy', 5.0), 
+        record.get('discountAmount', 0),
+        record.get('finalTotal', 0), 
+        record.get('paymentStatus', 'Pending')
+    ]
+    
+    try:
+        cell = sheet.find(reg_id)
+        if cell:
+            cell_list = sheet.range(f"A{cell.row}:O{cell.row}")
+            for i, val in enumerate(row_data):
+                cell_list[i].value = str(val)
+            sheet.update_cells(cell_list)
+        else:
+            sheet.insert_row(row_data, 2)
+    except Exception as e:
+        return jsonify({"error": f"GSheet Error: {str(e)}"}), 500
+        
+    return jsonify({"status": "success", "newRcId": p.get('rcId', rc_val)})
+
 @app.route('/api/admin/manual-register', methods=['POST'])
 def manual_register():
     data = request.json
@@ -776,13 +865,9 @@ def update_registration(reg_id):
     if 'finalTotal' in data: update_payload['finalTotal'] = data['finalTotal']
     if 'paymentStatus' in data: update_payload['paymentStatus'] = data['paymentStatus']
 
-    # 1. Update Database safely
     db.collection('registrations').document(reg_id).update(update_payload)
-    
-    # 2. Get the newly merged master document
     doc = db.collection('registrations').document(reg_id).get().to_dict()
     
-    # 3. Push entire row to Google Sheets using 100% bulletproof update_cells
     try:
         cell = sheet.find(reg_id)
         if cell:

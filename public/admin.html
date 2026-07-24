@@ -31,6 +31,7 @@
         .btn-waive { background: #64748B; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
         .btn-delete { background: #DC2626; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
         .btn-resend { background: var(--gctta-gold); color: var(--gctta-navy); border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
+        .btn-sync { background: #0284C7; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
 
         .event-checkbox-list {
             max-height: 160px;
@@ -116,13 +117,13 @@
                 <table class="admin-table">
                     <thead>
                         <tr>
-                            <th style="width: 15%;">Ref ID</th>
-                            <th style="width: 15%;">Player Name</th>
-                            <th style="width: 15%;">Email</th>
+                            <th style="width: 12%;">Ref ID</th>
+                            <th style="width: 12%;">Player Name</th>
+                            <th style="width: 10%;">RC ID</th>
                             <th style="width: 25%;">Events</th>
-                            <th style="width: 10%;">Partners</th>
+                            <th style="width: 12%;">Partners</th>
                             <th style="width: 10%;">Total Paid</th>
-                            <th style="width: 10%;">Status</th>
+                            <th style="width: 9%;">Status</th>
                             <th style="width: 10%; text-align: center;">Actions</th>
                         </tr>
                     </thead>
@@ -188,7 +189,10 @@
                     </div>
                     <div class="form-row" style="margin-top: 10px;">
                         <input type="text" id="editTta" placeholder="TTA ID">
-                        <input type="text" id="editRc" placeholder="RC ID">
+                        <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
+                            <input type="text" id="editRc" placeholder="RC ID" style="flex: 1;">
+                            <label style="font-size: 11px; font-weight: bold; cursor: pointer; white-space: nowrap;"><input type="checkbox" id="editNeverPlayed"> Never Played</label>
+                        </div>
                     </div>
                     <input type="text" id="editClub" placeholder="Club Name" style="width: 100%; margin-top: 10px;">
                     
@@ -272,7 +276,10 @@
                     </div>
                     <div class="form-row" style="margin-top: 10px;">
                         <input type="text" id="manTta" placeholder="TTA ID (Optional)">
-                        <input type="text" id="manRc" placeholder="RC ID (Optional)">
+                        <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
+                            <input type="text" id="manRc" placeholder="RC ID (Optional)" style="flex: 1;">
+                            <label style="font-size: 11px; font-weight: bold; cursor: pointer; white-space: nowrap;"><input type="checkbox" id="manNeverPlayed"> Never Played</label>
+                        </div>
                     </div>
                     <input type="text" id="manClub" placeholder="Club Name (Optional)" style="width: 100%; margin-top: 10px;">
                     
@@ -403,18 +410,24 @@
                         
                         let badgeClass = 'badge-pending';
                         if (reg.paymentStatus && reg.paymentStatus.includes('Paid')) badgeClass = 'badge-paid';
+
+                        let rcDisplay = reg.player.rcId || '';
+                        if (reg.player.neverPlayed || rcDisplay.toLowerCase() === 'never played') {
+                            rcDisplay = '<span class="badge badge-pending">Never Played</span>';
+                        }
                         
                         const row = `
                             <tr>
                                 <td><span class="ref-code">${reg.id}</span></td>
                                 <td style="font-weight: bold;">${reg.player.firstName} ${reg.player.lastName}</td>
-                                <td>${reg.player.email}</td>
+                                <td>${rcDisplay}</td>
                                 <td style="font-size: 12px;">${eventsList}</td>
                                 <td style="font-size: 12px;">${partnersList}</td>
                                 <td style="font-weight: bold;">$${parseFloat(reg.finalTotal || 0).toFixed(2)}</td>
                                 <td><span class="badge ${badgeClass}">${reg.paymentStatus}</span></td>
                                 <td>
                                     <div class="action-btns">
+                                        <button class="btn-sync" onclick="resyncSheet('${reg.id}')">Resync & Fix RC</button>
                                         <button class="btn-resend" onclick="resendEmail('${reg.id}')">Resend Email</button>
                                         <button class="btn-edit" onclick="openEditModal('${reg.id}')">Edit</button>
                                         <button class="btn-waive" onclick="waiveFee('${reg.id}')">Waive Fee</button>
@@ -475,7 +488,6 @@
                             } catch(e) {}
                         }
 
-                        // Toggle actions based on current status
                         const usedAction = code.used ? `<button class="btn-secondary-small" style="padding: 4px 8px; font-size: 11px;" onclick="updateDiscountCode('${code.id}', {used: false})">Reactivate Code</button>` 
                                                      : `<button class="btn-secondary-small" style="background: #DC2626; color: white; border: none; padding: 4px 8px; font-size: 11px;" onclick="updateDiscountCode('${code.id}', {used: true})">Expire Now</button>`;
                         
@@ -541,6 +553,21 @@
             }
         }
 
+        function resyncSheet(id) {
+            if(confirm("Force sync this registration to Google Sheets and auto-find missing RC ID?")) {
+                fetch(`/api/admin/registrations/${id}/resync`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.status === 'success') {
+                        alert('Successfully synced to Google Sheet!' + (data.newRcId !== 'N/A' && data.newRcId !== '' ? ' Found RC ID: ' + data.newRcId : ''));
+                        window.location.reload();
+                    } else {
+                        alert('Error syncing: ' + data.error);
+                    }
+                });
+            }
+        }
+
         function waiveFee(id) {
             if(confirm("Are you sure you want to Waive the fee for this registration? This will mark their status as 'Paid (Waived)' and balance as $0.00.")) {
                 fetch(`/api/admin/registrations/${id}`, {
@@ -564,16 +591,18 @@
 
             document.getElementById('editRegId').value = reg.id;
             
-            // Populate Details
             document.getElementById('editFirst').value = reg.player.firstName || '';
             document.getElementById('editLast').value = reg.player.lastName || '';
             document.getElementById('editEmail').value = reg.player.email || '';
             document.getElementById('editPhone').value = reg.player.phone || '';
             document.getElementById('editTta').value = reg.player.nationalId || '';
-            document.getElementById('editRc').value = reg.player.rcId || '';
+            
+            const isNeverPlayed = reg.player.neverPlayed || (reg.player.rcId && reg.player.rcId.toLowerCase() === 'never played');
+            document.getElementById('editNeverPlayed').checked = isNeverPlayed;
+            document.getElementById('editRc').value = isNeverPlayed ? '' : (reg.player.rcId || '');
+            
             document.getElementById('editClub').value = reg.player.club || '';
             
-            // Populate Checkboxes
             document.querySelectorAll('#editEventsContainer input[type="checkbox"]').forEach(cb => cb.checked = false);
             if (reg.events) {
                 const eventNames = reg.events.map(e => e.name);
@@ -582,14 +611,12 @@
                 });
             }
             
-            // Populate Partners
             let partnersStr = '';
             if (reg.doublesPartners) {
                 partnersStr = Object.entries(reg.doublesPartners).map(([k, v]) => `${k}: ${v}`).join(', ');
             }
             document.getElementById('editPartners').value = partnersStr;
             
-            // Populate Payment
             document.getElementById('editTotal').value = reg.finalTotal || 0;
             const statusSelect = document.getElementById('editStatus');
             if(Array.from(statusSelect.options).some(opt => opt.value === reg.paymentStatus)) {
@@ -605,11 +632,9 @@
             e.preventDefault();
             const id = document.getElementById('editRegId').value;
             
-            // Re-build events array from checkboxes
             const checkedBoxes = document.querySelectorAll('#editEventsContainer input[type="checkbox"]:checked');
             const eventsArr = Array.from(checkedBoxes).map(cb => ({name: cb.value}));
 
-            // Re-build doubles partners dictionary
             const partnersText = document.getElementById('editPartners').value;
             const partnersObj = {};
             if(partnersText.trim() !== "") {
@@ -623,6 +648,9 @@
                 });
             }
 
+            const isNeverPlayed = document.getElementById('editNeverPlayed').checked;
+            const rcVal = isNeverPlayed ? 'Never Played' : document.getElementById('editRc').value;
+
             const data = {
                 "player": {
                     "firstName": document.getElementById('editFirst').value,
@@ -630,7 +658,8 @@
                     "email": document.getElementById('editEmail').value,
                     "phone": document.getElementById('editPhone').value,
                     "nationalId": document.getElementById('editTta').value,
-                    "rcId": document.getElementById('editRc').value,
+                    "rcId": rcVal,
+                    "neverPlayed": isNeverPlayed,
                     "club": document.getElementById('editClub').value
                 },
                 "events": eventsArr,
@@ -658,8 +687,7 @@
             e.preventDefault();
             
             const checkedBoxes = document.querySelectorAll('#manEventsContainer input[type="checkbox"]:checked');
-            const selectedEvents = Array.from(checkedBoxes).map(cb => cb.value);
-            const eventsText = selectedEvents.join(', ');
+            const selectedEvents = Array.from(checkedBoxes).map(cb => ({name: cb.value}));
 
             if (selectedEvents.length === 0) {
                 alert("Please select at least one event.");
@@ -673,8 +701,9 @@
                 phone: document.getElementById('manPhone').value,
                 nationalId: document.getElementById('manTta').value,
                 rcId: document.getElementById('manRc').value,
+                neverPlayed: document.getElementById('manNeverPlayed').checked,
                 club: document.getElementById('manClub').value,
-                eventsText: eventsText,
+                events: selectedEvents,
                 totalPaid: document.getElementById('manPaid').value,
                 status: document.getElementById('manStatus').value
             };
