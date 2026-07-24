@@ -190,10 +190,10 @@ def sync_to_sheet(reg_id, record):
         if cell:
             cell_list = sheet.range(f"A{cell.row}:T{cell.row}")
             for i, val in enumerate(row_data):
-                cell_list[i].value = str(val)
-            sheet.update_cells(cell_list)
+                cell_list[i].value = val
+            sheet.update_cells(cell_list, value_input_option='USER_ENTERED')
         else:
-            sheet.insert_row(row_data, 2)
+            sheet.insert_row(row_data, 2, value_input_option='USER_ENTERED')
     except Exception as e:
         print(f"GSheet Sync Error: {str(e)}")
 
@@ -472,11 +472,9 @@ def register():
     final_total = max(0.0, (base_total + ttq_levy) - discount_amount)
     player_details['neverPlayed'] = never_played
 
-    # Ensure Gender is populated
     if not player_details.get('gender'):
         player_details['gender'] = 'N/A'
 
-    # Auto-Fetch RC Rating using TTA ID lookup
     rc_rating = "N/A"
     if not never_played and player_details.get('nationalId'):
         found_rc, found_rating = lookup_rc_by_tta_id(player_details.get('nationalId'))
@@ -488,7 +486,6 @@ def register():
     registered_at = get_local_now_str()
     paid_at = registered_at if final_total == 0 else "N/A"
 
-    # INITIAL HISTORY ENTRY
     initial_history_entry = {
         "updateNumber": 0,
         "type": "Initial Registration",
@@ -508,12 +505,13 @@ def register():
         "ttqLevy": ttq_levy,
         "discountCode": discount_code,
         "discountAmount": discount_amount,
-        "originalTotal": final_total, # LOCKED ORIGINAL COST
+        "originalTotal": final_total,
         "finalTotal": final_total,
+        "balanceDue": final_total if final_total > 0 else 0,
         "paymentStatus": "Paid" if final_total == 0 else "Pending",
         "registeredAt": registered_at,
         "paidAt": paid_at,
-        "history": [initial_history_entry], # AUDIT TRAIL LOG
+        "history": [initial_history_entry],
         "timestamp": firestore.SERVER_TIMESTAMP
     }
     
@@ -561,7 +559,6 @@ def register():
 def payment_success():
     reg_id = request.args.get('reg_id')
     session_id = request.args.get('session_id', 'N/A')
-    
     if reg_id:
         paid_at = get_local_now_str()
         doc_ref = db.collection('registrations').document(reg_id)
@@ -574,16 +571,18 @@ def payment_success():
                 history[0]['paymentStatus'] = 'Paid'
                 history[0]['stripeSessionId'] = session_id
                 history[0]['paidAt'] = paid_at
-            
-            doc_ref.update({
+
+            db.collection('registrations').document(reg_id).update({
                 "paymentStatus": "Paid",
                 "paidAt": paid_at,
+                "balanceDue": 0,
                 "history": history
             })
             
-            updated_record = doc_ref.get().to_dict()
+            updated_doc = doc_ref.get().to_dict()
+            sync_to_sheet(reg_id, updated_doc)
             
-            applied_code = updated_record.get('discountCode')
+            applied_code = updated_doc.get('discountCode')
             if applied_code:
                 code_docs = list(db.collection('discount_codes').where('code', '==', applied_code).stream())
                 if code_docs:
@@ -591,12 +590,13 @@ def payment_success():
                     if not doc_data.get('isPermanent', False):
                         db.collection('discount_codes').document(code_docs[0].id).update({"used": True})
             
-            sync_to_sheet(reg_id, updated_record)
-
-            events_str = ", ".join([e['name'] for e in updated_record.get('events', [])])
-            partners_str = ", ".join([f"{k}: {v}" for k, v in updated_record.get('doublesPartners', {}).items()])
-            email_body = generate_receipt_email(updated_record['player']['firstName'], reg_id, events_str, partners_str, updated_record['finalTotal'], "Paid")
-            send_email(updated_record['player']['email'], "Tournament Registration Confirmation", email_body)
+            events_str = ", ".join([e['name'] for e in updated_doc.get('events', [])])
+            partners_str = ", ".join([f"{k}: {v}" for k, v in updated_doc.get('doublesPartners', {}).items()])
+            email_body = generate_receipt_email(updated_doc['player']['firstName'], reg_id, events_str, partners_str, updated_doc['finalTotal'], "Paid")
+            send_email(updated_doc['player']['email'], "Tournament Registration Confirmation", email_body)
+            
+            admin_body = f"<p>New Paid Registration:<br>Player: {updated_doc['player']['firstName']} {updated_doc['player']['lastName']}<br>Ref ID: {reg_id}<br>Total: ${updated_doc['finalTotal']}<br>Events: {events_str}<br>Partners: {partners_str}</p>"
+            send_email(ADMIN_EMAIL, "New Tournament Registration", admin_body)
 
     return redirect(f"/success.html?reg_id={reg_id}")
 
@@ -665,7 +665,6 @@ def update_checkout():
             cancel_url=f"{BASE_URL}/update.html",
         )
         
-        # Calculate added and removed events for history logging
         old_event_names = [e['name'] for e in record.get('events', [])]
         new_event_names = [e['name'] for e in new_events]
         added_events = [e for e in new_event_names if e not in old_event_names]
@@ -743,7 +742,6 @@ def update_success():
                 new_partners = update_data['doublesPartners']
                 diff = update_data['difference']
                 
-                # Append Update Entry to Audit Log
                 history.append({
                     "updateNumber": update_num,
                     "type": f"Update #{update_num} (Added Events)",
@@ -893,7 +891,6 @@ def admin_resync(reg_id):
 
 @app.route('/api/admin/bulk-fix-rc', methods=['POST'])
 def bulk_fix_rc():
-    """Iterates through all registrations, queries RC by TTA ID, updates missing RC IDs & Ratings, and rebuilds the Google Sheet"""
     docs = db.collection('registrations').stream()
     updated_count = 0
     
@@ -917,7 +914,6 @@ def bulk_fix_rc():
                 })
                 updated_count += 1
 
-    # Rebuild Sheet
     all_docs = db.collection('registrations').order_by('timestamp', direction=firestore.Query.DESCENDING).stream()
     rows_data = []
     for doc in all_docs:
@@ -943,8 +939,8 @@ def bulk_fix_rc():
         cell_list = sheet.range(f"A2:T{len(rows_data)+1}")
         flat_data = [item for sublist in rows_data for item in sublist]
         for i, val in enumerate(flat_data):
-            cell_list[i].value = str(val)
-        sheet.update_cells(cell_list)
+            cell_list[i].value = val
+        sheet.update_cells(cell_list, value_input_option='USER_ENTERED')
         
     return jsonify({"status": "success", "updatedCount": updated_count, "totalRows": len(rows_data)})
 
@@ -975,8 +971,8 @@ def rebuild_sheet():
         cell_list = sheet.range(f"A2:T{len(rows_data)+1}")
         flat_data = [item for sublist in rows_data for item in sublist]
         for i, val in enumerate(flat_data):
-            cell_list[i].value = str(val)
-        sheet.update_cells(cell_list)
+            cell_list[i].value = val
+        sheet.update_cells(cell_list, value_input_option='USER_ENTERED')
         
     return jsonify({"status": "success", "rows": len(rows_data)})
 
@@ -1030,6 +1026,7 @@ def manual_register():
         "discountAmount": 0,
         "originalTotal": total_val,
         "finalTotal": total_val,
+        "balanceDue": 0 if data.get('status') == 'Paid' else total_val,
         "paymentStatus": data.get('status', 'Paid'),
         "registeredAt": registered_at,
         "paidAt": paid_at,
@@ -1071,8 +1068,10 @@ def update_registration(reg_id):
         update_payload['paymentStatus'] = data['paymentStatus']
         if 'Paid' in data['paymentStatus']:
             update_payload['paidAt'] = now_str
+            update_payload['balanceDue'] = 0
+        elif 'Pending' in data['paymentStatus']:
+            update_payload['balanceDue'] = data.get('finalTotal', record.get('finalTotal', 0))
 
-    # Append Admin Action to Audit History
     update_num = len(history)
     history.append({
         "updateNumber": update_num,
