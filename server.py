@@ -344,11 +344,13 @@ def register():
     discount_code = data.get('discountCode', '').upper()
     doubles_partners = data.get('doublesPartners', {})
     
+    rc_val = player_details.get('rcId', '').strip()
+    never_played = (rc_val.lower() == 'never played')
+    
     existing_id = list(db.collection('registrations').where(filter=FieldFilter('player.nationalId', '==', player_details['nationalId'])).stream())
     existing_rc = []
-    rc_id = player_details.get('rcId', '').strip()
-    if rc_id:
-        existing_rc = list(db.collection('registrations').where(filter=FieldFilter('player.rcId', '==', rc_id)).stream())
+    if rc_val and not never_played:
+        existing_rc = list(db.collection('registrations').where(filter=FieldFilter('player.rcId', '==', rc_val)).stream())
     
     if len(existing_id) > 0 or len(existing_rc) > 0:
         return jsonify({"error": "A player with this National ID or Ratings Central ID is already registered."}), 400
@@ -367,6 +369,8 @@ def register():
     final_total = (base_total + ttq_levy) - discount_amount
     if final_total < 0:
         final_total = 0
+
+    player_details['neverPlayed'] = never_played
 
     registration_data = {
         "player": player_details,
@@ -392,7 +396,7 @@ def register():
         row = [
             registration_id, player_details['firstName'], player_details['lastName'], player_details['email'],
             player_details['phone'], player_details['nationalId'], player_details['club'],
-            player_details.get('rcId', ''), events_str, partners_str, 
+            rc_val, str(never_played).upper(), events_str, partners_str, 
             ttq_levy, discount_amount, final_total, "Pending"
         ]
         
@@ -448,14 +452,13 @@ def payment_success():
                 code_docs = list(db.collection('discount_codes').where('code', '==', applied_code).stream())
                 if code_docs:
                     doc_data = code_docs[0].to_dict()
-                    # Only mark as used if it is NOT a permanent code
                     if not doc_data.get('isPermanent', False):
                         db.collection('discount_codes').document(code_docs[0].id).update({"used": True})
             
             try:
                 cell = sheet.find(reg_id)
                 if cell:
-                    sheet.update_cell(cell.row, 14, "Paid") 
+                    sheet.update_cell(cell.row, 15, "Paid") 
             except Exception as e:
                 print(f"GSheet Update Error: {e}")
 
@@ -617,10 +620,10 @@ def update_success():
                     if cell:
                         events_str = ", ".join([e['name'] for e in new_events])
                         partners_str = ", ".join([f"{k}: {v}" for k, v in new_partners.items()])
-                        sheet.update_cell(cell.row, 9, events_str)
-                        sheet.update_cell(cell.row, 10, partners_str)
-                        sheet.update_cell(cell.row, 13, new_final)
-                        sheet.update_cell(cell.row, 14, "Paid")
+                        sheet.update_cell(cell.row, 10, events_str)
+                        sheet.update_cell(cell.row, 11, partners_str)
+                        sheet.update_cell(cell.row, 14, new_final)
+                        sheet.update_cell(cell.row, 15, "Paid")
                 except Exception as e:
                     print("Sheet update error:", e)
                     
@@ -641,8 +644,8 @@ def update_success():
                 try:
                     cell = sheet.find(reg_id)
                     if cell:
-                        sheet.update_cell(cell.row, 13, new_total)
-                        sheet.update_cell(cell.row, 14, "Paid")
+                        sheet.update_cell(cell.row, 14, new_total)
+                        sheet.update_cell(cell.row, 15, "Paid")
                 except Exception as e:
                     print("Sheet update error:", e)
                     
@@ -715,6 +718,11 @@ def admin_resend_email(reg_id):
 def manual_register():
     data = request.json
     
+    rc_val = data.get('rcId', 'N/A')
+    never_played = data.get('neverPlayed', False)
+    if never_played:
+        rc_val = "Never Played"
+
     registration_data = {
         "player": {
             "firstName": data.get('firstName', ''),
@@ -722,10 +730,11 @@ def manual_register():
             "email": data.get('email', ''),
             "phone": data.get('phone', ''),
             "nationalId": data.get('nationalId', 'N/A'),
-            "rcId": data.get('rcId', 'N/A'),
-            "club": data.get('club', 'N/A')
+            "rcId": rc_val,
+            "club": data.get('club', 'N/A'),
+            "neverPlayed": never_played
         },
-        "events": [{"name": data.get('eventsText', '')}],
+        "events": data.get('events', []),
         "doublesPartners": {},
         "baseTotal": float(data.get('totalPaid', 0)),
         "ttqLevy": 0,
@@ -741,10 +750,11 @@ def manual_register():
     reg_id = doc_ref.id
 
     try:
+        events_str = ", ".join([e['name'] for e in data.get('events', [])])
         row = [
             reg_id, data.get('firstName', ''), data.get('lastName', ''), data.get('email', ''),
             data.get('phone', ''), data.get('nationalId', 'N/A'), data.get('club', 'N/A'),
-            data.get('rcId', 'N/A'), data.get('eventsText', ''), "", 
+            rc_val, str(never_played).upper(), events_str, "", 
             0, 0, float(data.get('totalPaid', 0)), data.get('status', 'Paid')
         ]
         sheet.insert_row(row, 2)
@@ -757,7 +767,6 @@ def manual_register():
 def update_registration(reg_id):
     data = request.json
     
-    # Safely convert dicts to dot notation for Firebase to avoid wiping hidden fields (like DOB)
     update_payload = {}
     if 'player' in data:
         for k, v in data['player'].items():
@@ -773,7 +782,7 @@ def update_registration(reg_id):
     # 2. Get the newly merged master document
     doc = db.collection('registrations').document(reg_id).get().to_dict()
     
-    # 3. Push entire row to Google Sheets in ONE bulk API call to avoid rate-limits
+    # 3. Push entire row to Google Sheets using 100% bulletproof update_cells
     try:
         cell = sheet.find(reg_id)
         if cell:
@@ -790,6 +799,7 @@ def update_registration(reg_id):
                 p.get('nationalId', 'N/A'), 
                 p.get('club', 'N/A'),
                 p.get('rcId', 'N/A'), 
+                str(p.get('neverPlayed', False)).upper(),
                 events_str, 
                 partners_str, 
                 doc.get('ttqLevy', 5.0), 
@@ -798,7 +808,11 @@ def update_registration(reg_id):
                 doc.get('paymentStatus', 'Pending')
             ]
             
-            sheet.update(f"A{cell.row}:N{cell.row}", [updated_row])
+            cell_list = sheet.range(f"A{cell.row}:O{cell.row}")
+            for i, val in enumerate(updated_row):
+                cell_list[i].value = str(val)
+            sheet.update_cells(cell_list)
+            
     except Exception as e:
         print(f"GSheet Bulk Update Error: {e}")
             

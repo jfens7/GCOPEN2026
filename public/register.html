@@ -239,20 +239,43 @@
 
     <script src="app.js"></script>
     <script>
+        function toggleRcProfile() {
+            const box = document.getElementById('neverPlayedBox');
+            const rcInput = document.getElementById('rcProfile');
+            if (box.checked) {
+                rcInput.value = 'Never Played';
+                rcInput.readOnly = true;
+                rcInput.style.backgroundColor = '#E2E8F0';
+            } else {
+                rcInput.value = '';
+                rcInput.readOnly = false;
+                rcInput.style.backgroundColor = '';
+            }
+        }
+
         function nextStep() {
-            // Force the browser to check if all required fields in Step 1 are filled
             const step1 = document.getElementById('step1');
             const inputs = step1.querySelectorAll('input, select');
             let isValid = true;
             
             for (let i = 0; i < inputs.length; i++) {
                 if (!inputs[i].checkValidity()) {
-                    inputs[i].reportValidity(); // This pops up the "Please fill out this field" warning
+                    inputs[i].reportValidity(); 
                     isValid = false;
                     break; 
                 }
             }
             
+            // STRICT RC VALIDATION LOCK
+            const rcInput = document.getElementById('rcProfile').value.trim();
+            const neverPlayed = document.getElementById('neverPlayedBox').checked;
+            
+            if (rcInput === "" && !neverPlayed) {
+                alert("Action Required: You must either find your Ratings Central Profile ID or strictly check the 'I have never played' box at the bottom of Step 1.");
+                document.getElementById('rcProfile').focus();
+                return;
+            }
+
             if (!isValid) return;
 
             document.getElementById('step1').style.display = 'none';
@@ -277,7 +300,7 @@
             const el = document.getElementById('registerCountdown');
             
             if (distance < 0) {
-                if (overlay) overlay.style.display = 'none'; // Auto unlock when time hits!
+                if (overlay) overlay.style.display = 'none'; 
                 return;
             }
             
@@ -307,9 +330,8 @@
             const form = document.getElementById('registrationForm');
             if (!form) return;
 
-            // Function to save an input
             const saveInput = (el) => {
-                if (!el.id && !el.name) return; // Skip if no identifier
+                if (!el.id && !el.name) return; 
                 
                 const key = el.type === 'radio' ? `gco_${el.name}_${el.value}` : `gco_${el.id || el.name}`;
                 
@@ -317,7 +339,6 @@
                     localStorage.setItem(key, el.checked);
                 } else if (el.type === 'radio') {
                     if (el.checked) {
-                        // Clear others in group
                         form.querySelectorAll(`input[name="${el.name}"]`).forEach(r => {
                             localStorage.removeItem(`gco_${r.name}_${r.value}`);
                         });
@@ -328,7 +349,6 @@
                 }
             };
 
-            // Attach listeners to all current AND future inputs 
             form.addEventListener('input', (e) => {
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
                     saveInput(e.target);
@@ -340,7 +360,6 @@
                 }
             });
 
-            // Restore data on load
             const allInputs = form.querySelectorAll('input, select, textarea');
             allInputs.forEach(input => {
                 if (!input.id && !input.name) return;
@@ -356,14 +375,12 @@
                 }
             });
 
-            // Make sure dynamic UI (like RC Profile checkbox or Club selection) matches restored values
             setTimeout(() => {
                 if (typeof toggleRcProfile === 'function') toggleRcProfile();
                 if (typeof toggleClubOther === 'function') toggleClubOther();
             }, 100);
         });
 
-        // Easily wipe data to register a second child
         function clearProgress() {
             if(confirm("Are you sure you want to clear the form and start over?")) {
                 Object.keys(localStorage).forEach(key => {
@@ -374,6 +391,25 @@
                 window.location.reload();
             }
         }
+
+        // ==========================================
+        // AUTO-SYNC TTA ID TO RATINGS CENTRAL
+        // ==========================================
+        document.getElementById('autoFillByIdBtn').addEventListener('click', () => {
+            const ttaId = document.getElementById('nationalId').value.trim();
+            const rcInput = document.getElementById('rcProfile');
+            
+            // In Australia, TTA ID and RC ID are almost always the same number!
+            if (ttaId && /^\d+$/.test(ttaId)) {
+                rcInput.value = ttaId;
+                
+                // Give the TTA lookup a second to finish, then automatically fire the RC lookup
+                setTimeout(() => {
+                    const rcBtn = document.getElementById('lookupRcBtn');
+                    if(rcBtn) rcBtn.click();
+                }, 1000);
+            }
+        });
     </script>
 </body>
 </html>
