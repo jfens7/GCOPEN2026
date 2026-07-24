@@ -155,9 +155,9 @@ def find_missing_rc(nat_id, first, last):
     except: pass
     return "N/A", "N/A"
 
-# --- MASTER ROW GENERATOR ---
+# --- MASTER ROW GENERATOR (20 COLUMNS: A through T) ---
 def sync_to_sheet(reg_id, record):
-    """Generates the exact 20-column array and pushes it, guaranteeing alignment."""
+    """Generates the exact 20-column array and pushes it, guaranteeing clean column layout."""
     p = record.get('player', {})
     events_str = ", ".join([e['name'] for e in record.get('events', [])])
     partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
@@ -472,14 +472,33 @@ def register():
     final_total = max(0.0, (base_total + ttq_levy) - discount_amount)
     player_details['neverPlayed'] = never_played
 
-    # Auto-Fetch RC Rating using the new lookup logic
+    # Ensure Gender is populated
+    if not player_details.get('gender'):
+        player_details['gender'] = 'N/A'
+
+    # Auto-Fetch RC Rating using TTA ID lookup
     rc_rating = "N/A"
-    if rc_val and not never_played and rc_val.isdigit():
-        _, rc_rating = lookup_rc_by_tta_id(player_details.get('nationalId'))
+    if not never_played and player_details.get('nationalId'):
+        found_rc, found_rating = lookup_rc_by_tta_id(player_details.get('nationalId'))
+        if found_rc != "N/A":
+            player_details['rcId'] = found_rc
+            rc_rating = found_rating
     player_details['rcRating'] = rc_rating
 
     registered_at = get_local_now_str()
     paid_at = registered_at if final_total == 0 else "N/A"
+
+    # INITIAL HISTORY ENTRY
+    initial_history_entry = {
+        "updateNumber": 0,
+        "type": "Initial Registration",
+        "timestamp": registered_at,
+        "amountCharged": final_total,
+        "paymentStatus": "Paid" if final_total == 0 else "Pending",
+        "events": [e['name'] for e in events],
+        "doublesPartners": doubles_partners,
+        "notes": "Initial player registration"
+    }
 
     registration_data = {
         "player": player_details,
@@ -489,10 +508,12 @@ def register():
         "ttqLevy": ttq_levy,
         "discountCode": discount_code,
         "discountAmount": discount_amount,
+        "originalTotal": final_total, # LOCKED ORIGINAL COST
         "finalTotal": final_total,
         "paymentStatus": "Paid" if final_total == 0 else "Pending",
         "registeredAt": registered_at,
         "paidAt": paid_at,
+        "history": [initial_history_entry], # AUDIT TRAIL LOG
         "timestamp": firestore.SERVER_TIMESTAMP
     }
     
@@ -539,16 +560,30 @@ def register():
 @app.route('/api/payment-success', methods=['GET'])
 def payment_success():
     reg_id = request.args.get('reg_id')
+    session_id = request.args.get('session_id', 'N/A')
+    
     if reg_id:
         paid_at = get_local_now_str()
-        db.collection('registrations').document(reg_id).update({
-            "paymentStatus": "Paid",
-            "paidAt": paid_at
-        })
-        doc = db.collection('registrations').document(reg_id).get()
+        doc_ref = db.collection('registrations').document(reg_id)
+        doc = doc_ref.get()
         if doc.exists:
             record = doc.to_dict()
-            applied_code = record.get('discountCode')
+            history = record.get('history', [])
+            
+            if history and len(history) > 0:
+                history[0]['paymentStatus'] = 'Paid'
+                history[0]['stripeSessionId'] = session_id
+                history[0]['paidAt'] = paid_at
+            
+            doc_ref.update({
+                "paymentStatus": "Paid",
+                "paidAt": paid_at,
+                "history": history
+            })
+            
+            updated_record = doc_ref.get().to_dict()
+            
+            applied_code = updated_record.get('discountCode')
             if applied_code:
                 code_docs = list(db.collection('discount_codes').where('code', '==', applied_code).stream())
                 if code_docs:
@@ -556,15 +591,12 @@ def payment_success():
                     if not doc_data.get('isPermanent', False):
                         db.collection('discount_codes').document(code_docs[0].id).update({"used": True})
             
-            sync_to_sheet(reg_id, record)
+            sync_to_sheet(reg_id, updated_record)
 
-            events_str = ", ".join([e['name'] for e in record.get('events', [])])
-            partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
-            email_body = generate_receipt_email(record['player']['firstName'], reg_id, events_str, partners_str, record['finalTotal'], "Paid")
-            send_email(record['player']['email'], "Tournament Registration Confirmation", email_body)
-            
-            admin_body = f"<p>New Paid Registration:<br>Player: {record['player']['firstName']} {record['player']['lastName']}<br>Ref ID: {reg_id}<br>Total: ${record['finalTotal']}<br>Events: {events_str}<br>Partners: {partners_str}</p>"
-            send_email(ADMIN_EMAIL, "New Tournament Registration", admin_body)
+            events_str = ", ".join([e['name'] for e in updated_record.get('events', [])])
+            partners_str = ", ".join([f"{k}: {v}" for k, v in updated_record.get('doublesPartners', {}).items()])
+            email_body = generate_receipt_email(updated_record['player']['firstName'], reg_id, events_str, partners_str, updated_record['finalTotal'], "Paid")
+            send_email(updated_record['player']['email'], "Tournament Registration Confirmation", email_body)
 
     return redirect(f"/success.html?reg_id={reg_id}")
 
@@ -609,14 +641,12 @@ def update_checkout():
     base_total = sum(float(event['price']) for event in new_events)
     ttq_levy = 5.00
     discount_amount = float(record.get('discountAmount', 0))
-    new_final_total = (base_total + ttq_levy) - discount_amount
-    if new_final_total < 0:
-        new_final_total = 0
+    new_final_total = max(0.0, (base_total + ttq_levy) - discount_amount)
         
-    difference = new_final_total - old_final_total
+    difference = round(new_final_total - old_final_total, 2)
     
     if difference <= 0:
-        return jsonify({"error": "Your new total is less than or equal to what you already paid. If you are removing events and require a refund, please contact the admin."}), 400
+        return jsonify({"error": "Your new total is less than or equal to what you already paid."}), 400
         
     try:
         checkout_session = stripe.checkout.Session.create(
@@ -635,12 +665,20 @@ def update_checkout():
             cancel_url=f"{BASE_URL}/update.html",
         )
         
+        # Calculate added and removed events for history logging
+        old_event_names = [e['name'] for e in record.get('events', [])]
+        new_event_names = [e['name'] for e in new_events]
+        added_events = [e for e in new_event_names if e not in old_event_names]
+        removed_events = [e for e in old_event_names if e not in new_event_names]
+
         doc_ref.update({
             "pendingUpdate": {
                 "events": new_events,
                 "doublesPartners": doubles_partners,
                 "newFinalTotal": new_final_total,
-                "difference": difference
+                "difference": difference,
+                "addedEvents": added_events,
+                "removedEvents": removed_events
             }
         })
         
@@ -687,18 +725,37 @@ def pay_balance():
 @app.route('/api/update-success', methods=['GET'])
 def update_success():
     reg_id = request.args.get('reg_id')
+    session_id = request.args.get('session_id', 'N/A')
+    
     if reg_id:
         doc_ref = db.collection('registrations').document(reg_id)
         doc = doc_ref.get()
         if doc.exists:
             record = doc.to_dict()
             paid_at = get_local_now_str()
+            history = record.get('history', [])
+            update_num = len(history)
             
             if 'pendingUpdate' in record:
                 update_data = record['pendingUpdate']
                 new_final = update_data['newFinalTotal']
                 new_events = update_data['events']
                 new_partners = update_data['doublesPartners']
+                diff = update_data['difference']
+                
+                # Append Update Entry to Audit Log
+                history.append({
+                    "updateNumber": update_num,
+                    "type": f"Update #{update_num} (Added Events)",
+                    "timestamp": paid_at,
+                    "amountPaid": diff,
+                    "previousTotal": record.get('finalTotal', 0),
+                    "newTotal": new_final,
+                    "addedEvents": update_data.get('addedEvents', []),
+                    "removedEvents": update_data.get('removedEvents', []),
+                    "paymentStatus": "Paid",
+                    "stripeSessionId": session_id
+                })
                 
                 doc_ref.update({
                     "events": new_events,
@@ -707,6 +764,7 @@ def update_success():
                     "paymentStatus": "Paid",
                     "paidAt": paid_at,
                     "balanceDue": 0,
+                    "history": history,
                     "pendingUpdate": firestore.DELETE_FIELD
                 })
                 
@@ -723,20 +781,27 @@ def update_success():
                 balance = float(record.get('balanceDue', 0))
                 new_total = old_total + balance
                 
+                history.append({
+                    "updateNumber": update_num,
+                    "type": f"Update #{update_num} (Balance Payment)",
+                    "timestamp": paid_at,
+                    "amountPaid": balance,
+                    "previousTotal": old_total,
+                    "newTotal": new_total,
+                    "paymentStatus": "Paid",
+                    "stripeSessionId": session_id
+                })
+                
                 doc_ref.update({
                     "finalTotal": new_total,
                     "paymentStatus": "Paid",
                     "paidAt": paid_at,
-                    "balanceDue": 0
+                    "balanceDue": 0,
+                    "history": history
                 })
                 
                 updated_record = doc_ref.get().to_dict()
                 sync_to_sheet(reg_id, updated_record)
-                    
-                events_str = ", ".join([e['name'] for e in record.get('events', [])])
-                partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
-                email_body = generate_receipt_email(record['player']['firstName'], reg_id, events_str, partners_str, new_total, "Paid")
-                send_email(record['player']['email'], "Balance Payment Confirmed", email_body)
 
     return redirect(f"/success.html?reg_id={reg_id}&updated=true")
 
@@ -784,7 +849,6 @@ def admin_resend_email(reg_id):
         return jsonify({"error": "Registration not found"}), 404
         
     record = doc.to_dict()
-    
     events_str = ", ".join([e['name'] for e in record.get('events', [])])
     partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
     final_total = record.get('finalTotal', 0)
@@ -932,6 +996,17 @@ def manual_register():
 
     registered_at = get_local_now_str()
     paid_at = registered_at if data.get('status') == 'Paid' else 'N/A'
+    total_val = float(data.get('totalPaid', 0))
+
+    initial_history = {
+        "updateNumber": 0,
+        "type": "Admin Manual Entry",
+        "timestamp": registered_at,
+        "amountCharged": total_val,
+        "paymentStatus": data.get('status', 'Paid'),
+        "events": [e['name'] for e in data.get('events', [])],
+        "notes": "Added manually by admin"
+    }
 
     registration_data = {
         "player": {
@@ -940,7 +1015,7 @@ def manual_register():
             "email": data.get('email', ''),
             "phone": data.get('phone', ''),
             "dob": data.get('dob', 'N/A'),
-            "gender": data.get('gender', 'N/A'),
+            "gender": data.get('gender', 'Male'),
             "nationalId": data.get('nationalId', 'N/A'),
             "rcId": rc_val,
             "rcRating": rc_rating,
@@ -949,14 +1024,16 @@ def manual_register():
         },
         "events": data.get('events', []),
         "doublesPartners": {},
-        "baseTotal": float(data.get('totalPaid', 0)),
+        "baseTotal": total_val,
         "ttqLevy": 0,
         "discountCode": "MANUAL",
         "discountAmount": 0,
-        "finalTotal": float(data.get('totalPaid', 0)),
+        "originalTotal": total_val,
+        "finalTotal": total_val,
         "paymentStatus": data.get('status', 'Paid'),
         "registeredAt": registered_at,
         "paidAt": paid_at,
+        "history": [initial_history],
         "timestamp": firestore.SERVER_TIMESTAMP
     }
     
@@ -969,16 +1046,46 @@ def manual_register():
 @app.route('/api/admin/registrations/<reg_id>', methods=['PUT'])
 def update_registration(reg_id):
     data = request.json
+    doc_ref = db.collection('registrations').document(reg_id)
+    doc = doc_ref.get()
+    
+    if not doc.exists:
+        return jsonify({"error": "Registration not found"}), 404
+        
+    record = doc.to_dict()
+    history = record.get('history', [])
+    now_str = get_local_now_str()
+
     update_payload = {}
     if 'player' in data:
-        for k, v in data['player'].items(): update_payload[f'player.{k}'] = v
-    if 'events' in data: update_payload['events'] = data['events']
-    if 'doublesPartners' in data: update_payload['doublesPartners'] = data['doublesPartners']
-    if 'finalTotal' in data: update_payload['finalTotal'] = data['finalTotal']
-    if 'paymentStatus' in data: update_payload['paymentStatus'] = data['paymentStatus']
+        for k, v in data['player'].items(): 
+            update_payload[f'player.{k}'] = v
+            
+    if 'events' in data: 
+        update_payload['events'] = data['events']
+    if 'doublesPartners' in data: 
+        update_payload['doublesPartners'] = data['doublesPartners']
+    if 'finalTotal' in data: 
+        update_payload['finalTotal'] = data['finalTotal']
+    if 'paymentStatus' in data: 
+        update_payload['paymentStatus'] = data['paymentStatus']
+        if 'Paid' in data['paymentStatus']:
+            update_payload['paidAt'] = now_str
 
-    db.collection('registrations').document(reg_id).update(update_payload)
-    updated_record = db.collection('registrations').document(reg_id).get().to_dict()
+    # Append Admin Action to Audit History
+    update_num = len(history)
+    history.append({
+        "updateNumber": update_num,
+        "type": f"Admin Overwrite #{update_num}",
+        "timestamp": now_str,
+        "newTotal": data.get('finalTotal', record.get('finalTotal', 0)),
+        "paymentStatus": data.get('paymentStatus', record.get('paymentStatus', 'Pending')),
+        "notes": "Full overwrite updated via Admin Panel"
+    })
+    update_payload['history'] = history
+
+    doc_ref.update(update_payload)
+    updated_record = doc_ref.get().to_dict()
     sync_to_sheet(reg_id, updated_record)
     return jsonify({"status": "updated"})
 

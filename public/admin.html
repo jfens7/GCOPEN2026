@@ -40,11 +40,14 @@
         
         .full-width-text { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1; font-size: 13px; font-family: inherit; }
         
-        /* Scrollbar styling for modals */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* History Log styling */
+        .history-card { background: #F8FAFC; border: 1px solid #E2E8F0; border-left: 4px solid var(--gctta-navy); padding: 12px; margin-bottom: 10px; border-radius: 4px; font-size: 13px; }
+        .history-title { font-weight: bold; color: var(--gctta-navy); display: flex; justify-content: space-between; margin-bottom: 5px; }
     </style>
 </head>
 <body style="background-color: #F8FAFC; margin: 0;">
@@ -169,9 +172,9 @@
 
         <!-- FULL VIEW DETAILS MODAL -->
         <div id="viewModal" class="login-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 10000;">
-            <div class="login-box" style="width: 800px; max-width: 95vw; max-height: 90vh; overflow-y: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+            <div class="login-box" style="width: 850px; max-width: 95vw; max-height: 90vh; overflow-y: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
                <div style="display:flex; justify-content: space-between; align-items:center;">
-                   <h2 style="margin: 0; color: var(--gctta-navy);">Player Summary</h2>
+                   <h2 style="margin: 0; color: var(--gctta-navy);">Player Summary & Audit History</h2>
                    <button onclick="document.getElementById('viewModal').style.display='none'" style="background:none; border:none; font-size:28px; cursor:pointer; color: #64748B; padding: 0;">&times;</button>
                </div>
                <hr style="border: none; border-top: 1px solid #E2E8F0; margin: 15px 0;">
@@ -490,7 +493,6 @@
                 document.getElementById('viewPlayers').style.display = 'block';
                 document.getElementById('viewDiscounts').style.display = 'none';
                 
-                // Show Player action buttons
                 document.getElementById('btnBulkFix').style.display = 'inline-block';
                 document.getElementById('btnRebuildSheet').style.display = 'inline-block';
                 document.getElementById('btnManualEntry').style.display = 'inline-block';
@@ -501,7 +503,6 @@
                 document.getElementById('viewDiscounts').style.display = 'block';
                 document.getElementById('viewPlayers').style.display = 'none';
                 
-                // Hide Player action buttons
                 document.getElementById('btnBulkFix').style.display = 'none';
                 document.getElementById('btnRebuildSheet').style.display = 'none';
                 document.getElementById('btnManualEntry').style.display = 'none';
@@ -522,7 +523,6 @@
 
             let csvContent = "data:text/csv;charset=utf-8,";
             
-            // Zermelo standard headers + our custom data
             const headers = [
                 "Ref ID", "First Name", "Last Name", "Email", "Phone", "DOB", "Gender", 
                 "TTA ID", "Club", "RC ID", "RC Rating", "Never Played", "Events", 
@@ -572,7 +572,7 @@
         // BULK FIX & REBUILD ACTIONS
         // ==========================================
         function bulkFixRc() {
-            if(confirm("This will query Ratings Central for every player using their exact TTA ID, update their missing RC IDs and live Ratings, and rebuild the Google Sheet. This may take a minute. Proceed?")) {
+            if(confirm("This will query Ratings Central for every player using their exact TTA ID, update their missing RC IDs and live Ratings, and rebuild the Google Sheet. Proceed?")) {
                 const btn = document.getElementById('btnBulkFix');
                 btn.textContent = "Querying Ratings Central...";
                 btn.disabled = true;
@@ -665,7 +665,7 @@
         }
 
         // ==========================================
-        // VIEW SUMMARY MODAL
+        // VIEW SUMMARY & AUDIT TRAIL MODAL
         // ==========================================
         async function openViewModal(id) {
             const reg = allRegistrations.find(r => r.id === id);
@@ -677,7 +677,6 @@
             let liveRating = reg.player.rcRating && reg.player.rcRating !== 'N/A' ? reg.player.rcRating : 'Fetching...';
             let liveRcId = reg.player.rcId || 'N/A';
 
-            // Attempt a live fetch if the DB rating is blank but they have an RC ID
             if (liveRating === 'Fetching...' && liveRcId !== 'N/A' && liveRcId !== 'Never Played') {
                 try {
                     const res = await fetch(`/api/ratings-central/search?query=${liveRcId}`);
@@ -707,6 +706,33 @@
                 partnersList = Object.entries(reg.doublesPartners).map(([k,v]) => `<li style="margin-bottom:6px; padding-bottom: 6px; border-bottom: 1px dashed #E2E8F0;"><b style="color: var(--gctta-navy);">${k}:</b> ${v}</li>`).join('');
             }
 
+            // Build History HTML
+            let historyHtml = '<p style="color: #64748B; font-style: italic;">No updates recorded yet.</p>';
+            if (reg.history && reg.history.length > 0) {
+                historyHtml = reg.history.map((h, idx) => {
+                    let addedText = h.addedEvents && h.addedEvents.length > 0 ? `<br><span style="color: green;"><b>+ Added Events:</b> ${h.addedEvents.join(', ')}</span>` : '';
+                    let removedText = h.removedEvents && h.removedEvents.length > 0 ? `<br><span style="color: red;"><b>- Removed Events:</b> ${h.removedEvents.join(', ')}</span>` : '';
+                    let diffText = h.amountPaid ? `<br><b>Amount Paid in Update:</b> $${parseFloat(h.amountPaid).toFixed(2)}` : '';
+                    let stripeText = h.stripeSessionId ? `<br><span style="font-size:11px; color:#64748B;">Stripe Ref: ${h.stripeSessionId}</span>` : '';
+
+                    return `
+                        <div class="history-card">
+                            <div class="history-title">
+                                <span>${h.type || 'Update #' + idx}</span>
+                                <span style="font-weight: normal; color: #64748B;">${h.timestamp || 'N/A'}</span>
+                            </div>
+                            <div>
+                                Status: <b>${h.paymentStatus || 'Paid'}</b>
+                                ${diffText}
+                                ${addedText}
+                                ${removedText}
+                                ${stripeText}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
             content.innerHTML = `
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; font-size: 14px; color: #334155;">
                     <div style="background: #F8FAFC; padding: 20px; border-radius: 6px; border: 1px solid #E2E8F0;">
@@ -715,31 +741,37 @@
                         <p style="margin: 8px 0;"><strong>Email:</strong> ${reg.player.email}</p>
                         <p style="margin: 8px 0;"><strong>Phone:</strong> ${reg.player.phone}</p>
                         <p style="margin: 8px 0;"><strong>DOB:</strong> ${reg.player.dob}</p>
-                        <p style="margin: 8px 0;"><strong>Gender:</strong> ${reg.player.gender}</p>
+                        <p style="margin: 8px 0;"><strong>Gender:</strong> ${reg.player.gender || 'N/A'}</p>
                         <p style="margin: 8px 0;"><strong>Club:</strong> ${reg.player.club}</p>
                     </div>
                     <div style="background: #F8FAFC; padding: 20px; border-radius: 6px; border: 1px solid #E2E8F0;">
-                        <h4 style="margin-top: 0; color: var(--gctta-navy); border-bottom: 2px solid var(--gctta-gold); padding-bottom: 5px;">Registration Info</h4>
+                        <h4 style="margin-top: 0; color: var(--gctta-navy); border-bottom: 2px solid var(--gctta-gold); padding-bottom: 5px;">Registration & Financial Summary</h4>
                         <p style="margin: 8px 0;"><strong>TTA ID:</strong> ${reg.player.nationalId}</p>
                         <p style="margin: 8px 0;"><strong>RC ID:</strong> ${liveRcId}</p>
-                        <div style="background: #FEF3C7; padding: 12px; border-left: 4px solid #D97706; margin: 15px 0; border-radius: 4px;">
-                            <strong style="color: #92400E; display: block; margin-bottom: 4px;">Ratings Central Rating:</strong> 
-                            <span style="font-size: 20px; font-weight: bold; color: #B45309;">${liveRating}</span>
+                        <div style="background: #FEF3C7; padding: 10px; border-left: 4px solid #D97706; margin: 10px 0; border-radius: 4px;">
+                            <strong style="color: #92400E; display: block;">Ratings Central Rating:</strong> 
+                            <span style="font-size: 18px; font-weight: bold; color: #B45309;">${liveRating}</span>
                         </div>
-                        <p style="margin: 8px 0;"><strong>Registered:</strong> ${reg.registeredAt || 'N/A'}</p>
-                        <p style="margin: 8px 0;"><strong>Status:</strong> <span class="badge ${reg.paymentStatus === 'Paid' ? 'badge-paid' : 'badge-pending'}">${reg.paymentStatus}</span></p>
-                        <p style="margin: 8px 0;"><strong>Total Paid:</strong> $${parseFloat(reg.finalTotal || 0).toFixed(2)}</p>
+                        <p style="margin: 8px 0;"><strong>Original Entry Cost:</strong> $${parseFloat(reg.originalTotal || reg.finalTotal || 0).toFixed(2)}</p>
+                        <p style="margin: 8px 0;"><strong>Current Total Value:</strong> $${parseFloat(reg.finalTotal || 0).toFixed(2)}</p>
+                        <p style="margin: 8px 0;"><strong>Payment Status:</strong> <span class="badge ${reg.paymentStatus === 'Paid' ? 'badge-paid' : 'badge-pending'}">${reg.paymentStatus}</span></p>
                     </div>
                 </div>
                 
-                <div style="margin-top: 25px;">
-                    <h4 style="margin-bottom: 10px; color: var(--gctta-navy); border-bottom: 2px solid var(--gctta-gold); padding-bottom: 5px;">Events Entered</h4>
-                    <ul style="margin-top: 0; padding-left: 0; list-style-type: none; color: #475569; font-size: 13px;">${eventsList}</ul>
+                <div style="margin-top: 25px; display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
+                    <div>
+                        <h4 style="margin-bottom: 10px; color: var(--gctta-navy); border-bottom: 2px solid var(--gctta-gold); padding-bottom: 5px;">Current Events Entered</h4>
+                        <ul style="margin-top: 0; padding-left: 0; list-style-type: none; color: #475569; font-size: 13px;">${eventsList}</ul>
+                    </div>
+                    <div>
+                        <h4 style="margin-bottom: 10px; color: var(--gctta-navy); border-bottom: 2px solid var(--gctta-gold); padding-bottom: 5px;">Doubles Partners</h4>
+                        <ul style="margin-top: 0; padding-left: 0; list-style-type: none; color: #475569; font-size: 13px;">${partnersList}</ul>
+                    </div>
                 </div>
-                
-                <div style="margin-top: 25px;">
-                    <h4 style="margin-bottom: 10px; color: var(--gctta-navy); border-bottom: 2px solid var(--gctta-gold); padding-bottom: 5px;">Doubles Partners</h4>
-                    <ul style="margin-top: 0; padding-left: 0; list-style-type: none; color: #475569; font-size: 13px;">${partnersList}</ul>
+
+                <div style="margin-top: 25px; border-top: 2px solid #E2E8F0; padding-top: 15px;">
+                    <h4 style="margin-bottom: 15px; color: var(--gctta-navy);">Update & Revision History Log</h4>
+                    ${historyHtml}
                 </div>
             `;
         }
