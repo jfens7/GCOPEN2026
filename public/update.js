@@ -1,4 +1,10 @@
 let currentReg = null;
+let apiBaseUrl = window.location.origin + '/api';
+
+// Adjust for local dev vs production
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    apiBaseUrl = 'http://localhost:5000/api';
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById('findRegBtn').addEventListener('click', lookupRegistration);
@@ -23,7 +29,7 @@ async function lookupRegistration() {
     errorEl.style.display = "none";
 
     try {
-        const response = await fetch(`${API_BASE}/registration/lookup`, {
+        const response = await fetch(`${apiBaseUrl}/registration/lookup`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ nationalId: nationalId, dob: dob })
@@ -31,7 +37,7 @@ async function lookupRegistration() {
         
         if (response.ok) {
             currentReg = await response.json();
-            showUpdateStep();
+            await showUpdateStep();
         } else {
             const data = await response.json();
             errorEl.textContent = data.error || "Registration not found.";
@@ -47,7 +53,7 @@ async function lookupRegistration() {
     }
 }
 
-function showUpdateStep() {
+async function showUpdateStep() {
     document.getElementById('lookupStep').style.display = "none";
     document.getElementById('updateStep').style.display = "block";
     
@@ -63,26 +69,118 @@ function showUpdateStep() {
 
     document.getElementById('oldPaidAmount').textContent = parseFloat(currentReg.finalTotal || 0).toFixed(2);
     
+    // 1. Render all radio buttons and select the ones they already paid for
     renderUpdateEventsList();
+    
+    // 2. Fetch their rating and disable events they are too old/young/highly-rated for
+    await applyEligibilityRestrictions();
+
+    // 3. Calculate the math
     calculateUpdateTotals();
 }
 
 function renderUpdateEventsList() {
-    const eventsList = document.getElementById('updateEventsContainer');
-    eventsList.innerHTML = "";
-    
+    // Reset all radios to 'None'
+    document.querySelectorAll('#updateEventsContainer input[type="radio"][value=""]').forEach(r => r.checked = true);
+
+    // Look for the events they already signed up for and pre-select them
     const regEventIds = currentReg.events.map(e => e.id);
+
+    document.querySelectorAll('#updateEventsContainer input[type="radio"]:not([value=""])').forEach(radio => {
+        const ev = JSON.parse(radio.value);
+        if (regEventIds.includes(ev.id)) {
+            radio.checked = true;
+        }
+    });
+}
+
+async function applyEligibilityRestrictions() {
+    let playerRating = 0;
+    const rcId = currentReg.player.rcId;
     
-    masterEventsList.forEach(ev => {
-        const isChecked = regEventIds.includes(ev.id) ? "checked" : "";
-        eventsList.innerHTML += `
-            <div style="margin-bottom: 5px;">
-                <label style="cursor: pointer; font-weight: normal; font-size: 14px;">
-                    <input type="checkbox" name="update_event" value='${JSON.stringify(ev)}' ${isChecked} onchange="calculateUpdateTotals()">
-                    ${ev.name} - $${ev.price.toFixed(2)}
-                </label>
-            </div>
-        `;
+    // Attempt to silently fetch their exact Rating from Ratings Central
+    if (rcId && rcId.toLowerCase() !== 'never played' && rcId.toLowerCase() !== 'n/a') {
+        try {
+            const res = await fetch(`${apiBaseUrl}/ratings-central/search?query=${rcId}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.players && data.players.length > 0) {
+                    playerRating = parseInt(data.players[0].rating, 10);
+                }
+            }
+        } catch (e) {
+            console.warn("Could not fetch player rating for validation.");
+        }
+    }
+
+    // Calculate Age exactly at the end of the year (2026)
+    let ageIn2026 = 0;
+    if (currentReg.player.dob) {
+        const parts = currentReg.player.dob.split('/');
+        if (parts.length === 3) {
+            ageIn2026 = 2026 - parseInt(parts[2], 10);
+        }
+    }
+
+    // Determine Gender
+    const gender = currentReg.player.gender || "";
+
+    // Iterate through every event on the screen and enforce the rules
+    document.querySelectorAll('#updateEventsContainer input[type="radio"]:not([value=""])').forEach(radio => {
+        const ev = JSON.parse(radio.value);
+        const name = ev.name.toLowerCase();
+        let disable = false;
+        let reason = [];
+
+        // --- GENDER RULES ---
+        if (gender === 'Male' && (name.includes('women') || name.includes('girl'))) { disable = true; reason.push('Gender'); }
+        if (gender === 'Female' && (name.includes('men') || name.includes('boy'))) { disable = true; reason.push('Gender'); }
+
+        // --- AGE RULES (JUNIORS) ---
+        if (name.includes('under 11') && ageIn2026 >= 11) { disable = true; reason.push('Age'); }
+        if (name.includes('under 13') && ageIn2026 >= 13) { disable = true; reason.push('Age'); }
+        if (name.includes('under 15') && ageIn2026 >= 15) { disable = true; reason.push('Age'); }
+        if (name.includes('under 17') && ageIn2026 >= 17) { disable = true; reason.push('Age'); }
+        if (name.includes('under 19') && ageIn2026 >= 19) { disable = true; reason.push('Age'); }
+
+        // --- AGE RULES (VETERANS) ---
+        if (name.includes('over 30') && ageIn2026 < 30) { disable = true; reason.push('Age'); }
+        if (name.includes('over 40') && ageIn2026 < 40) { disable = true; reason.push('Age'); }
+        if (name.includes('over 50') && ageIn2026 < 50) { disable = true; reason.push('Age'); }
+        if (name.includes('over 60') && ageIn2026 < 60) { disable = true; reason.push('Age'); }
+        if (name.includes('over 70') && ageIn2026 < 70) { disable = true; reason.push('Age'); }
+        if (name.includes('over 80') && ageIn2026 < 80) { disable = true; reason.push('Age'); }
+        if (name.includes('veteran') && ageIn2026 < 30) { disable = true; reason.push('Age'); }
+
+        // --- RATING RULES ---
+        if (playerRating > 0) {
+            if (name.includes('under 1700') && playerRating >= 1700) { disable = true; reason.push('Rating'); }
+            if (name.includes('under 1400') && playerRating >= 1400) { disable = true; reason.push('Rating'); }
+            if (name.includes('under 1200') && playerRating >= 1200) { disable = true; reason.push('Rating'); }
+            if (name.includes('under 1000') && playerRating >= 1000) { disable = true; reason.push('Rating'); }
+            if (name.includes('under 800') && playerRating >= 800) { disable = true; reason.push('Rating'); }
+        }
+
+        // Apply visual lockout if they fail the checks
+        if (disable) {
+            radio.disabled = true;
+            const label = radio.parentNode;
+            label.style.color = '#94A3B8';
+            label.style.textDecoration = 'line-through';
+            
+            // Generate a mini badge explaining exactly why they can't play it
+            const badge = document.createElement('span');
+            badge.style.fontSize = '10px';
+            badge.style.background = '#F1F5F9';
+            badge.style.padding = '2px 6px';
+            badge.style.borderRadius = '4px';
+            badge.style.marginLeft = '8px';
+            badge.style.textDecoration = 'none';
+            badge.style.display = 'inline-block';
+            badge.textContent = `Ineligible (${reason.join(', ')})`;
+            
+            label.appendChild(badge);
+        }
     });
 }
 
@@ -90,8 +188,9 @@ function calculateUpdateTotals() {
     const selectedEvents = [];
     let baseTotal = 0;
     
-    document.querySelectorAll('input[name="update_event"]:checked').forEach(chk => {
-        const ev = JSON.parse(chk.value);
+    // Grab all checked events that are not "None"
+    document.querySelectorAll('#updateEventsContainer input[type="radio"]:not([value=""]):checked').forEach(rad => {
+        const ev = JSON.parse(rad.value);
         selectedEvents.push(ev);
         baseTotal += parseFloat(ev.price);
     });
@@ -111,16 +210,25 @@ function calculateUpdateTotals() {
     const warningEl = document.getElementById('refundWarning');
     const payBtn = document.getElementById('payDifferenceBtn');
     
-    if (difference <= 0 && newFinalTotal !== oldFinalTotal) {
+    if (difference < 0) {
         warningEl.style.display = "block";
         payBtn.disabled = true;
-    } else if (difference <= 0 && newFinalTotal === oldFinalTotal) {
+        payBtn.textContent = "PROCEED TO PAY DIFFERENCE";
+    } else if (difference === 0) {
         warningEl.style.display = "none";
-        payBtn.disabled = true;
+        payBtn.disabled = false;
+        payBtn.textContent = "SAVE CHANGES (FREE)";
     } else {
         warningEl.style.display = "none";
         payBtn.disabled = false;
+        payBtn.textContent = "PROCEED TO SECURE PAYMENT";
     }
+
+    // Capture currently typed partner values so they don't erase while clicking radio buttons
+    const currentPartnerValues = {};
+    document.querySelectorAll('#partnerInputsUpdate input').forEach(inp => {
+        currentPartnerValues[inp.id] = inp.value;
+    });
 
     const partnerSection = document.getElementById('doublesPartnerSectionUpdate');
     const partnerInputs = document.getElementById('partnerInputsUpdate');
@@ -130,11 +238,17 @@ function calculateUpdateTotals() {
     selectedEvents.forEach(ev => {
         if (ev.name.toLowerCase().includes('doubles')) {
             needsPartner = true;
-            let savedPartner = (currentReg.doublesPartners && currentReg.doublesPartners[ev.name]) ? currentReg.doublesPartners[ev.name] : "";
+            
+            // Prefer currently typed text -> then database saved partner -> then empty string
+            let savedPartner = currentPartnerValues[`partner_update_${ev.id}`];
+            if (savedPartner === undefined) {
+                savedPartner = (currentReg.doublesPartners && currentReg.doublesPartners[ev.name]) ? currentReg.doublesPartners[ev.name] : "";
+            }
+            
             partnerInputs.innerHTML += `
                 <div class="form-group" style="margin-bottom: 10px;">
                     <label style="font-size: 13px;">Partner for ${ev.name}</label>
-                    <input type="text" id="partner_update_${ev.id}" value="${savedPartner}" placeholder="Partner Name (or 'Partner Required')" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                    <input type="text" id="partner_update_${ev.id}" value="${savedPartner}" placeholder="Partner Name (or 'Partner Required')" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" onchange="calculateUpdateTotals()">
                 </div>
             `;
         }
@@ -145,7 +259,7 @@ function calculateUpdateTotals() {
 
 async function processUpdateAndPay() {
     const selectedEvents = [];
-    document.querySelectorAll('input[name="update_event"]:checked').forEach(chk => {
+    document.querySelectorAll('#updateEventsContainer input[type="radio"]:not([value=""]):checked').forEach(chk => {
         selectedEvents.push(JSON.parse(chk.value));
     });
 
@@ -157,18 +271,56 @@ async function processUpdateAndPay() {
         }
     });
 
+    const oldFinalTotal = parseFloat(currentReg.finalTotal || 0);
+    const newTotalText = parseFloat(document.getElementById('newTotalAmount').textContent);
+    const difference = newTotalText - oldFinalTotal;
+
+    const btn = document.getElementById('payDifferenceBtn');
+    
+    // FREE UPDATE BYPASS (e.g. Swapping events or just editing partner names)
+    if (difference === 0) {
+        btn.textContent = "Saving Changes...";
+        btn.disabled = true;
+        try {
+            const response = await fetch(`${apiBaseUrl}/admin/registrations/${currentReg.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    events: selectedEvents,
+                    doublesPartners: doublesPartners,
+                    finalTotal: newTotalText,
+                    paymentStatus: currentReg.paymentStatus
+                })
+            });
+            if (response.ok) {
+                alert("Your registration has been updated successfully!");
+                window.location.reload();
+            } else {
+                alert("Failed to update registration. Please try again.");
+                btn.textContent = "SAVE CHANGES (FREE)";
+                btn.disabled = false;
+            }
+        } catch(err) {
+            console.error(err);
+            alert("Server error. Please try again.");
+            btn.textContent = "SAVE CHANGES (FREE)";
+            btn.disabled = false;
+        }
+        return;
+    }
+
+    // STANDARD PAID UPDATE
     const payload = {
         reg_id: currentReg.id,
         events: selectedEvents,
         doublesPartners: doublesPartners
     };
 
-    const btn = document.getElementById('payDifferenceBtn');
     btn.textContent = "Processing...";
     btn.disabled = true;
 
     try {
-        const response = await fetch(`${API_BASE}/registration/update-checkout`, {
+        const response = await fetch(`${apiBaseUrl}/registration/update-checkout`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -197,7 +349,7 @@ async function payBalance() {
     btn.disabled = true;
 
     try {
-        const response = await fetch(`${API_BASE}/registration/pay-balance`, {
+        const response = await fetch(`${apiBaseUrl}/registration/pay-balance`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reg_id: currentReg.id })
