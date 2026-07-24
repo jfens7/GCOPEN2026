@@ -101,7 +101,6 @@ def generate_receipt_email(first_name, reg_id, events_str, partners_str, final_t
 def find_missing_rc(nat_id, first, last):
     """Fallback scraper to auto-locate RC ID purely by exact name match"""
     headers = {"User-Agent": "Mozilla/5.0"}
-    
     try:
         name_query = f"{last.strip()}, {first.strip()}"
         rc_url = f"https://www.ratingscentral.com/PlayerList.php?PlayerName={requests.utils.quote(name_query)}&PlayerSport=1"
@@ -117,8 +116,48 @@ def find_missing_rc(nat_id, first, last):
                 elif len(tds) == 4:
                     return tds[2].get_text(strip=True)
     except: pass
-    
     return "N/A"
+
+# --- MASTER ROW GENERATOR ---
+def sync_to_sheet(reg_id, record):
+    """Generates the exact 19-column array and pushes it, guaranteeing alignment."""
+    p = record.get('player', {})
+    events_str = ", ".join([e['name'] for e in record.get('events', [])])
+    partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
+    
+    row_data = [
+        reg_id, 
+        p.get('firstName', ''), 
+        p.get('lastName', ''), 
+        p.get('email', ''),
+        p.get('phone', ''), 
+        p.get('dob', 'N/A'),
+        p.get('gender', 'N/A'),
+        p.get('nationalId', 'N/A'), 
+        p.get('club', 'N/A'),
+        p.get('rcId', 'N/A'), 
+        str(p.get('neverPlayed', False)).upper(),
+        events_str, 
+        partners_str, 
+        record.get('ttqLevy', 5.0), 
+        record.get('discountAmount', 0),
+        record.get('finalTotal', 0), 
+        record.get('paymentStatus', 'Pending'),
+        record.get('registeredAt', 'N/A'),
+        record.get('paidAt', 'N/A')
+    ]
+    
+    try:
+        cell = sheet.find(reg_id)
+        if cell:
+            cell_list = sheet.range(f"A{cell.row}:S{cell.row}")
+            for i, val in enumerate(row_data):
+                cell_list[i].value = str(val)
+            sheet.update_cells(cell_list)
+        else:
+            sheet.insert_row(row_data, 2)
+    except Exception as e:
+        print(f"GSheet Sync Error: {str(e)}")
 
 # ==========================================
 # PAGE ROUTING
@@ -210,7 +249,6 @@ def search_national_id():
             return jsonify({"error": "Playwright browser missing."}), 500
         return jsonify({"error": "Failed to search National ID", "details": str(e)}), 500
 
-
 @app.route('/api/national-id/lookup-by-id', methods=['GET'])
 def lookup_national_id_by_id():
     nat_id = request.args.get('id')
@@ -288,7 +326,6 @@ def lookup_national_id_by_id():
 
     except Exception as e:
         return jsonify({"error": "Failed to search National ID", "details": str(e)}), 500
-
 
 @app.route('/api/ratings-central/search', methods=['GET'])
 def search_ratings_central():
@@ -421,21 +458,7 @@ def register():
     doc_ref.set(registration_data)
     registration_id = doc_ref.id
 
-    try:
-        events_str = ", ".join([e['name'] for e in events])
-        partners_str = ", ".join([f"{k}: {v}" for k, v in doubles_partners.items()])
-        
-        row = [
-            registration_id, player_details['firstName'], player_details['lastName'], player_details['email'],
-            player_details['phone'], player_details.get('dob', 'N/A'), player_details['nationalId'], player_details['club'],
-            rc_val, str(never_played).upper(), events_str, partners_str, 
-            ttq_levy, discount_amount, final_total, "Paid" if final_total == 0 else "Pending",
-            registered_at, paid_at
-        ]
-        
-        sheet.insert_row(row, 2)
-    except Exception as e:
-        print(f"GSheet Insert Error: {e}")
+    sync_to_sheet(registration_id, registration_data)
 
     if data.get('payLater') or final_total == 0:
         if final_total == 0:
@@ -443,7 +466,6 @@ def register():
         
         events_str = ", ".join([e['name'] for e in events])
         partners_str = ", ".join([f"{k}: {v}" for k, v in doubles_partners.items()])
-        
         email_body = generate_receipt_email(player_details['firstName'], registration_id, events_str, partners_str, final_total, "Pending")
         send_email(player_details['email'], "Tournament Registration (Pending Payment)", email_body)
         
@@ -492,17 +514,10 @@ def payment_success():
                     if not doc_data.get('isPermanent', False):
                         db.collection('discount_codes').document(code_docs[0].id).update({"used": True})
             
-            try:
-                cell = sheet.find(reg_id)
-                if cell:
-                    sheet.update_cell(cell.row, 16, "Paid") 
-                    sheet.update_cell(cell.row, 18, paid_at)
-            except Exception as e:
-                print(f"GSheet Update Error: {e}")
+            sync_to_sheet(reg_id, record)
 
-            events_str = ", ".join([e['name'] for e in record['events']])
+            events_str = ", ".join([e['name'] for e in record.get('events', [])])
             partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
-
             email_body = generate_receipt_email(record['player']['firstName'], reg_id, events_str, partners_str, record['finalTotal'], "Paid")
             send_email(record['player']['email'], "Tournament Registration Confirmation", email_body)
             
@@ -515,23 +530,22 @@ def payment_success():
 # ==========================================
 # UPDATE / BALANCE ENDPOINTS
 # ==========================================
-
 @app.route('/api/registration/lookup', methods=['POST'])
 def lookup_reg():
     data = request.json
+    email_input = data.get('email', '').strip().lower()
     nat_id_input = data.get('nationalId', '').strip()
-    dob_input = data.get('dob', '').strip()
     
     docs = db.collection('registrations').where(filter=FieldFilter('player.nationalId', '==', nat_id_input)).stream()
     registrations = []
     for doc in docs:
         doc_dict = doc.to_dict()
-        doc_dob = doc_dict.get('player', {}).get('dob', '').strip()
-        if doc_dob == dob_input:
+        doc_email = doc_dict.get('player', {}).get('email', '').strip().lower()
+        if doc_email == email_input:
             registrations.append(doc_dict | {"id": doc.id})
             
     if not registrations:
-        return jsonify({"error": "No registration found with this TTA Member Number and Date of Birth."}), 404
+        return jsonify({"error": "No registration found with this Email and TTA Member Number."}), 404
         
     return jsonify(registrations[0])
 
@@ -631,7 +645,6 @@ def pay_balance():
 @app.route('/api/update-success', methods=['GET'])
 def update_success():
     reg_id = request.args.get('reg_id')
-    
     if reg_id:
         doc_ref = db.collection('registrations').document(reg_id)
         doc = doc_ref.get()
@@ -655,19 +668,11 @@ def update_success():
                     "pendingUpdate": firestore.DELETE_FIELD
                 })
                 
-                try:
-                    cell = sheet.find(reg_id)
-                    if cell:
-                        events_str = ", ".join([e['name'] for e in new_events])
-                        partners_str = ", ".join([f"{k}: {v}" for k, v in new_partners.items()])
-                        sheet.update_cell(cell.row, 11, events_str)
-                        sheet.update_cell(cell.row, 12, partners_str)
-                        sheet.update_cell(cell.row, 15, new_final)
-                        sheet.update_cell(cell.row, 16, "Paid")
-                        sheet.update_cell(cell.row, 18, paid_at)
-                except Exception as e:
-                    print("Sheet update error:", e)
+                updated_record = doc_ref.get().to_dict()
+                sync_to_sheet(reg_id, updated_record)
                     
+                events_str = ", ".join([e['name'] for e in new_events])
+                partners_str = ", ".join([f"{k}: {v}" for k, v in new_partners.items()])
                 email_body = generate_receipt_email(record['player']['firstName'], reg_id, events_str, partners_str, new_final, "Paid")
                 send_email(record['player']['email'], "Registration Update Confirmed", email_body)
                 
@@ -683,14 +688,8 @@ def update_success():
                     "balanceDue": 0
                 })
                 
-                try:
-                    cell = sheet.find(reg_id)
-                    if cell:
-                        sheet.update_cell(cell.row, 15, new_total)
-                        sheet.update_cell(cell.row, 16, "Paid")
-                        sheet.update_cell(cell.row, 18, paid_at)
-                except Exception as e:
-                    print("Sheet update error:", e)
+                updated_record = doc_ref.get().to_dict()
+                sync_to_sheet(reg_id, updated_record)
                     
                 events_str = ", ".join([e['name'] for e in record.get('events', [])])
                 partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
@@ -759,7 +758,6 @@ def admin_resend_email(reg_id):
 
 @app.route('/api/admin/registrations/<reg_id>/resync', methods=['POST'])
 def admin_resync(reg_id):
-    """Forces a sync to Google Sheets and auto-finds missing RC IDs by Name"""
     doc_ref = db.collection('registrations').document(reg_id)
     doc = doc_ref.get()
     if not doc.exists:
@@ -767,7 +765,6 @@ def admin_resync(reg_id):
         
     record = doc.to_dict()
     p = record.get('player', {})
-    
     rc_val = p.get('rcId', '').strip()
     never_played = p.get('neverPlayed', False)
     
@@ -777,44 +774,59 @@ def admin_resync(reg_id):
             p['rcId'] = found_rc
             doc_ref.update({"player.rcId": found_rc})
             record['player']['rcId'] = found_rc
-            
-    events_str = ", ".join([e['name'] for e in record.get('events', [])])
-    partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
-    
-    row_data = [
-        reg_id, 
-        p.get('firstName', ''), 
-        p.get('lastName', ''), 
-        p.get('email', ''),
-        p.get('phone', ''), 
-        p.get('dob', 'N/A'),
-        p.get('nationalId', 'N/A'), 
-        p.get('club', 'N/A'),
-        p.get('rcId', 'N/A'), 
-        str(p.get('neverPlayed', False)).upper(),
-        events_str, 
-        partners_str, 
-        record.get('ttqLevy', 5.0), 
-        record.get('discountAmount', 0),
-        record.get('finalTotal', 0), 
-        record.get('paymentStatus', 'Pending'),
-        record.get('registeredAt', 'N/A'),
-        record.get('paidAt', 'N/A')
-    ]
-    
+
+    sync_to_sheet(reg_id, record)
+    return jsonify({"status": "success", "newRcId": p.get('rcId', rc_val)})
+
+@app.route('/api/admin/rebuild-sheet', methods=['POST'])
+def rebuild_sheet():
+    """Wipes the Google Sheet and completely rebuilds it from the Firebase Database"""
     try:
-        cell = sheet.find(reg_id)
-        if cell:
-            cell_list = sheet.range(f"A{cell.row}:R{cell.row}")
-            for i, val in enumerate(row_data):
+        docs = db.collection('registrations').order_by('timestamp', direction=firestore.Query.DESCENDING).stream()
+        rows_data = []
+        for doc in docs:
+            record = doc.to_dict()
+            reg_id = doc.id
+            p = record.get('player', {})
+            events_str = ", ".join([e['name'] for e in record.get('events', [])])
+            partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
+            
+            row = [
+                reg_id, 
+                p.get('firstName', ''), 
+                p.get('lastName', ''), 
+                p.get('email', ''),
+                p.get('phone', ''), 
+                p.get('dob', 'N/A'),
+                p.get('gender', 'N/A'),
+                p.get('nationalId', 'N/A'), 
+                p.get('club', 'N/A'),
+                p.get('rcId', 'N/A'), 
+                str(p.get('neverPlayed', False)).upper(),
+                events_str, 
+                partners_str, 
+                record.get('ttqLevy', 5.0), 
+                record.get('discountAmount', 0),
+                record.get('finalTotal', 0), 
+                record.get('paymentStatus', 'Pending'),
+                record.get('registeredAt', 'N/A'),
+                record.get('paidAt', 'N/A')
+            ]
+            rows_data.append(row)
+            
+        # Clear everything from row 2 to 1000 to wipe the mess
+        sheet.batch_clear(["A2:S1000"])
+        
+        if rows_data:
+            cell_list = sheet.range(f"A2:S{len(rows_data)+1}")
+            flat_data = [item for sublist in rows_data for item in sublist]
+            for i, val in enumerate(flat_data):
                 cell_list[i].value = str(val)
             sheet.update_cells(cell_list)
-        else:
-            sheet.insert_row(row_data, 2)
+            
+        return jsonify({"status": "success", "rows": len(rows_data)})
     except Exception as e:
         return jsonify({"error": f"GSheet Error: {str(e)}"}), 500
-        
-    return jsonify({"status": "success", "newRcId": p.get('rcId', rc_val)})
 
 @app.route('/api/admin/manual-register', methods=['POST'])
 def manual_register():
@@ -835,6 +847,7 @@ def manual_register():
             "email": data.get('email', ''),
             "phone": data.get('phone', ''),
             "dob": data.get('dob', 'N/A'),
+            "gender": data.get('gender', 'N/A'),
             "nationalId": data.get('nationalId', 'N/A'),
             "rcId": rc_val,
             "club": data.get('club', 'N/A'),
@@ -857,18 +870,7 @@ def manual_register():
     doc_ref.set(registration_data)
     reg_id = doc_ref.id
 
-    try:
-        events_str = ", ".join([e['name'] for e in data.get('events', [])])
-        row = [
-            reg_id, data.get('firstName', ''), data.get('lastName', ''), data.get('email', ''),
-            data.get('phone', ''), data.get('dob', 'N/A'), data.get('nationalId', 'N/A'), data.get('club', 'N/A'),
-            rc_val, str(never_played).upper(), events_str, "", 
-            0, 0, float(data.get('totalPaid', 0)), data.get('status', 'Paid'),
-            registered_at, paid_at
-        ]
-        sheet.insert_row(row, 2)
-    except Exception as e:
-        print(f"Manual GSheet Insert Error: {e}")
+    sync_to_sheet(reg_id, registration_data)
         
     return jsonify({"status": "success", "id": reg_id})
 
@@ -889,43 +891,9 @@ def update_registration(reg_id):
             update_payload['paidAt'] = get_local_now_str()
 
     db.collection('registrations').document(reg_id).update(update_payload)
-    doc = db.collection('registrations').document(reg_id).get().to_dict()
+    updated_record = db.collection('registrations').document(reg_id).get().to_dict()
     
-    try:
-        cell = sheet.find(reg_id)
-        if cell:
-            events_str = ", ".join([e['name'] for e in doc.get('events', [])])
-            partners_str = ", ".join([f"{k}: {v}" for k, v in doc.get('doublesPartners', {}).items()])
-            p = doc.get('player', {})
-            
-            updated_row = [
-                reg_id, 
-                p.get('firstName', ''), 
-                p.get('lastName', ''), 
-                p.get('email', ''),
-                p.get('phone', ''), 
-                p.get('dob', 'N/A'),
-                p.get('nationalId', 'N/A'), 
-                p.get('club', 'N/A'),
-                p.get('rcId', 'N/A'), 
-                str(p.get('neverPlayed', False)).upper(),
-                events_str, 
-                partners_str, 
-                doc.get('ttqLevy', 5.0), 
-                doc.get('discountAmount', 0),
-                doc.get('finalTotal', 0), 
-                doc.get('paymentStatus', 'Pending'),
-                doc.get('registeredAt', 'N/A'),
-                doc.get('paidAt', 'N/A')
-            ]
-            
-            cell_list = sheet.range(f"A{cell.row}:R{cell.row}")
-            for i, val in enumerate(updated_row):
-                cell_list[i].value = str(val)
-            sheet.update_cells(cell_list)
-            
-    except Exception as e:
-        print(f"GSheet Bulk Update Error: {e}")
+    sync_to_sheet(reg_id, updated_record)
             
     return jsonify({"status": "updated"})
 

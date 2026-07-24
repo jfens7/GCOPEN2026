@@ -12,13 +12,13 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 async function lookupRegistration() {
+    const email = document.getElementById('lookupEmail').value.trim();
     const nationalId = document.getElementById('lookupTtaId').value.trim();
-    const dob = document.getElementById('lookupDob').value.trim();
     const errorEl = document.getElementById('lookupError');
     const btn = document.getElementById('findRegBtn');
 
-    if (!nationalId || !dob) {
-        errorEl.textContent = "Please enter both your TTA Member Number and DOB.";
+    if (!email || !nationalId) {
+        errorEl.textContent = "Please enter both your Email and TTA Member Number.";
         errorEl.style.display = "block";
         return;
     }
@@ -31,7 +31,7 @@ async function lookupRegistration() {
         const response = await fetch(`${apiBaseUrl}/registration/lookup`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nationalId: nationalId, dob: dob })
+            body: JSON.stringify({ email: email, nationalId: nationalId })
         });
         
         if (response.ok) {
@@ -185,7 +185,6 @@ function calculateUpdateTotals() {
     document.getElementById('newTotalAmount').textContent = newFinalTotal.toFixed(2);
     
     const oldFinalTotal = parseFloat(currentReg.finalTotal || 0);
-    // Strict rounding to fix float math issues
     const difference = Math.round((newFinalTotal - oldFinalTotal) * 100) / 100;
     
     document.getElementById('differenceAmount').textContent = difference.toFixed(2);
@@ -258,7 +257,6 @@ async function processUpdateAndPay() {
 
     const btn = document.getElementById('payDifferenceBtn');
     
-    // FREE UPDATE BYPASS (Handles event swaps, partner edits, or event drops)
     if (difference <= 0) {
         btn.textContent = "Saving Changes...";
         btn.disabled = true;
@@ -269,7 +267,6 @@ async function processUpdateAndPay() {
                 body: JSON.stringify({
                     events: selectedEvents,
                     doublesPartners: doublesPartners
-                    // Intentionally omitting 'finalTotal' so the Admin dashboard correctly shows their overpayment
                 })
             });
             if (response.ok) {

@@ -104,6 +104,7 @@
                     <button id="tabDiscounts" onclick="switchTab('discounts')">Discount Codes</button>
                 </div>
                 <div>
+                    <button id="btnRebuildSheet" class="btn-secondary-small" style="background: #DC2626; color: white; margin-right: 10px;" onclick="rebuildSheet()">⚠️ Rebuild Entire Sheet</button>
                     <button id="btnManualEntry" class="btn-secondary-small" style="background: var(--gctta-gold); color: var(--gctta-navy); margin-right: 10px;" onclick="document.getElementById('manualModal').style.display='flex'">+ Add Manual Entry</button>
                     <button id="btnExport" class="btn-primary" style="padding: 10px 20px;">One-Click Zermelo CSV Export</button>
                 </div>
@@ -188,8 +189,12 @@
                         <input type="text" id="editPhone" placeholder="Phone">
                     </div>
                     <div class="form-row" style="margin-top: 10px;">
-                        <input type="text" id="editDob" placeholder="DOB (DD/MM/YYYY)" required>
-                        <input type="text" id="editTta" placeholder="TTA ID">
+                        <input type="text" id="editDob" placeholder="DOB (DD/MM/YYYY)" style="flex: 1;" required>
+                        <select id="editGender" style="flex: 1; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1;">
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                        <input type="text" id="editTta" placeholder="TTA ID" style="flex: 1;">
                     </div>
                     <div class="form-row" style="margin-top: 10px;">
                         <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
@@ -278,8 +283,12 @@
                         <input type="text" id="manPhone" placeholder="Phone">
                     </div>
                     <div class="form-row" style="margin-top: 10px;">
-                        <input type="text" id="manDob" placeholder="DOB (DD/MM/YYYY)" required>
-                        <input type="text" id="manTta" placeholder="TTA ID (Optional)">
+                        <input type="text" id="manDob" placeholder="DOB (DD/MM/YYYY)" style="flex: 1;" required>
+                        <select id="manGender" style="flex: 1; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1;">
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                        <input type="text" id="manTta" placeholder="TTA ID (Optional)" style="flex: 1;">
                     </div>
                     <div class="form-row" style="margin-top: 10px;">
                         <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
@@ -449,6 +458,7 @@
                 document.getElementById('viewPlayers').style.display = 'block';
                 document.getElementById('viewDiscounts').style.display = 'none';
                 document.getElementById('btnManualEntry').style.display = 'inline-block';
+                document.getElementById('btnRebuildSheet').style.display = 'inline-block';
                 document.getElementById('btnExport').style.display = 'inline-block';
             } else {
                 document.getElementById('tabDiscounts').classList.add('active');
@@ -456,8 +466,26 @@
                 document.getElementById('viewDiscounts').style.display = 'block';
                 document.getElementById('viewPlayers').style.display = 'none';
                 document.getElementById('btnManualEntry').style.display = 'none';
+                document.getElementById('btnRebuildSheet').style.display = 'none';
                 document.getElementById('btnExport').style.display = 'none';
                 loadDiscounts();
+            }
+        }
+
+        // ==========================================
+        // REBUILD GOOGLE SHEET FROM FIREBASE
+        // ==========================================
+        function rebuildSheet() {
+            if(confirm("⚠️ WARNING: This will completely wipe Google Sheets Rows 2-1000 and rebuild it from the Firebase Database. Make sure your Row 1 headers A through S are perfectly correct! Proceed?")) {
+                fetch('/api/admin/rebuild-sheet', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.status === 'success') {
+                        alert('Sheet successfully rebuilt with ' + data.rows + ' rows!');
+                    } else {
+                        alert('Error rebuilding sheet: ' + data.error);
+                    }
+                });
             }
         }
 
@@ -596,6 +624,7 @@
             document.getElementById('editEmail').value = reg.player.email || '';
             document.getElementById('editPhone').value = reg.player.phone || '';
             document.getElementById('editDob').value = reg.player.dob || '';
+            document.getElementById('editGender').value = reg.player.gender || 'Male';
             document.getElementById('editTta').value = reg.player.nationalId || '';
             
             const isNeverPlayed = reg.player.neverPlayed || (reg.player.rcId && reg.player.rcId.toLowerCase() === 'never played');
@@ -659,6 +688,7 @@
                     "email": document.getElementById('editEmail').value,
                     "phone": document.getElementById('editPhone').value,
                     "dob": document.getElementById('editDob').value,
+                    "gender": document.getElementById('editGender').value,
                     "nationalId": document.getElementById('editTta').value,
                     "rcId": rcVal,
                     "neverPlayed": isNeverPlayed,
@@ -702,6 +732,7 @@
                 email: document.getElementById('manEmail').value,
                 phone: document.getElementById('manPhone').value,
                 dob: document.getElementById('manDob').value,
+                gender: document.getElementById('manGender').value,
                 nationalId: document.getElementById('manTta').value,
                 rcId: document.getElementById('manRc').value,
                 neverPlayed: document.getElementById('manNeverPlayed').checked,
