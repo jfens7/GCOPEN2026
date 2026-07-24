@@ -1,7 +1,6 @@
 let currentReg = null;
 let apiBaseUrl = window.location.origin + '/api';
 
-// Adjust for local dev vs production
 if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     apiBaseUrl = 'http://localhost:5000/api';
 }
@@ -69,21 +68,15 @@ async function showUpdateStep() {
 
     document.getElementById('oldPaidAmount').textContent = parseFloat(currentReg.finalTotal || 0).toFixed(2);
     
-    // 1. Render all radio buttons and select the ones they already paid for
     renderUpdateEventsList();
-    
-    // 2. Fetch their rating and disable events they are too old/young/highly-rated for
     await applyEligibilityRestrictions();
-
-    // 3. Calculate the math
     calculateUpdateTotals();
 }
 
 function renderUpdateEventsList() {
-    // Reset all radios to 'None'
     document.querySelectorAll('#updateEventsContainer input[type="radio"][value=""]').forEach(r => r.checked = true);
 
-    // Look for the events they already signed up for and pre-select them
+    if (!currentReg.events) return;
     const regEventIds = currentReg.events.map(e => e.id);
 
     document.querySelectorAll('#updateEventsContainer input[type="radio"]:not([value=""])').forEach(radio => {
@@ -98,7 +91,6 @@ async function applyEligibilityRestrictions() {
     let playerRating = 0;
     const rcId = currentReg.player.rcId;
     
-    // Attempt to silently fetch their exact Rating from Ratings Central
     if (rcId && rcId.toLowerCase() !== 'never played' && rcId.toLowerCase() !== 'n/a') {
         try {
             const res = await fetch(`${apiBaseUrl}/ratings-central/search?query=${rcId}`);
@@ -113,7 +105,6 @@ async function applyEligibilityRestrictions() {
         }
     }
 
-    // Calculate Age exactly at the end of the year (2026)
     let ageIn2026 = 0;
     if (currentReg.player.dob) {
         const parts = currentReg.player.dob.split('/');
@@ -122,28 +113,23 @@ async function applyEligibilityRestrictions() {
         }
     }
 
-    // Determine Gender
     const gender = currentReg.player.gender || "";
 
-    // Iterate through every event on the screen and enforce the rules
     document.querySelectorAll('#updateEventsContainer input[type="radio"]:not([value=""])').forEach(radio => {
         const ev = JSON.parse(radio.value);
         const name = ev.name.toLowerCase();
         let disable = false;
         let reason = [];
 
-        // --- GENDER RULES ---
         if (gender === 'Male' && (name.includes('women') || name.includes('girl'))) { disable = true; reason.push('Gender'); }
         if (gender === 'Female' && (name.includes('men') || name.includes('boy'))) { disable = true; reason.push('Gender'); }
 
-        // --- AGE RULES (JUNIORS) ---
         if (name.includes('under 11') && ageIn2026 >= 11) { disable = true; reason.push('Age'); }
         if (name.includes('under 13') && ageIn2026 >= 13) { disable = true; reason.push('Age'); }
         if (name.includes('under 15') && ageIn2026 >= 15) { disable = true; reason.push('Age'); }
         if (name.includes('under 17') && ageIn2026 >= 17) { disable = true; reason.push('Age'); }
         if (name.includes('under 19') && ageIn2026 >= 19) { disable = true; reason.push('Age'); }
 
-        // --- AGE RULES (VETERANS) ---
         if (name.includes('over 30') && ageIn2026 < 30) { disable = true; reason.push('Age'); }
         if (name.includes('over 40') && ageIn2026 < 40) { disable = true; reason.push('Age'); }
         if (name.includes('over 50') && ageIn2026 < 50) { disable = true; reason.push('Age'); }
@@ -152,7 +138,6 @@ async function applyEligibilityRestrictions() {
         if (name.includes('over 80') && ageIn2026 < 80) { disable = true; reason.push('Age'); }
         if (name.includes('veteran') && ageIn2026 < 30) { disable = true; reason.push('Age'); }
 
-        // --- RATING RULES ---
         if (playerRating > 0) {
             if (name.includes('under 1700') && playerRating >= 1700) { disable = true; reason.push('Rating'); }
             if (name.includes('under 1400') && playerRating >= 1400) { disable = true; reason.push('Rating'); }
@@ -161,14 +146,12 @@ async function applyEligibilityRestrictions() {
             if (name.includes('under 800') && playerRating >= 800) { disable = true; reason.push('Rating'); }
         }
 
-        // Apply visual lockout if they fail the checks
         if (disable) {
             radio.disabled = true;
             const label = radio.parentNode;
             label.style.color = '#94A3B8';
             label.style.textDecoration = 'line-through';
             
-            // Generate a mini badge explaining exactly why they can't play it
             const badge = document.createElement('span');
             badge.style.fontSize = '10px';
             badge.style.background = '#F1F5F9';
@@ -188,7 +171,6 @@ function calculateUpdateTotals() {
     const selectedEvents = [];
     let baseTotal = 0;
     
-    // Grab all checked events that are not "None"
     document.querySelectorAll('#updateEventsContainer input[type="radio"]:not([value=""]):checked').forEach(rad => {
         const ev = JSON.parse(rad.value);
         selectedEvents.push(ev);
@@ -203,7 +185,8 @@ function calculateUpdateTotals() {
     document.getElementById('newTotalAmount').textContent = newFinalTotal.toFixed(2);
     
     const oldFinalTotal = parseFloat(currentReg.finalTotal || 0);
-    const difference = newFinalTotal - oldFinalTotal;
+    // Strict rounding to fix float math issues
+    const difference = Math.round((newFinalTotal - oldFinalTotal) * 100) / 100;
     
     document.getElementById('differenceAmount').textContent = difference.toFixed(2);
     
@@ -212,8 +195,8 @@ function calculateUpdateTotals() {
     
     if (difference < 0) {
         warningEl.style.display = "block";
-        payBtn.disabled = true;
-        payBtn.textContent = "PROCEED TO PAY DIFFERENCE";
+        payBtn.disabled = false;
+        payBtn.textContent = "SAVE CHANGES";
     } else if (difference === 0) {
         warningEl.style.display = "none";
         payBtn.disabled = false;
@@ -224,7 +207,6 @@ function calculateUpdateTotals() {
         payBtn.textContent = "PROCEED TO SECURE PAYMENT";
     }
 
-    // Capture currently typed partner values so they don't erase while clicking radio buttons
     const currentPartnerValues = {};
     document.querySelectorAll('#partnerInputsUpdate input').forEach(inp => {
         currentPartnerValues[inp.id] = inp.value;
@@ -239,7 +221,6 @@ function calculateUpdateTotals() {
         if (ev.name.toLowerCase().includes('doubles')) {
             needsPartner = true;
             
-            // Prefer currently typed text -> then database saved partner -> then empty string
             let savedPartner = currentPartnerValues[`partner_update_${ev.id}`];
             if (savedPartner === undefined) {
                 savedPartner = (currentReg.doublesPartners && currentReg.doublesPartners[ev.name]) ? currentReg.doublesPartners[ev.name] : "";
@@ -273,12 +254,12 @@ async function processUpdateAndPay() {
 
     const oldFinalTotal = parseFloat(currentReg.finalTotal || 0);
     const newTotalText = parseFloat(document.getElementById('newTotalAmount').textContent);
-    const difference = newTotalText - oldFinalTotal;
+    const difference = Math.round((newTotalText - oldFinalTotal) * 100) / 100;
 
     const btn = document.getElementById('payDifferenceBtn');
     
-    // FREE UPDATE BYPASS (e.g. Swapping events or just editing partner names)
-    if (difference === 0) {
+    // FREE UPDATE BYPASS (Handles event swaps, partner edits, or event drops)
+    if (difference <= 0) {
         btn.textContent = "Saving Changes...";
         btn.disabled = true;
         try {
@@ -287,9 +268,8 @@ async function processUpdateAndPay() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     events: selectedEvents,
-                    doublesPartners: doublesPartners,
-                    finalTotal: newTotalText,
-                    paymentStatus: currentReg.paymentStatus
+                    doublesPartners: doublesPartners
+                    // Intentionally omitting 'finalTotal' so the Admin dashboard correctly shows their overpayment
                 })
             });
             if (response.ok) {
@@ -297,19 +277,18 @@ async function processUpdateAndPay() {
                 window.location.reload();
             } else {
                 alert("Failed to update registration. Please try again.");
-                btn.textContent = "SAVE CHANGES (FREE)";
+                btn.textContent = "SAVE CHANGES";
                 btn.disabled = false;
             }
         } catch(err) {
             console.error(err);
             alert("Server error. Please try again.");
-            btn.textContent = "SAVE CHANGES (FREE)";
+            btn.textContent = "SAVE CHANGES";
             btn.disabled = false;
         }
         return;
     }
 
-    // STANDARD PAID UPDATE
     const payload = {
         reg_id: currentReg.id,
         events: selectedEvents,
