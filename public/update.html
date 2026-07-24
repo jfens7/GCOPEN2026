@@ -22,7 +22,7 @@
         <!-- STEP 1: Lookup -->
         <div id="lookupStep">
             <h2 style="color: var(--gctta-navy); margin-top:0;">Manage Your Registration</h2>
-            <p>Enter your details below to add events or pay an outstanding balance.</p>
+            <p>Enter your details below to add events, modify your doubles partner, or pay an outstanding balance.</p>
             
             <div class="form-group">
                 <label>TTA Member Number</label>
@@ -51,11 +51,75 @@
 
             <div id="eventsEditSection">
                 <h4 style="color: var(--gctta-navy); border-bottom: 2px solid #E2E8F0; padding-bottom: 5px;">Update Events</h4>
-                <p style="font-size: 13px; color: #64748B;">You can add additional events below. If you need to remove events and request a refund, please contact the administrator.</p>
+                <p style="font-size: 13px; color: #64748B;">You can add or swap events below. If you need to drop events and request a refund, please contact the administrator.</p>
                 
                 <form id="updateEventsForm">
-                    <div id="updateEventsContainer" style="max-height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; border-radius: 4px; background: #F8FAFC; margin-bottom: 15px;">
-                        <!-- Checkboxes populated via JS -->
+                    <div id="updateEventsContainer" style="margin-bottom: 15px;">
+                        
+                        <div style="background: #F8FAFC; padding: 15px; margin-bottom: 15px; border-left: 4px solid var(--gctta-navy); border-radius: 4px;">
+                            <h4 style="margin-top:0;">Saturday 8th August | 9:00am - 12:00pm</h4>
+                            <label><input type="radio" name="upd_sat_am" value='{"id":10, "name":"Event #10: Under 17 Boy’s Singles", "price":10}' onchange="calculateUpdateTotals()"> Event #10: Under 17 Boy’s Singles ($10)</label><br>
+                            <label><input type="radio" name="upd_sat_am" value='{"id":11, "name":"Event #11: Under 17 Girl’s Singles", "price":10}' onchange="calculateUpdateTotals()"> Event #11: Under 17 Girl’s Singles ($10)</label><br>
+                            <label><input type="radio" name="upd_sat_am" value='{"id":12, "name":"Event #12: Under 15 Boy’s Singles", "price":10}' onchange="calculateUpdateTotals()"> Event #12: Under 15 Boy’s Singles ($10)</label><br>
+                            <label><input type="radio" name="upd_sat_am" value='{"id":13, "name":"Event #13: Under 15 Girl’s Singles", "price":10}' onchange="calculateUpdateTotals()"> Event #13: Under 15 Girl’s Singles ($10)</label><br>
+                            <label><input type="radio" name="upd_sat_am" value='{"id":16, "name":"Event #16: Under 11 Boy’s Singles", "price":10}' onchange="calculateUpdateTotals()"> Event #16: Under 11 Boy’s Singles ($10)</label><br>
+                            <label><input type="radio" name="upd_sat_am" value='{"id":17, "name":"Event #17: Under 11 Girl’s Singles", "price":10}' onchange="calculateUpdateTotals()"> Event #17: Under 11 Girl’s Singles ($10)</label><br>
+                            <label><input type="radio" name="upd_sat_am" value="" onchange="calculateUpdateTotals()" checked> None</label>
+                        </div>
+
+                        <div style="background: #F8FAFC; padding: 15px; margin-bottom: 15px; border-left: 4px solid var(--gctta-navy); border-radius: 4px;">
+                            <h4 style="margin-top:0;">Saturday 8th August | 12:00pm - 4:00pm</h4>
+                            <label><input type="radio" name="upd_sat_mid" value='{"id":8, "name":"Event #8: Under 19 Boy’s Singles", "price":10}' onchange="calculateUpdateTotals()"> Event #8: Under 19 Boy’s Singles ($10)</label><br>
+                            <label><input type="radio" name="upd_sat_mid" value='{"id":9, "name":"Event #9: Under 19 Girl’s Singles", "price":10}' onchange="calculateUpdateTotals()"> Event #9: Under 19 Girl’s Singles ($10)</label><br>
+                            <label><input type="radio" name="upd_sat_mid" value='{"id":14, "name":"Event #14: Under 13 Boy’s Singles", "price":10}' onchange="calculateUpdateTotals()"> Event #14: Under 13 Boy’s Singles ($10)</label><br>
+                            <label><input type="radio" name="upd_sat_mid" value='{"id":15, "name":"Event #15: Under 13 Girl’s Singles", "price":10}' onchange="calculateUpdateTotals()"> Event #15: Under 13 Girl’s Singles ($10)</label><br>
+                            <label><input type="radio" name="upd_sat_mid" value='{"id":3, "name":"Event #3: Men’s Open Doubles", "price":12}' onchange="calculateUpdateTotals()"> Event #3: Men’s Open Doubles ($12 ea)</label><br>
+                            <label><input type="radio" name="upd_sat_mid" value='{"id":4, "name":"Event #4: Women’s Open Doubles", "price":12}' onchange="calculateUpdateTotals()"> Event #4: Women’s Open Doubles ($12 ea)</label><br>
+                            <label><input type="radio" name="upd_sat_mid" value='{"id":6, "name":"Event #6: Under 1700 Singles", "price":15}' onchange="calculateUpdateTotals()"> Event #6: Under 1700 Singles ($15)</label><br>
+                            <label><input type="radio" name="upd_sat_mid" value="" onchange="calculateUpdateTotals()" checked> None</label>
+                        </div>
+
+                        <div style="background: #F8FAFC; padding: 15px; margin-bottom: 15px; border-left: 4px solid var(--gctta-navy); border-radius: 4px;">
+                            <h4 style="margin-top:0;">Saturday 8th August | 4:00pm - 8:00pm</h4>
+                            <label><input type="radio" name="upd_sat_pm" value='{"id":1, "name":"Event #1: Men’s Open Singles", "price":25}' onchange="calculateUpdateTotals()"> Event #1: Men’s Open Singles ($25)</label><br>
+                            <label><input type="radio" name="upd_sat_pm" value='{"id":2, "name":"Event #2: Women’s Open Singles", "price":20}' onchange="calculateUpdateTotals()"> Event #2: Women’s Open Singles ($20)</label><br>
+                            <label><input type="radio" name="upd_sat_pm" value='{"id":5, "name":"Event #5: Para Open Singles", "price":10}' onchange="calculateUpdateTotals()"> Event #5: Para Open Singles ($10)</label><br>
+                            <label><input type="radio" name="upd_sat_pm" value='{"id":7, "name":"Event #7: Under 1400 Singles", "price":15}' onchange="calculateUpdateTotals()"> Event #7: Under 1400 Singles ($15)</label><br>
+                            <label><input type="radio" name="upd_sat_pm" value="" onchange="calculateUpdateTotals()" checked> None</label>
+                        </div>
+
+                        <div style="background: #F8FAFC; padding: 15px; margin-bottom: 15px; border-left: 4px solid var(--gctta-navy); border-radius: 4px;">
+                            <h4 style="margin-top:0;">Sunday 9th August | 9:00am - 12:00pm</h4>
+                            <label><input type="radio" name="upd_sun_am" value='{"id":26, "name":"Event #26: Over 50 Men’s Singles", "price":15}' onchange="calculateUpdateTotals()"> Event #26: Over 50 Men’s Singles ($15)</label><br>
+                            <label><input type="radio" name="upd_sun_am" value='{"id":27, "name":"Event #27: Over 50 Women’s Singles", "price":15}' onchange="calculateUpdateTotals()"> Event #27: Over 50 Women’s Singles ($15)</label><br>
+                            <label><input type="radio" name="upd_sun_am" value='{"id":30, "name":"Event #30: Over 70 Men’s Singles", "price":10}' onchange="calculateUpdateTotals()"> Event #30: Over 70 Men’s Singles ($10)</label><br>
+                            <label><input type="radio" name="upd_sun_am" value='{"id":31, "name":"Event #31: Over 70 Women’s Singles", "price":10}' onchange="calculateUpdateTotals()"> Event #31: Over 70 Women’s Singles ($10)</label><br>
+                            <label><input type="radio" name="upd_sun_am" value='{"id":20, "name":"Event #20: Under 800 Singles", "price":12}' onchange="calculateUpdateTotals()"> Event #20: Under 800 Singles ($12)</label><br>
+                            <label><input type="radio" name="upd_sun_am" value="" onchange="calculateUpdateTotals()" checked> None</label>
+                        </div>
+
+                        <div style="background: #F8FAFC; padding: 15px; margin-bottom: 15px; border-left: 4px solid var(--gctta-navy); border-radius: 4px;">
+                            <h4 style="margin-top:0;">Sunday 9th August | 12:00pm - 3:00pm</h4>
+                            <label><input type="radio" name="upd_sun_mid" value='{"id":24, "name":"Event #24: Over 40 Men’s Singles", "price":15}' onchange="calculateUpdateTotals()"> Event #24: Over 40 Men’s Singles ($15)</label><br>
+                            <label><input type="radio" name="upd_sun_mid" value='{"id":25, "name":"Event #25: Over 40 Women’s Singles", "price":15}' onchange="calculateUpdateTotals()"> Event #25: Over 40 Women’s Singles ($15)</label><br>
+                            <label><input type="radio" name="upd_sun_mid" value='{"id":21, "name":"Event #21: Open Rating Doubles", "price":10}' onchange="calculateUpdateTotals()"> Event #21: Open Rating Doubles ($10 ea)</label><br>
+                            <label><input type="radio" name="upd_sun_mid" value='{"id":33, "name":"Event #33: Veteran Women’s Doubles", "price":10}' onchange="calculateUpdateTotals()"> Event #33: Veteran Women’s Doubles ($10 ea)</label><br>
+                            <label><input type="radio" name="upd_sun_mid" value='{"id":34, "name":"Event #34: Veteran Men’s Doubles", "price":10}' onchange="calculateUpdateTotals()"> Event #34: Veteran Men’s Doubles ($10 ea)</label><br>
+                            <label><input type="radio" name="upd_sun_mid" value='{"id":19, "name":"Event #19: Under 1000 Singles", "price":15}' onchange="calculateUpdateTotals()"> Event #19: Under 1000 Singles ($15)</label><br>
+                            <label><input type="radio" name="upd_sun_mid" value="" onchange="calculateUpdateTotals()" checked> None</label>
+                        </div>
+
+                        <div style="background: #F8FAFC; padding: 15px; margin-bottom: 15px; border-left: 4px solid var(--gctta-navy); border-radius: 4px;">
+                            <h4 style="margin-top:0;">Sunday 9th August | 3:00pm - 6:00pm</h4>
+                            <label><input type="radio" name="upd_sun_pm" value='{"id":22, "name":"Event #22: Over 30 Men’s Singles", "price":15}' onchange="calculateUpdateTotals()"> Event #22: Over 30 Men’s Singles ($15)</label><br>
+                            <label><input type="radio" name="upd_sun_pm" value='{"id":23, "name":"Event #23: Over 30 Women’s Singles", "price":15}' onchange="calculateUpdateTotals()"> Event #23: Over 30 Women’s Singles ($15)</label><br>
+                            <label><input type="radio" name="upd_sun_pm" value='{"id":28, "name":"Event #28: Over 60 Men’s Singles", "price":12}' onchange="calculateUpdateTotals()"> Event #28: Over 60 Men’s Singles ($12)</label><br>
+                            <label><input type="radio" name="upd_sun_pm" value='{"id":29, "name":"Event #29: Over 60 Women’s Singles", "price":12}' onchange="calculateUpdateTotals()"> Event #29: Over 60 Women’s Singles ($12)</label><br>
+                            <label><input type="radio" name="upd_sun_pm" value='{"id":32, "name":"Event #32: Over 80 Singles", "price":10}' onchange="calculateUpdateTotals()"> Event #32: Over 80 Singles ($10)</label><br>
+                            <label><input type="radio" name="upd_sun_pm" value='{"id":18, "name":"Event #18: Under 1200 Singles", "price":15}' onchange="calculateUpdateTotals()"> Event #18: Under 1200 Singles ($15)</label><br>
+                            <label><input type="radio" name="upd_sun_pm" value="" onchange="calculateUpdateTotals()" checked> None</label>
+                        </div>
+
                     </div>
                     
                     <div id="doublesPartnerSectionUpdate" style="display: none; background: #FFF3CD; padding: 15px; margin-top: 15px; border-left: 4px solid #856404; border-radius: 4px;">
@@ -68,7 +132,7 @@
                         <p>New Total (Events + Levy - Discounts): $<span id="newTotalAmount">0.00</span></p>
                         <hr>
                         <h3 style="margin:0;">Difference to Pay: $<span id="differenceAmount">0.00</span></h3>
-                        <p id="refundWarning" style="color:#DC2626; font-weight:bold; display:none; margin-top: 10px;">You have removed events. Please contact the administrator for a refund. Online updates are only for adding events.</p>
+                        <p id="refundWarning" style="color:#DC2626; font-weight:bold; display:none; margin-top: 10px;">You have removed events. Please contact the administrator for a refund. Online updates are only for adding/swapping events or changing partners.</p>
                         <button type="button" id="payDifferenceBtn" class="btn-primary btn-block" style="margin-top:15px;" disabled>PROCEED TO PAY DIFFERENCE</button>
                     </div>
                 </form>
