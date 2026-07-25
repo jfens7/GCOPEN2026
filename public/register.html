@@ -246,8 +246,29 @@
             </div>
             
             <div style="display: flex; gap: 10px;">
-                <button type="button" id="tcAgreeBtn" class="btn-primary" style="flex: 2; opacity: 0.5; cursor: not-allowed;" disabled>I Agree & Proceed to Payment</button>
+                <button type="button" id="tcAgreeBtn" class="btn-primary" style="flex: 2; opacity: 0.5; cursor: not-allowed;" disabled>I Agree</button>
                 <button type="button" class="btn-secondary-small" style="flex: 1; background: #64748B;" onclick="closeTcModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONFIRMATION & DOB RE-ENTRY MODAL -->
+    <div id="confirmModal" class="login-overlay" style="display: none;">
+        <div class="login-box" style="width: 600px; max-width: 90vw; padding: 25px; text-align: left;">
+            <h2 style="margin-top: 0; color: var(--gctta-navy); border-bottom: 2px solid var(--gctta-gold); padding-bottom: 10px;">Confirm Your Entry</h2>
+            
+            <div id="confirmSummary" style="background: #F8FAFC; padding: 15px; border-radius: 4px; border: 1px solid #CBD5E1; margin-bottom: 20px; font-size: 14px; color: #334155; line-height: 1.6;">
+                <!-- JS injects summary here -->
+            </div>
+            
+            <div style="background: #FEFCE8; padding: 15px; border-radius: 4px; border: 1px solid #FEF08A; margin-bottom: 20px;">
+                <label style="font-weight: bold; color: #854D0E; display: block; margin-bottom: 8px;">To prevent default errors, please re-enter your Date of Birth (DD/MM/YYYY):</label>
+                <input type="text" id="confirmDobInput" placeholder="DD/MM/YYYY" required style="width: 100%; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px; box-sizing: border-box;">
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button type="button" id="finalConfirmBtn" class="btn-primary" style="flex: 2;">Confirm & Proceed to Payment</button>
+                <button type="button" class="btn-secondary-small" style="flex: 1; background: #64748B;" onclick="closeConfirmModal()">Cancel</button>
             </div>
         </div>
     </div>
