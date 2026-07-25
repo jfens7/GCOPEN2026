@@ -793,7 +793,6 @@ def get_registrations():
 
 @app.route('/api/admin/sync-from-sheet', methods=['POST'])
 def sync_from_sheet():
-    """Reads the Google Sheet, matches by Ref ID (Col A), and updates Gender, DOB, Phone, Club in Firebase to achieve two-way sync."""
     try:
         all_rows = sheet.get_all_values()
         if len(all_rows) <= 1:
@@ -804,7 +803,6 @@ def sync_from_sheet():
             if not row or not row[0]: continue
             reg_id = row[0]
             
-            # Extract fields assuming standard layout: A:Ref, D:Email, E:Phone, F:DOB, G:Gender, I:Club
             try:
                 phone = row[4] if len(row) > 4 else "N/A"
                 dob = row[5] if len(row) > 5 else "N/A"
@@ -824,6 +822,59 @@ def sync_from_sheet():
                 print(f"Error syncing row {reg_id} from sheet: {e}")
                 
         return jsonify({"status": "success", "updated": updated_count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/push-to-sheet', methods=['POST'])
+def push_to_sheet():
+    """Safely updates existing rows in Google Sheets and appends new ones without wiping the formatting."""
+    try:
+        docs = db.collection('registrations').stream()
+        reg_map = {doc.id: doc.to_dict() for doc in docs}
+        
+        all_rows = sheet.get_all_values()
+        cells_to_update = []
+        
+        for i, row in enumerate(all_rows):
+            if i == 0 or not row: continue
+            reg_id = row[0]
+            if reg_id in reg_map:
+                rec = reg_map[reg_id]
+                p = rec.get('player', {})
+                events = rec.get('events', [])
+                e_str = ", ".join([e['name'] for e in events])
+                pt_str = ", ".join([f"{k}: {v}" for k, v in rec.get('doublesPartners', {}).items()])
+                
+                total_events = len(events)
+                doubles_count = sum(1 for e in events if e.get('id') in DOUBLES_EVENT_IDS)
+                singles_count = total_events - doubles_count
+
+                new_row = [
+                    reg_id, p.get('firstName',''), p.get('lastName',''), p.get('email',''),
+                    p.get('phone',''), p.get('dob','N/A'), p.get('gender','N/A'),
+                    p.get('nationalId','N/A'), p.get('club','N/A'), p.get('rcId','N/A'),
+                    p.get('rcRating','N/A'), str(p.get('neverPlayed', False)).upper(),
+                    e_str, pt_str, rec.get('ttqLevy', 5.0), rec.get('discountAmount', 0),
+                    rec.get('finalTotal', 0), rec.get('paymentStatus', 'Pending'),
+                    rec.get('registeredAt', 'N/A'), rec.get('paidAt', 'N/A'),
+                    singles_count, doubles_count, total_events
+                ]
+                
+                row_num = i + 1
+                cell_list = sheet.range(f"A{row_num}:W{row_num}")
+                for j, val in enumerate(new_row):
+                    cell_list[j].value = val
+                cells_to_update.extend(cell_list)
+                
+                del reg_map[reg_id]
+                
+        if cells_to_update:
+            sheet.update_cells(cells_to_update, value_input_option='USER_ENTERED')
+            
+        for reg_id, rec in reg_map.items():
+            sync_to_sheet(reg_id, rec)
+            
+        return jsonify({"status": "success", "updated": (len(cells_to_update)//23) + len(reg_map)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

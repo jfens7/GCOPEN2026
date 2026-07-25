@@ -109,6 +109,7 @@
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <button id="btnBulkFix" class="btn-secondary-small" style="background: #0284C7; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="bulkFixRc()">🔍 Auto-Fetch RC IDs</button>
                     <button id="btnPullSheets" class="btn-secondary-small" style="background: #10B981; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="pullFromSheets()">📥 Pull GSheet Edits</button>
+                    <button id="btnPushSheets" class="btn-secondary-small" style="background: #3B82F6; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="pushToSheets()">📤 Push to GSheet</button>
                     <button id="btnRebuildSheet" class="btn-secondary-small" style="background: #DC2626; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="rebuildSheet()">⚠️ Rebuild Entire Sheet</button>
                     <button id="btnManualEntry" class="btn-secondary-small" style="background: var(--gctta-gold); color: var(--gctta-navy); padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="document.getElementById('manualModal').style.display='flex'">+ Add Manual Entry</button>
                     <button id="btnExport" class="btn-primary" style="padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="exportZermeloCSV()">One-Click Zermelo CSV Export</button>
@@ -422,7 +423,7 @@
                         </div>
                         <div style="flex: 1;">
                             <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Payment Status</label>
-                            <select id="manStatus" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1; box-sizing: border-box; background: white;">
+                            <select id="manStatus" style="width: 100%; padding: 10px; border: 1px solid #CBD5E1; box-sizing: border-box; background: white;">
                                 <option value="Paid">Paid (Cash/EFT)</option>
                                 <option value="Pending">Pending (Owes Money)</option>
                             </select>
@@ -572,6 +573,7 @@
             // Hide Player action buttons by default
             document.getElementById('btnBulkFix').style.display = 'none';
             document.getElementById('btnPullSheets').style.display = 'none';
+            document.getElementById('btnPushSheets').style.display = 'none';
             document.getElementById('btnRebuildSheet').style.display = 'none';
             document.getElementById('btnManualEntry').style.display = 'none';
             document.getElementById('btnExport').style.display = 'none';
@@ -582,6 +584,7 @@
                 
                 document.getElementById('btnBulkFix').style.display = 'inline-block';
                 document.getElementById('btnPullSheets').style.display = 'inline-block';
+                document.getElementById('btnPushSheets').style.display = 'inline-block';
                 document.getElementById('btnRebuildSheet').style.display = 'inline-block';
                 document.getElementById('btnManualEntry').style.display = 'inline-block';
                 document.getElementById('btnExport').style.display = 'inline-block';
@@ -777,7 +780,7 @@
         }
 
         // ==========================================
-        // BULK FIX & REBUILD & PULL ACTIONS
+        // BULK FIX & REBUILD & PULL/PUSH ACTIONS
         // ==========================================
         function bulkFixRc() {
             if(confirm("This will query Ratings Central for every player using their exact TTA ID, update their missing RC IDs and live Ratings, and rebuild the Google Sheet. This may take a minute. Proceed?")) {
@@ -840,6 +843,33 @@
                 .catch(err => {
                     alert("Error reaching server.");
                     btn.textContent = "📥 Pull GSheet Edits";
+                    btn.disabled = false;
+                });
+            }
+        }
+
+        function pushToSheets() {
+            if(confirm("This will safely update every existing row in Google Sheets with the current database information without wiping the sheet. Proceed?")) {
+                const btn = document.getElementById('btnPushSheets');
+                btn.textContent = "Pushing data...";
+                btn.disabled = true;
+
+                fetch('/api/admin/push-to-sheet', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.status === 'success') {
+                        alert(`Successfully pushed data to Google Sheets! Synced ${data.updated} records.`);
+                        btn.textContent = "📤 Push to GSheet";
+                        btn.disabled = false;
+                    } else {
+                        alert('Error pushing data: ' + data.error);
+                        btn.textContent = "📤 Push to GSheet";
+                        btn.disabled = false;
+                    }
+                })
+                .catch(err => {
+                    alert("Error reaching server.");
+                    btn.textContent = "📤 Push to GSheet";
                     btn.disabled = false;
                 });
             }

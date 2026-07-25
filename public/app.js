@@ -752,6 +752,11 @@ if (form) {
         let finalClub = clubSelect.value;
         if (finalClub === "Other") finalClub = clubOther.value;
 
+        // Extract the Gender
+        let selectedGender = "N/A";
+        const genderRadios = document.getElementsByName('gender');
+        genderRadios.forEach(r => { if(r.checked) selectedGender = r.value; });
+
         // Check if Pay Later is explicitly triggered
         const payLaterInput = document.getElementById('payLaterCheckbox');
         const isPayLater = payLaterInput ? payLaterInput.checked : false;
@@ -764,6 +769,7 @@ if (form) {
                 phone: document.getElementById('phone').value,
                 nationalId: document.getElementById('nationalId').value,
                 dob: document.getElementById('dob').value,
+                gender: selectedGender, 
                 club: finalClub,
                 rcProfile: document.getElementById('rcProfile').value,
                 rcId: currentRcId // Explicitly sent for GSheet separation
