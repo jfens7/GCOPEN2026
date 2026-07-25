@@ -52,6 +52,9 @@ sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1EJ5lEZs4eIkA
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", "noreply@goldcoastopen.com")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "jakobwill7@gmail.com")
 
+# Define which event IDs are doubles to automate singles/doubles tracking
+DOUBLES_EVENT_IDS = [3, 4, 21, 33, 34]
+
 def get_local_now_str():
     brisbane_tz = pytz.timezone('Australia/Brisbane')
     return datetime.now(brisbane_tz).strftime('%Y-%m-%d %H:%M:%S')
@@ -151,11 +154,17 @@ def find_missing_rc(nat_id, first, last):
     except: pass
     return "N/A", "N/A"
 
+# --- MASTER ROW GENERATOR (23 COLUMNS: A through W) ---
 def sync_to_sheet(reg_id, record):
     p = record.get('player', {})
-    events_str = ", ".join([e['name'] for e in record.get('events', [])])
+    events = record.get('events', [])
+    events_str = ", ".join([e['name'] for e in events])
     partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
     
+    total_events = len(events)
+    doubles_count = sum(1 for e in events if e.get('id') in DOUBLES_EVENT_IDS)
+    singles_count = total_events - doubles_count
+
     row_data = [
         reg_id, 
         p.get('firstName', ''), 
@@ -176,13 +185,16 @@ def sync_to_sheet(reg_id, record):
         record.get('finalTotal', 0), 
         record.get('paymentStatus', 'Pending'),
         record.get('registeredAt', 'N/A'),
-        record.get('paidAt', 'N/A')
+        record.get('paidAt', 'N/A'),
+        singles_count,
+        doubles_count,
+        total_events
     ]
     
     try:
         cell = sheet.find(reg_id)
         if cell:
-            cell_list = sheet.range(f"A{cell.row}:T{cell.row}")
+            cell_list = sheet.range(f"A{cell.row}:W{cell.row}")
             for i, val in enumerate(row_data):
                 cell_list[i].value = val
             sheet.update_cells(cell_list, value_input_option='USER_ENTERED')
@@ -191,6 +203,9 @@ def sync_to_sheet(reg_id, record):
     except Exception as e:
         print(f"GSheet Sync Error: {str(e)}")
 
+# ==========================================
+# PAGE ROUTING
+# ==========================================
 @app.route('/')
 def serve_home(): return send_from_directory(app.static_folder, 'index.html')
 
@@ -206,6 +221,9 @@ def serve_admin(): return send_from_directory(app.static_folder, 'admin.html')
 @app.route('/success.html')
 def serve_success(): return send_from_directory(app.static_folder, 'success.html')
 
+# ==========================================
+# LOOKUP API ENDPOINTS
+# ==========================================
 @app.route('/api/national-id/search', methods=['GET'])
 def search_national_id():
     name = request.args.get('name')
@@ -368,6 +386,9 @@ def validate_discount(code):
             return jsonify({"valid": True, "discountAmount": d['discountAmount']})
     return jsonify({"valid": False, "discountAmount": 0})
 
+# ==========================================
+# REGISTRATION API
+# ==========================================
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.json
@@ -539,6 +560,10 @@ def payment_success():
 
     return redirect(f"/success.html?reg_id={reg_id}")
 
+
+# ==========================================
+# UPDATE / BALANCE ENDPOINTS
+# ==========================================
 @app.route('/api/registration/lookup', methods=['POST'])
 def lookup_reg():
     data = request.json
@@ -741,6 +766,10 @@ def update_success():
 
     return redirect(f"/success.html?reg_id={reg_id}&updated=true")
 
+
+# ==========================================
+# ADMIN ENDPOINTS
+# ==========================================
 @app.route('/api/admin/stats', methods=['GET'])
 def get_admin_stats():
     docs = db.collection('registrations').stream()
@@ -762,10 +791,47 @@ def get_registrations():
         registrations.append(data)
     return jsonify(registrations)
 
+@app.route('/api/admin/sync-from-sheet', methods=['POST'])
+def sync_from_sheet():
+    """Reads the Google Sheet, matches by Ref ID (Col A), and updates Gender, DOB, Phone, Club in Firebase to achieve two-way sync."""
+    try:
+        all_rows = sheet.get_all_values()
+        if len(all_rows) <= 1:
+            return jsonify({"status": "success", "updated": 0})
+        
+        updated_count = 0
+        for row in all_rows[1:]:
+            if not row or not row[0]: continue
+            reg_id = row[0]
+            
+            # Extract fields assuming standard layout: A:Ref, D:Email, E:Phone, F:DOB, G:Gender, I:Club
+            try:
+                phone = row[4] if len(row) > 4 else "N/A"
+                dob = row[5] if len(row) > 5 else "N/A"
+                gender = row[6] if len(row) > 6 else "N/A"
+                club = row[8] if len(row) > 8 else "N/A"
+                
+                doc_ref = db.collection('registrations').document(reg_id)
+                if doc_ref.get().exists:
+                    doc_ref.update({
+                        "player.gender": gender,
+                        "player.dob": dob,
+                        "player.phone": phone,
+                        "player.club": club
+                    })
+                    updated_count += 1
+            except Exception as e:
+                print(f"Error syncing row {reg_id} from sheet: {e}")
+                
+        return jsonify({"status": "success", "updated": updated_count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/admin/registrations/<reg_id>/resend-email', methods=['POST'])
 def admin_resend_email(reg_id):
     doc_ref = db.collection('registrations').document(reg_id)
     doc = doc_ref.get()
+    
     if not doc.exists:
         return jsonify({"error": "Registration not found"}), 404
         
@@ -843,9 +909,14 @@ def bulk_fix_rc():
         rec = doc.to_dict()
         rid = doc.id
         pl = rec.get('player', {})
-        e_str = ", ".join([e['name'] for e in rec.get('events', [])])
+        events = rec.get('events', [])
+        e_str = ", ".join([e['name'] for e in events])
         pt_str = ", ".join([f"{k}: {v}" for k, v in rec.get('doublesPartners', {}).items()])
         
+        total_events = len(events)
+        doubles_count = sum(1 for e in events if e.get('id') in DOUBLES_EVENT_IDS)
+        singles_count = total_events - doubles_count
+
         row = [
             rid, pl.get('firstName',''), pl.get('lastName',''), pl.get('email',''),
             pl.get('phone',''), pl.get('dob','N/A'), pl.get('gender','N/A'),
@@ -853,13 +924,14 @@ def bulk_fix_rc():
             pl.get('rcRating','N/A'), str(pl.get('neverPlayed', False)).upper(),
             e_str, pt_str, rec.get('ttqLevy', 5.0), rec.get('discountAmount', 0),
             rec.get('finalTotal', 0), rec.get('paymentStatus', 'Pending'),
-            rec.get('registeredAt', 'N/A'), rec.get('paidAt', 'N/A')
+            rec.get('registeredAt', 'N/A'), rec.get('paidAt', 'N/A'),
+            singles_count, doubles_count, total_events
         ]
         rows_data.append(row)
         
-    sheet.batch_clear(["A2:T1000"])
+    sheet.batch_clear(["A2:W1000"])
     if rows_data:
-        cell_list = sheet.range(f"A2:T{len(rows_data)+1}")
+        cell_list = sheet.range(f"A2:W{len(rows_data)+1}")
         flat_data = [item for sublist in rows_data for item in sublist]
         for i, val in enumerate(flat_data):
             cell_list[i].value = val
@@ -875,9 +947,14 @@ def rebuild_sheet():
         rec = doc.to_dict()
         rid = doc.id
         pl = rec.get('player', {})
-        e_str = ", ".join([e['name'] for e in rec.get('events', [])])
+        events = rec.get('events', [])
+        e_str = ", ".join([e['name'] for e in events])
         pt_str = ", ".join([f"{k}: {v}" for k, v in rec.get('doublesPartners', {}).items()])
         
+        total_events = len(events)
+        doubles_count = sum(1 for e in events if e.get('id') in DOUBLES_EVENT_IDS)
+        singles_count = total_events - doubles_count
+
         row = [
             rid, pl.get('firstName',''), pl.get('lastName',''), pl.get('email',''),
             pl.get('phone',''), pl.get('dob','N/A'), pl.get('gender','N/A'),
@@ -885,13 +962,14 @@ def rebuild_sheet():
             pl.get('rcRating','N/A'), str(pl.get('neverPlayed', False)).upper(),
             e_str, pt_str, rec.get('ttqLevy', 5.0), rec.get('discountAmount', 0),
             rec.get('finalTotal', 0), rec.get('paymentStatus', 'Pending'),
-            rec.get('registeredAt', 'N/A'), rec.get('paidAt', 'N/A')
+            rec.get('registeredAt', 'N/A'), rec.get('paidAt', 'N/A'),
+            singles_count, doubles_count, total_events
         ]
         rows_data.append(row)
         
-    sheet.batch_clear(["A2:T1000"])
+    sheet.batch_clear(["A2:W1000"])
     if rows_data:
-        cell_list = sheet.range(f"A2:T{len(rows_data)+1}")
+        cell_list = sheet.range(f"A2:W{len(rows_data)+1}")
         flat_data = [item for sublist in rows_data for item in sublist]
         for i, val in enumerate(flat_data):
             cell_list[i].value = val
