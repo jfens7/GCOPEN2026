@@ -212,6 +212,15 @@
                     <p>Discount Applied: $<span id="discountAmount">0.00</span></p>
                     <hr>
                     <h3 style="margin:0;">Total Due: $<span id="finalTotal">5.00</span></h3>
+                    
+                    <!-- Hidden by default. Only appears after 3 failed Stripe attempts -->
+                    <div id="payLaterContainer" style="display: none; background: #FEF3C7; padding: 15px; border-left: 4px solid #D97706; margin-top: 15px; margin-bottom: 15px; border-radius: 4px;">
+                        <label style="font-weight: bold; color: #92400E; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="payLaterCheckbox" style="width: 18px; height: 18px;">
+                            Having trouble with card payments? Click here to bypass Stripe and Pay on the Day (Cash/EFT).
+                        </label>
+                    </div>
+
                     <button type="submit" id="checkoutBtn" class="btn-primary btn-block">PROCEED TO SECURE PAYMENT</button>
                 </div>
             </div>

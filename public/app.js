@@ -1,5 +1,29 @@
 const API_BASE = "/api";
 
+document.addEventListener("DOMContentLoaded", () => {
+    // --- THREE STRIKES STRIPE TRACKING ---
+    const urlParams = new URLSearchParams(window.location.search);
+    let attempts = parseInt(localStorage.getItem('gco_payment_attempts') || '0');
+
+    if (urlParams.has('canceled')) {
+        attempts++;
+        localStorage.setItem('gco_payment_attempts', attempts);
+        
+        // Clean the URL so refreshing doesn't add fake strikes
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        if (attempts < 3) {
+            alert(`Payment cancelled or failed. You have ${3 - attempts} attempt(s) remaining before manual payment is unlocked.`);
+        }
+    }
+
+    // If they have 3 or more strikes, unhide the Pay Later box
+    if (attempts >= 3) {
+        const payLaterContainer = document.getElementById('payLaterContainer');
+        if(payLaterContainer) payLaterContainer.style.display = 'block';
+    }
+});
+
 window.toggleRcProfile = function() {
     const box = document.getElementById('neverPlayedBox');
     const input = document.getElementById('rcProfile');
@@ -89,24 +113,258 @@ const masterEventsList = [
 // CLUBS INITIALIZATION
 // ==========================================
 const australianClubs = [
-    "Independent / None",
-    "Gold Coast Table Tennis Association",
-    "Brisbane Table Tennis Association",
-    "Wynnum Table Tennis Association",
-    "Moreton Bay Table Tennis Association",
-    "Sunshine Coast Table Tennis",
-    "Townsville Table Tennis Association",
-    "Mackay Table Tennis Association",
-    "Rockhampton Table Tennis Association",
-    "Bundaberg Table Tennis Association",
-    "Cairns Table Tennis Association",
-    "Toowoomba Table Tennis Association",
-    "Tweed Heads Table Tennis",
-    "Sydney Indoor Table Tennis",
-    "Table Tennis NSW",
-    "Table Tennis Victoria",
-    "Table Tennis SA",
-    "Other"
+  "Independent / None",
+  "Gold Coast Table Tennis Association",
+  "Brisbane Table Tennis Association",
+  "Wynnum Table Tennis Association",
+  "Moreton Bay Table Tennis Association",
+  "Sunshine Coast Table Tennis",
+  "Townsville Table Tennis Association",
+  "Mackay Table Tennis Association",
+  "Rockhampton Table Tennis Association",
+  "Bundaberg Table Tennis Association",
+  "Cairns Table Tennis Association",
+  "Toowoomba Table Tennis Association",
+  "Tweed Heads Table Tennis",
+  "Centenary Table Tennis Club",
+  "Ipswich Table Tennis Association",
+  "Crows Nest and District Table Tennis Association",
+  "Gatton Table Tennis Association",
+  "Noosa Table Tennis Club",
+  "University of Queensland Table Tennis Club",
+  "Maryborough Table Tennis & Pickleball",
+  "Star Table Tennis Association",
+  "Table Tennis Society",
+  "Yvonne Table Tennis Academy",
+  "ACDMA Table Tennis Club",
+  "Albury Wodonga Table Tennis Association",
+  "Apex Table Tennis Centre",
+  "Ararat/Armenian Table Tennis Club",
+  "Armidale Table Tennis Club",
+  "Ashfield Table Tennis Club",
+  "Australian Table Tennis Academy",
+  "Australian Table Tennis Promotion Association",
+  "Bathurst District Table Tennis Association",
+  "Bavpast Social Table Tennis Club",
+  "Bega Table Tennis Club",
+  "Bermagui Table Tennis Club",
+  "Blacktown Workers Table Tennis Club",
+  "Blayney Table Tennis",
+  "Bowral Table Tennis Association",
+  "Byron Bay Table Tennis Club",
+  "Cabarita Beach Table Tennis Club",
+  "Cabra-Vale Diggers Club",
+  "Canterbury Leagues Club",
+  "Central Coast Table Tennis Club",
+  "Chatswood Table Tennis Club",
+  "Cherrybrook Table Tennis Club",
+  "Coffs Harbour Over 50s Table Tennis Club",
+  "Coffs Table Tennis Club",
+  "Con's Table Tennis Academy",
+  "Cronulla RSL",
+  "CrossCourt Table Tennis Hub",
+  "Dooley's Table Tennis Club",
+  "E.L.I.T.E. Table Tennis Club",
+  "EH Table Tennis Club",
+  "Epping Table Tennis Club",
+  "Fairfield PCYC",
+  "Far North Coast Table Tennis Association",
+  "Far South Coast Table Tennis Group",
+  "Forestville Table Tennis Club",
+  "Georges River Association Table Tennis Club",
+  "Gina Table Tennis Academy",
+  "Goulburn Table Tennis Association",
+  "Hong Kong University Alumni Association NSW Chapter",
+  "Hornsby RSL Table Tennis Club",
+  "Howlong Table Tennis Club",
+  "Hunters Hill Glades Table Tennis Group",
+  "Illawarra District Table Tennis Association",
+  "Inh Le Table Tennis Academy",
+  "Inter-University Table Tennis Association",
+  "J & B Sports Club",
+  "JJW Table Tennis Club",
+  "Katoomba Table Tennis Club",
+  "Kempsey Macleay Table Tennis Club",
+  "Kiama Table Tennis Club",
+  "Kim's Training Centre",
+  "Kogarah Table Tennis Club",
+  "KTTA Juniors Training Centre",
+  "Lane Cove Table Tennis Group",
+  "Lithgow Table Tennis Association",
+  "Macquarie University Table Tennis Club",
+  "Maitland Social Table Tennis Club",
+  "Manning Table Tennis Club",
+  "Mounties Table Tennis Club",
+  "MTTC Table Tennis",
+  "Nambucca Heads Table Tennis Club",
+  "Nepean District Table Tennis Association",
+  "Newcastle PCYC Table Tennis Club",
+  "North Shore Table Tennis Academy",
+  "Norths Table Tennis Club",
+  "Norwest Table Tennis Club",
+  "NSW Country Table Tennis League",
+  "NSW Insurance Officers Table Tennis Association",
+  "NSW Veterans Table Tennis Association",
+  "Opal Grand Table Tennis Club",
+  "Orange Table Tennis Association",
+  "Paul Zhao Table Tennis Academy",
+  "Peter Masen Table Tennis Academy",
+  "Ping Pong HQ Kingsgrove",
+  "Port Macquarie Table Tennis Club",
+  "Pymble Table Tennis Club",
+  "Robertson Table Tennis Association",
+  "RTTC Table Tennis Academy",
+  "South Hurstville",
+  "South Tweed Sports Table Tennis Club",
+  "St George & Sutherland Shire Active Seniors",
+  "St George & Sutherland Shire Table Tennis Association",
+  "Stars Centre",
+  "Sydney Northern Districts Table Tennis Association",
+  "Sydney Sports Club",
+  "Sydney Suburban Sports Club Incorporated",
+  "Sydney Table Tennis Club",
+  "Sydney Upper North Shore Table Tennis Association",
+  "Table Tennis ACT",
+  "Table Tennis Canberra North Club",
+  "Table Tennis NSW Umpires & Referees Association",
+  "Table Tennis Western Sydney",
+  "Tamworth Table Tennis Club",
+  "Terrey Hills Table Tennis Club",
+  "The Country Club Table Tennis Club",
+  "The Elanora Table Tennis Centre",
+  "Vietnamese Australian Table Tennis Association",
+  "Vivian's Table Tennis Academy",
+  "Wagga Wagga Table Tennis Club",
+  "Wentworthville Leagues Table Tennis Club",
+  "Willoughby Table Tennis Club",
+  "Wollondilly Table Tennis Association",
+  "World Table Tennis Centre",
+  "Xpong Table Tennis Club",
+  "Bairnsdale & District Table Tennis Association/KeenAgers",
+  "Ballarat Table Tennis Association",
+  "Balwyn United Table Tennis Club",
+  "Bellarine Keenagers Table Tennis Club",
+  "Bellarine Table Tennis Club",
+  "Bendigo & District Table Tennis Association",
+  "CH Table Tennis",
+  "Coburg Table Tennis Club",
+  "Croydon & Districts Table Tennis Association",
+  "Daylesford Table Tennis Association",
+  "Deniliquin Table Tennis Club",
+  "Diamond Valley Table Tennis Association",
+  "Eastern Suburbs & Churches Table Tennis Association",
+  "Geelong Table Tennis Association",
+  "Gisborne District Table Tennis Association",
+  "Greater Dandenong Table Tennis Association",
+  "Hamilton Table Tennis Association",
+  "Horsham Table Tennis Association",
+  "ICC Academy",
+  "Kyabram Youth Club",
+  "Lakes Entrance Keenagers",
+  "Leongatha Table Tennis Association",
+  "LOOPS powered by HWATT",
+  "Maccabi Table Tennis Club (VIC)",
+  "Manningham Table Tennis Club",
+  "Melbourne Veterans Table Tennis Association",
+  "Melton Table Tennis Association",
+  "Miao's Table Tennis Academy",
+  "Moe/Newborough Keen-agers",
+  "Monbulk Table Tennis Association",
+  "Mornington Peninsula & Frankston City Table Tennis Association",
+  "Officer City Soccer Club",
+  "Peak Agility Table Tennis",
+  "Peter's Table Tennis Academy",
+  "Portland Table Tennis Association",
+  "Sale Keenagers Table Tennis Club",
+  "Scorpio Table Tennis Academy",
+  "Shepparton Table Tennis Association",
+  "South Eastern Table Tennis Association",
+  "St Kilda Cricket Table Tennis Club",
+  "Sunbury & District Table Tennis Association",
+  "Sunraysia Table Tennis Association",
+  "Sunshine & District Table Tennis Association",
+  "Swan Hill Table Tennis Association",
+  "Table Tennis Victoria",
+  "Terang Table Tennis Association",
+  "The Disruptor Club",
+  "Traralgon Table Tennis Association",
+  "Triangle Table Tennis",
+  "Vietnamese Table Tennis Association",
+  "Wangaratta Table Tennis Association",
+  "Warracknabeal Table Tennis Association",
+  "Warrnambool Table Tennis Association",
+  "Werribee Table Tennis Association",
+  "Western Table Tennis Club",
+  "Wonthaggi Table Tennis Association",
+  "Yarra Table Tennis Club",
+  "Yarrawonga/Mulwala Table Tennis Association",
+  "Albert Park Club",
+  "Anthony's Table Tennis Academy",
+  "Deakin University Table Tennis Club",
+  "Melbourne Lakeside Table Tennis",
+  "Melbourne University Table Tennis Club",
+  "Monash Caulfield Table Tennis Club",
+  "Monash Clayton Table Tennis Club",
+  "Old Melburnians Table Tennis",
+  "RMIT Table Tennis Club",
+  "Swinburne Table Tennis Club",
+  "Trafalgar Ping Pong Kings",
+  "Victoria University Table Tennis Club",
+  "Hopetoun Table Tennis Club",
+  "Warracknabeal Table Tennis",
+  "Adelaide Table Tennis Club",
+  "Barossa & Light Table Tennis Association",
+  "Brighton District Table Tennis Club",
+  "Campbelltown City Table Tennis (HEATT)",
+  "Copper Coast Table Tennis Association",
+  "German Table Tennis Club",
+  "Great Southern Table Tennis Association",
+  "Jamestown Table Tennis Association",
+  "Mount Gambier Table Tennis Association",
+  "Murray Bridge & Districts Table Tennis Association",
+  "North East Hills Table Tennis Association",
+  "Payneham Table Tennis Academy",
+  "Port Lincoln Table Tennis Association",
+  "Port Pirie Table Tennis Club",
+  "Renmark Table Tennis Association",
+  "South Australian Table Tennis Officiating Council",
+  "Southern Table Tennis",
+  "Vietnamese Friendship Table Tennis Club",
+  "Whyalla Table Tennis Association",
+  "Wilmington Table Tennis Club Inc",
+  "Woodville District Table Tennis Club",
+  "Inman Valley Table Tennis Club",
+  "South Coast Seniors",
+  "Ebenezer Table Tennis Club",
+  "Eden Valley Table Tennis Club",
+  "Light Pass Table Tennis Club",
+  "Tanunda Table Tennis Club",
+  "Albany Table Tennis Club",
+  "Armadale Table Tennis Club",
+  "Black Swan Table Tennis Club",
+  "Denmark Table Tennis Club",
+  "Esperance Table Tennis Club",
+  "Fremantle Table Tennis Club - Bicton",
+  "Fremantle Table Tennis Club - Samson",
+  "Geographe Bay Table Tennis Club",
+  "Geraldton Table Tennis Club",
+  "Great Wall Table Tennis Club",
+  "Hammond Table Tennis Club",
+  "Hot Shot Table Tennis Club",
+  "Kingsway Table Tennis Club",
+  "Mandurah Table Tennis Club",
+  "Melville Seniors Table Tennis Group",
+  "Morley Table Tennis Club",
+  "Scarborough Table Tennis Club",
+  "Sun Table Tennis Club",
+  "Swans Table Tennis Club",
+  "Table Tennis Western Australia",
+  "Top Spins Table Tennis Club",
+  "Table Tennis NSW",
+  "Table Tennis SA",
+  "Table Tennis WA",
+  "Table Tennis NT",
+  "Other"
 ];
 
 if (clubSelect) {
@@ -461,10 +719,10 @@ if (form) {
         }
 
         // 2. If valid, open the Terms & Conditions Modal instead of submitting directly
-        openTcModal(false); 
+        openTcModal(); 
     });
 
-    window.submitRegistration = async function(payLater = false) {
+    window.submitRegistration = async function() {
         currentEvents = [];
         const radios = document.querySelectorAll('input[type="radio"][name^="sat_"]:checked, input[type="radio"][name^="sun_"]:checked');
         radios.forEach(radio => {
@@ -494,6 +752,10 @@ if (form) {
         let finalClub = clubSelect.value;
         if (finalClub === "Other") finalClub = clubOther.value;
 
+        // Check if Pay Later is explicitly triggered
+        const payLaterInput = document.getElementById('payLaterCheckbox');
+        const isPayLater = payLaterInput ? payLaterInput.checked : false;
+
         const payload = {
             player: {
                 firstName: document.getElementById('firstName').value,
@@ -509,7 +771,7 @@ if (form) {
             events: currentEvents,
             doublesPartners: doublesPartners,
             discountCode: validatedCode,
-            payLater: payLater
+            payLater: isPayLater
         };
 
         const btn = document.getElementById('checkoutBtn');
@@ -840,10 +1102,8 @@ async function loadStats() {
 const tcModal = document.getElementById('tcModal');
 const tcScrollArea = document.getElementById('tcScrollArea');
 const tcAgreeBtn = document.getElementById('tcAgreeBtn');
-let payLaterState = false;
 
-window.openTcModal = function(payLater) {
-    payLaterState = payLater;
+window.openTcModal = function() {
     tcModal.style.display = 'flex';
     
     // Reset button state every time modal opens
@@ -881,6 +1141,6 @@ if (tcScrollArea) {
 if (tcAgreeBtn) {
     tcAgreeBtn.addEventListener('click', async () => {
         closeTcModal();
-        await window.submitRegistration(payLaterState); // Now process the actual payment API
+        await window.submitRegistration(); // Now process the actual payment API
     });
 }

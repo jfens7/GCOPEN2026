@@ -45,7 +45,6 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-        /* History Log styling */
         .history-card { background: #F8FAFC; border: 1px solid #E2E8F0; border-left: 4px solid var(--gctta-navy); padding: 12px; margin-bottom: 10px; border-radius: 4px; font-size: 13px; }
         .history-title { font-weight: bold; color: var(--gctta-navy); display: flex; justify-content: space-between; margin-bottom: 5px; }
     </style>
@@ -269,7 +268,7 @@
                         </div>
                         <div style="flex: 1;">
                             <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Payment Status</label>
-                            <select id="editStatus" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1; box-sizing: border-box; background: white;">
+                            <select id="editStatus" style="width: 100%; padding: 10px; border: 1px solid #CBD5E1; box-sizing: border-box; background: white;">
                                 <option value="Paid">Paid</option>
                                 <option value="Pending">Pending</option>
                                 <option value="Paid (Waived)">Paid (Waived)</option>
@@ -362,7 +361,7 @@
                         </div>
                         <div style="flex: 1;">
                             <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Payment Status</label>
-                            <select id="manStatus" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1; box-sizing: border-box; background: white;">
+                            <select id="manStatus" style="width: 100%; padding: 10px; border: 1px solid #CBD5E1; box-sizing: border-box; background: white;">
                                 <option value="Paid">Paid (Cash/EFT)</option>
                                 <option value="Pending">Pending (Owes Money)</option>
                             </select>
@@ -448,7 +447,17 @@
                 }
                 
                 let badgeClass = 'badge-pending';
-                if (reg.paymentStatus && reg.paymentStatus.includes('Paid')) badgeClass = 'badge-paid';
+                let reasonHtml = '';
+                
+                if (reg.paymentStatus && reg.paymentStatus.includes('Paid')) {
+                    badgeClass = 'badge-paid';
+                } else {
+                    let reason = reg.pendingReason || 'Original Unpaid Entry';
+                    // Retroactive fallback for old updates
+                    if (reg.pendingUpdate) reason = 'Unpaid Event Update';
+                    
+                    reasonHtml = `<div style="font-size: 10px; color: #854D0E; margin-top: 4px; text-align: center; font-weight: bold;">${reason}</div>`;
+                }
 
                 const row = `
                     <tr>
@@ -460,7 +469,10 @@
                         <td style="font-size: 11px; line-height: 1.4;">${eventsList}</td>
                         <td style="font-size: 11px; line-height: 1.4; color: #0F172A;">${partnersList}</td>
                         <td style="font-weight: bold;">$${parseFloat(reg.finalTotal || 0).toFixed(2)}</td>
-                        <td><span class="badge ${badgeClass}">${reg.paymentStatus}</span></td>
+                        <td>
+                            <span class="badge ${badgeClass}">${reg.paymentStatus}</span>
+                            ${reasonHtml}
+                        </td>
                         <td>
                             <div class="action-btns">
                                 <button class="btn-view" onclick="openViewModal('${reg.id}')">View</button>
@@ -493,6 +505,7 @@
                 document.getElementById('viewPlayers').style.display = 'block';
                 document.getElementById('viewDiscounts').style.display = 'none';
                 
+                // Show Player action buttons
                 document.getElementById('btnBulkFix').style.display = 'inline-block';
                 document.getElementById('btnRebuildSheet').style.display = 'inline-block';
                 document.getElementById('btnManualEntry').style.display = 'inline-block';
@@ -503,6 +516,7 @@
                 document.getElementById('viewDiscounts').style.display = 'block';
                 document.getElementById('viewPlayers').style.display = 'none';
                 
+                // Hide Player action buttons
                 document.getElementById('btnBulkFix').style.display = 'none';
                 document.getElementById('btnRebuildSheet').style.display = 'none';
                 document.getElementById('btnManualEntry').style.display = 'none';
@@ -523,6 +537,7 @@
 
             let csvContent = "data:text/csv;charset=utf-8,";
             
+            // Zermelo standard headers + our custom data
             const headers = [
                 "Ref ID", "First Name", "Last Name", "Email", "Phone", "DOB", "Gender", 
                 "TTA ID", "Club", "RC ID", "RC Rating", "Never Played", "Events", 
@@ -572,7 +587,7 @@
         // BULK FIX & REBUILD ACTIONS
         // ==========================================
         function bulkFixRc() {
-            if(confirm("This will query Ratings Central for every player using their exact TTA ID, update their missing RC IDs and live Ratings, and rebuild the Google Sheet. Proceed?")) {
+            if(confirm("This will query Ratings Central for every player using their exact TTA ID, update their missing RC IDs and live Ratings, and rebuild the Google Sheet. This may take a minute. Proceed?")) {
                 const btn = document.getElementById('btnBulkFix');
                 btn.textContent = "Querying Ratings Central...";
                 btn.disabled = true;
@@ -677,6 +692,7 @@
             let liveRating = reg.player.rcRating && reg.player.rcRating !== 'N/A' ? reg.player.rcRating : 'Fetching...';
             let liveRcId = reg.player.rcId || 'N/A';
 
+            // Attempt a live fetch if the DB rating is blank but they have an RC ID
             if (liveRating === 'Fetching...' && liveRcId !== 'N/A' && liveRcId !== 'Never Played') {
                 try {
                     const res = await fetch(`/api/ratings-central/search?query=${liveRcId}`);
@@ -755,6 +771,7 @@
                         <p style="margin: 8px 0;"><strong>Original Entry Cost:</strong> $${parseFloat(reg.originalTotal || reg.finalTotal || 0).toFixed(2)}</p>
                         <p style="margin: 8px 0;"><strong>Current Total Value:</strong> $${parseFloat(reg.finalTotal || 0).toFixed(2)}</p>
                         <p style="margin: 8px 0;"><strong>Payment Status:</strong> <span class="badge ${reg.paymentStatus === 'Paid' ? 'badge-paid' : 'badge-pending'}">${reg.paymentStatus}</span></p>
+                        ${reg.paymentStatus === 'Pending' ? `<p style="margin: 8px 0; color: #854D0E; font-size: 12px;"><strong>Reason:</strong> ${reg.pendingReason || (reg.pendingUpdate ? 'Unpaid Event Update' : 'Original Unpaid Entry')}</p>` : ''}
                     </div>
                 </div>
                 

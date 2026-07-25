@@ -99,10 +99,8 @@ def generate_receipt_email(first_name, reg_id, events_str, partners_str, final_t
     <p><strong>2026 Gold Coast Open</strong></p>"""
 
 def lookup_rc_by_tta_id(tta_id):
-    """Directly queries Ratings Central using the official PlayerTTA_ID parameter"""
     if not tta_id or str(tta_id).strip() in ["", "N/A", "None"]:
         return "N/A", "N/A"
-    
     try:
         url = f"https://www.ratingscentral.com/PlayerList.php?PlayerTTA_ID={str(tta_id).strip()}&PlayerSport=1"
         headers = {"User-Agent": "Mozilla/5.0"}
@@ -126,11 +124,9 @@ def lookup_rc_by_tta_id(tta_id):
                     return rc_id, rating_str
     except Exception as e:
         print(f"RC TTA Lookup Error: {e}")
-    
     return "N/A", "N/A"
 
 def find_missing_rc(nat_id, first, last):
-    """Fallback scraper by Name if TTA ID isn't linked on RC"""
     rc_id, rating = lookup_rc_by_tta_id(nat_id)
     if rc_id != "N/A":
         return rc_id, rating
@@ -155,9 +151,7 @@ def find_missing_rc(nat_id, first, last):
     except: pass
     return "N/A", "N/A"
 
-# --- MASTER ROW GENERATOR (20 COLUMNS: A through T) ---
 def sync_to_sheet(reg_id, record):
-    """Generates the exact 20-column array and pushes it, guaranteeing clean column layout."""
     p = record.get('player', {})
     events_str = ", ".join([e['name'] for e in record.get('events', [])])
     partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
@@ -193,41 +187,29 @@ def sync_to_sheet(reg_id, record):
                 cell_list[i].value = val
             sheet.update_cells(cell_list, value_input_option='USER_ENTERED')
         else:
-            sheet.insert_row(row_data, 2, value_input_option='USER_ENTERED')
+            sheet.append_row(row_data, value_input_option='USER_ENTERED')
     except Exception as e:
         print(f"GSheet Sync Error: {str(e)}")
 
-# ==========================================
-# PAGE ROUTING
-# ==========================================
 @app.route('/')
-def serve_home():
-    return send_from_directory(app.static_folder, 'index.html')
+def serve_home(): return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/registration')
-def serve_registration():
-    return send_from_directory(app.static_folder, 'register.html')
+def serve_registration(): return send_from_directory(app.static_folder, 'register.html')
 
 @app.route('/schedule')
-def serve_schedule():
-    return send_from_directory(app.static_folder, 'schedule.html')
+def serve_schedule(): return send_from_directory(app.static_folder, 'schedule.html')
 
 @app.route('/admin')
-def serve_admin():
-    return send_from_directory(app.static_folder, 'admin.html')
+def serve_admin(): return send_from_directory(app.static_folder, 'admin.html')
 
 @app.route('/success.html')
-def serve_success():
-    return send_from_directory(app.static_folder, 'success.html')
+def serve_success(): return send_from_directory(app.static_folder, 'success.html')
 
-# ==========================================
-# LOOKUP API ENDPOINTS
-# ==========================================
 @app.route('/api/national-id/search', methods=['GET'])
 def search_national_id():
     name = request.args.get('name')
-    if not name:
-        return jsonify({"error": "Missing name"}), 400
+    if not name: return jsonify({"error": "Missing name"}), 400
     
     name_parts = name.strip().split(' ')
     first_name = name_parts[0] if len(name_parts) > 0 else ''
@@ -237,21 +219,16 @@ def search_national_id():
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
             page = browser.new_page()
-            
             page.goto('https://www.tabletennis.org.au/login')
             page.wait_for_selector('input[name="username"]')
             page.fill('input[name="username"]', 'jfensom3')
             page.fill('input[name="password"]', 'Pizza1200!')
-            
-            with page.expect_navigation():
-                page.click('button#submit')
+            with page.expect_navigation(): page.click('button#submit')
                 
             page.goto('https://www.tabletennis.org.au/member-finder/')
             page.wait_for_selector('input[placeholder*="First name"]')
-            
             page.fill('input[placeholder*="First name"]', first_name)
-            if last_name:
-                page.fill('input[placeholder*="last name"]', last_name)
+            if last_name: page.fill('input[placeholder*="last name"]', last_name)
                 
             page.get_by_role("button", name="SEARCH").click()
             page.wait_for_timeout(2500)
@@ -261,7 +238,6 @@ def search_national_id():
             
             soup = BeautifulSoup(content, 'html.parser')
             found_data = None
-            
             for card in soup.find_all(class_='card'):
                 text = card.get_text()
                 if 'National Member ID:' in text:
@@ -272,45 +248,32 @@ def search_national_id():
                             "success": True,
                             "nationalId": match_id.group(1),
                             "state": match_state.group(1).strip() if match_state else "Unknown",
-                            "status": "Active" if "Active" in text else "Unknown",
-                            "rawText": re.sub(r'\s+', ' ', text).strip()
+                            "status": "Active" if "Active" in text else "Unknown"
                         }
                         break
-            
-            if found_data:
-                return jsonify(found_data)
-            else:
-                return jsonify({"error": "No matching National ID found."}), 404
-
+            if found_data: return jsonify(found_data)
+            return jsonify({"error": "No matching National ID found."}), 404
     except Exception as e:
-        if "Executable doesn't exist" in str(e):
-            return jsonify({"error": "Playwright browser missing."}), 500
-        return jsonify({"error": "Failed to search National ID", "details": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/national-id/lookup-by-id', methods=['GET'])
 def lookup_national_id_by_id():
     nat_id = request.args.get('id')
-    if not nat_id:
-        return jsonify({"error": "Missing National ID"}), 400
+    if not nat_id: return jsonify({"error": "Missing National ID"}), 400
     
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
             page = browser.new_page()
-            
             page.goto('https://www.tabletennis.org.au/login')
             page.wait_for_selector('input[name="username"]')
             page.fill('input[name="username"]', 'jfensom3')
             page.fill('input[name="password"]', 'Pizza1200!')
-            
-            with page.expect_navigation():
-                page.click('button#submit')
+            with page.expect_navigation(): page.click('button#submit')
                 
             page.goto('https://www.tabletennis.org.au/member-finder/')
-            
             id_input = page.locator('input[placeholder*="National Member ID"]')
-            if id_input.count() == 0:
-                id_input = page.locator('input[type="text"]').first
+            if id_input.count() == 0: id_input = page.locator('input[type="text"]').first
                 
             id_input.fill(str(nat_id))
             page.get_by_role("button", name="SEARCH").click()
@@ -321,19 +284,16 @@ def lookup_national_id_by_id():
             
             soup = BeautifulSoup(content, 'html.parser')
             found_data = None
-            
             for card in soup.find_all(class_='card'):
                 text = card.get_text()
                 if str(nat_id) in text:
                     name_tag = card.find('h4') or card.find('h5') or card.find('strong')
                     full_name_text = name_tag.get_text(strip=True) if name_tag else ""
-                    
                     if not full_name_text:
                         lines = [line.strip() for line in text.split('\n') if line.strip()]
                         full_name_text = lines[0] if lines else ""
                     
-                    first_name = ""
-                    last_name = ""
+                    first_name, last_name = "", ""
                     if ',' in full_name_text:
                         parts = full_name_text.split(',')
                         last_name = parts[0].strip()
@@ -356,21 +316,15 @@ def lookup_national_id_by_id():
                         "state": match_state.group(1).strip() if match_state else "Unknown",
                     }
                     break
-            
-            if found_data:
-                return jsonify(found_data)
-            else:
-                return jsonify({"error": f"No TTA member found with ID #{nat_id}."}), 404
-
+            if found_data: return jsonify(found_data)
+            return jsonify({"error": f"No TTA member found with ID #{nat_id}."}), 404
     except Exception as e:
         return jsonify({"error": "Failed to search National ID", "details": str(e)}), 500
 
 @app.route('/api/ratings-central/search', methods=['GET'])
 def search_ratings_central():
     query = request.args.get('query')
-    if not query:
-        return jsonify({"error": "Missing search query"}), 400
-    
+    if not query: return jsonify({"error": "Missing search query"}), 400
     try:
         q_str = query.strip()
         if re.match(r'^\d+$', q_str):
@@ -379,16 +333,12 @@ def search_ratings_central():
             name_query = q_str.replace(',', '')
             name_parts = name_query.split()
             if len(name_parts) > 1 and ',' not in q_str:
-                last = name_parts[-1]
-                first = ' '.join(name_parts[:-1])
-                name_query = f"{last}, {first}"
+                name_query = f"{name_parts[-1]}, {' '.join(name_parts[:-1])}"
             else:
                 name_query = q_str
             rc_url = f"https://www.ratingscentral.com/PlayerList.php?PlayerName={requests.utils.quote(name_query)}&PlayerSport=1"
         
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
+        headers = {"User-Agent": "Mozilla/5.0"}
         resp = requests.get(rc_url, headers=headers, timeout=10)
         soup = BeautifulSoup(resp.text, 'html.parser')
         
@@ -398,38 +348,17 @@ def search_ratings_central():
             tbody = table.find('tbody') or table
             for tr in tbody.find_all('tr'):
                 tds = tr.find_all('td')
-                rating_str = ""
-                name = ""
-                player_id = ""
-                last_event = ""
-                
-                if len(tds) == 5:
-                    rating_str = tds[1].get_text(strip=True).split('±')[0].strip()
-                    name = tds[2].get_text(strip=True)
-                    player_id = tds[3].get_text(strip=True)
-                    last_event = tds[4].get_text(strip=True)
-                elif len(tds) == 4:
-                    rating_str = tds[0].get_text(strip=True).split('±')[0].strip()
-                    name = tds[1].get_text(strip=True)
-                    player_id = tds[2].get_text(strip=True)
-                    last_event = tds[3].get_text(strip=True)
-                
-                if player_id and rating_str and rating_str != "Unrated":
-                    rating_str = re.sub(r'[\u200B-\u200D\uFEFF]', '', rating_str)
-                    if rating_str.isdigit():
-                        players.append({
-                            "id": player_id,
-                            "name": name,
-                            "rating": int(rating_str),
-                            "lastEvent": last_event
-                        })
+                if len(tds) >= 4:
+                    rating_str = tds[1].get_text(strip=True).split('±')[0].strip() if len(tds) == 5 else tds[0].get_text(strip=True).split('±')[0].strip()
+                    name = tds[2].get_text(strip=True) if len(tds) == 5 else tds[1].get_text(strip=True)
+                    player_id = tds[3].get_text(strip=True) if len(tds) == 5 else tds[2].get_text(strip=True)
+                    rating_str = re.sub(r'[^\d]', '', rating_str)
+                    if player_id and rating_str.isdigit():
+                        players.append({"id": player_id, "name": name, "rating": int(rating_str)})
         return jsonify({"players": players, "status": "success"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ==========================================
-# REGISTRATION & PAYMENT API
-# ==========================================
 @app.route('/api/validate-discount/<code>', methods=['GET'])
 def validate_discount(code):
     docs = list(db.collection('discount_codes').where(filter=FieldFilter('code', '==', code.upper())).stream())
@@ -485,6 +414,14 @@ def register():
 
     registered_at = get_local_now_str()
     paid_at = registered_at if final_total == 0 else "N/A"
+    
+    if data.get('payLater'):
+        pending_reason = "Pay Later Selected"
+    else:
+        pending_reason = "Abandoned Checkout"
+        
+    if final_total == 0:
+        pending_reason = "N/A"
 
     initial_history_entry = {
         "updateNumber": 0,
@@ -509,6 +446,7 @@ def register():
         "finalTotal": final_total,
         "balanceDue": final_total if final_total > 0 else 0,
         "paymentStatus": "Paid" if final_total == 0 else "Pending",
+        "pendingReason": pending_reason,
         "registeredAt": registered_at,
         "paidAt": paid_at,
         "history": [initial_history_entry],
@@ -548,7 +486,7 @@ def register():
             }],
             mode='payment',
             success_url=f"{BASE_URL}/api/payment-success?session_id={{CHECKOUT_SESSION_ID}}&reg_id={registration_id}",
-            cancel_url=f"{BASE_URL}/registration",
+            cancel_url=f"{BASE_URL}/registration?canceled=true",
         )
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -576,6 +514,7 @@ def payment_success():
                 "paymentStatus": "Paid",
                 "paidAt": paid_at,
                 "balanceDue": 0,
+                "pendingReason": "N/A",
                 "history": history
             })
             
@@ -600,10 +539,6 @@ def payment_success():
 
     return redirect(f"/success.html?reg_id={reg_id}")
 
-
-# ==========================================
-# UPDATE / BALANCE ENDPOINTS
-# ==========================================
 @app.route('/api/registration/lookup', methods=['POST'])
 def lookup_reg():
     data = request.json
@@ -678,7 +613,8 @@ def update_checkout():
                 "difference": difference,
                 "addedEvents": added_events,
                 "removedEvents": removed_events
-            }
+            },
+            "pendingReason": "Unpaid Event Update"
         })
         
         return jsonify({"url": checkout_session.url})
@@ -762,6 +698,7 @@ def update_success():
                     "paymentStatus": "Paid",
                     "paidAt": paid_at,
                     "balanceDue": 0,
+                    "pendingReason": "N/A",
                     "history": history,
                     "pendingUpdate": firestore.DELETE_FIELD
                 })
@@ -795,6 +732,7 @@ def update_success():
                     "paymentStatus": "Paid",
                     "paidAt": paid_at,
                     "balanceDue": 0,
+                    "pendingReason": "N/A",
                     "history": history
                 })
                 
@@ -803,30 +741,16 @@ def update_success():
 
     return redirect(f"/success.html?reg_id={reg_id}&updated=true")
 
-
-# ==========================================
-# ADMIN ENDPOINTS
-# ==========================================
 @app.route('/api/admin/stats', methods=['GET'])
 def get_admin_stats():
     docs = db.collection('registrations').stream()
-    total_revenue = 0
-    total_players = 0
-    pending_payments = 0
-    
+    rev, players, pending = 0, 0, 0
     for doc in docs:
         d = doc.to_dict()
-        total_players += 1
-        if 'Paid' in d.get('paymentStatus', ''):
-            total_revenue += float(d.get('finalTotal', 0))
-        else:
-            pending_payments += 1
-            
-    return jsonify({
-        "totalRevenue": total_revenue,
-        "totalPlayers": total_players,
-        "pendingPayments": pending_payments
-    })
+        players += 1
+        if 'Paid' in d.get('paymentStatus', ''): rev += float(d.get('finalTotal', 0))
+        else: pending += 1
+    return jsonify({"totalRevenue": rev, "totalPlayers": players, "pendingPayments": pending})
 
 @app.route('/api/admin/registrations', methods=['GET'])
 def get_registrations():
@@ -842,7 +766,6 @@ def get_registrations():
 def admin_resend_email(reg_id):
     doc_ref = db.collection('registrations').document(reg_id)
     doc = doc_ref.get()
-    
     if not doc.exists:
         return jsonify({"error": "Registration not found"}), 404
         
@@ -993,6 +916,7 @@ def manual_register():
     registered_at = get_local_now_str()
     paid_at = registered_at if data.get('status') == 'Paid' else 'N/A'
     total_val = float(data.get('totalPaid', 0))
+    pending_reason = "N/A" if data.get('status') == 'Paid' else "Manual Entry (Unpaid)"
 
     initial_history = {
         "updateNumber": 0,
@@ -1028,6 +952,7 @@ def manual_register():
         "finalTotal": total_val,
         "balanceDue": 0 if data.get('status') == 'Paid' else total_val,
         "paymentStatus": data.get('status', 'Paid'),
+        "pendingReason": pending_reason,
         "registeredAt": registered_at,
         "paidAt": paid_at,
         "history": [initial_history],
@@ -1069,8 +994,10 @@ def update_registration(reg_id):
         if 'Paid' in data['paymentStatus']:
             update_payload['paidAt'] = now_str
             update_payload['balanceDue'] = 0
+            update_payload['pendingReason'] = 'N/A'
         elif 'Pending' in data['paymentStatus']:
             update_payload['balanceDue'] = data.get('finalTotal', record.get('finalTotal', 0))
+            update_payload['pendingReason'] = 'Admin Overwrite (Unpaid)'
 
     update_num = len(history)
     history.append({
