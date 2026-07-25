@@ -159,6 +159,35 @@
                     </div>
                 </div>
 
+                <h3 style="margin-top: 0; color: var(--gctta-navy); border-bottom: 2px solid #E2E8F0; padding-bottom: 10px;">Player Demographics & Stats</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                    <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 15px;">
+                        <h4 style="margin: 0 0 15px 0; color: #475569; text-transform: uppercase; font-size: 12px; letter-spacing: 1px;">Gender Breakdown</h4>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span style="color:#64748B;">Male</span><strong id="analyticsMale">0</strong></div>
+                        <div style="display:flex; justify-content:space-between;"><span style="color:#64748B;">Female</span><strong id="analyticsFemale">0</strong></div>
+                    </div>
+                    
+                    <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 15px;">
+                        <h4 style="margin: 0 0 15px 0; color: #475569; text-transform: uppercase; font-size: 12px; letter-spacing: 1px;">Age Categories</h4>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span style="color:#64748B;">Juniors (Under 18)</span><strong id="analyticsJunior">0</strong></div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span style="color:#64748B;">Seniors (18 - 39)</span><strong id="analyticsAdult">0</strong></div>
+                        <div style="display:flex; justify-content:space-between;"><span style="color:#64748B;">Veterans (40+)</span><strong id="analyticsVet">0</strong></div>
+                    </div>
+
+                    <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 15px;">
+                        <h4 style="margin: 0 0 15px 0; color: #475569; text-transform: uppercase; font-size: 12px; letter-spacing: 1px;">RC Rating Spread</h4>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span style="color:#64748B;">Unrated</span><strong id="analyticsUnrated">0</strong></div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span style="color:#64748B;">Under 1000</span><strong id="analyticsU1000">0</strong></div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;"><span style="color:#64748B;">1000 - 1500</span><strong id="analyticsU1500">0</strong></div>
+                        <div style="display:flex; justify-content:space-between;"><span style="color:#64748B;">Over 1500</span><strong id="analyticsO1500">0</strong></div>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 0; color: var(--gctta-navy); border-bottom: 2px solid #E2E8F0; padding-bottom: 10px;">Club Representation</h3>
+                <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 15px; margin-bottom: 30px; max-height: 250px; overflow-y: auto;">
+                    <div id="analyticsClubGrid"></div>
+                </div>
+
                 <h3 style="margin-top: 0; color: var(--gctta-navy); border-bottom: 2px solid #E2E8F0; padding-bottom: 10px;">Player Counts Per Event</h3>
                 <div class="analytics-grid" id="analyticsBreakdownGrid">
                     <!-- Populated dynamically via JS -->
@@ -300,7 +329,7 @@
                         </div>
                         <div style="flex: 1;">
                             <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Payment Status</label>
-                            <select id="editStatus" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1; box-sizing: border-box; background: white;">
+                            <select id="editStatus" style="width: 100%; padding: 10px; border: 1px solid #CBD5E1; box-sizing: border-box; background: white;">
                                 <option value="Paid">Paid</option>
                                 <option value="Pending">Pending</option>
                                 <option value="Paid (Waived)">Paid (Waived)</option>
@@ -574,10 +603,56 @@
             let totalDoubles = 0;
             let totalOverall = 0;
             const eventCounts = {};
+            const clubCounts = {};
+            let maleCount = 0;
+            let femaleCount = 0;
+            
+            let unratedCount = 0;
+            let u1000Count = 0;
+            let u1500Count = 0;
+            let over1500Count = 0;
 
-            const doublesIds = [3, 4, 21, 33, 34]; // Identical to Python server logic
+            let juniorCount = 0;
+            let adultCount = 0;
+            let vetCount = 0;
+
+            const doublesIds = [3, 4, 21, 33, 34];
 
             dataArray.forEach(reg => {
+                // Gender
+                let g = reg.player.gender || 'N/A';
+                if (g === 'Male') maleCount++;
+                else if (g === 'Female') femaleCount++;
+
+                // Club
+                let c = reg.player.club || 'N/A';
+                if(c === 'Independent / None') c = 'None';
+                if(!clubCounts[c]) clubCounts[c] = 0;
+                clubCounts[c]++;
+
+                // Rating
+                let r = reg.player.rcRating;
+                if (!r || r === 'N/A' || isNaN(r)) {
+                    unratedCount++;
+                } else {
+                    r = parseInt(r);
+                    if (r < 1000) u1000Count++;
+                    else if (r < 1500) u1500Count++;
+                    else over1500Count++;
+                }
+
+                // Age
+                if (reg.player.dob && reg.player.dob !== 'N/A') {
+                    const yearMatch = reg.player.dob.match(/\d{4}/);
+                    if (yearMatch) {
+                        const age = 2026 - parseInt(yearMatch[0]);
+                        if (age < 18) juniorCount++;
+                        else if (age >= 40) vetCount++;
+                        else adultCount++;
+                    }
+                }
+
+                // Events
                 if(reg.events) {
                     reg.events.forEach(e => {
                         totalOverall++;
@@ -596,13 +671,38 @@
             document.getElementById('analyticsTotalSingles').innerText = totalSingles;
             document.getElementById('analyticsTotalDoubles').innerText = totalDoubles;
             document.getElementById('analyticsTotalOverall').innerText = totalOverall;
+            
+            // Render Genders
+            document.getElementById('analyticsMale').innerText = maleCount;
+            document.getElementById('analyticsFemale').innerText = femaleCount;
 
+            // Render Ages
+            document.getElementById('analyticsJunior').innerText = juniorCount;
+            document.getElementById('analyticsAdult').innerText = adultCount;
+            document.getElementById('analyticsVet').innerText = vetCount;
+
+            // Render Ratings
+            document.getElementById('analyticsUnrated').innerText = unratedCount;
+            document.getElementById('analyticsU1000').innerText = u1000Count;
+            document.getElementById('analyticsU1500').innerText = u1500Count;
+            document.getElementById('analyticsO1500').innerText = over1500Count;
+
+            // Render Clubs
+            const clubGrid = document.getElementById('analyticsClubGrid');
+            clubGrid.innerHTML = '';
+            Object.keys(clubCounts).sort((a,b) => clubCounts[b] - clubCounts[a]).forEach(club => {
+                clubGrid.innerHTML += `
+                    <div style="display:flex; justify-content:space-between; border-bottom:1px solid #E2E8F0; padding:8px 0;">
+                        <span style="color:#475569; font-size:13px;">${club}</span>
+                        <span style="font-weight:bold; color:var(--gctta-navy);">${clubCounts[club]}</span>
+                    </div>
+                `;
+            });
+
+            // Render Event Popularity
             const breakdownGrid = document.getElementById('analyticsBreakdownGrid');
             breakdownGrid.innerHTML = '';
-            
-            // Sort by Event Name
             const sortedEvents = Object.keys(eventCounts).sort((a, b) => {
-                // Extract event number to sort logically (e.g. Event #2 comes before Event #10)
                 const numA = parseInt(a.match(/\d+/)) || 0;
                 const numB = parseInt(b.match(/\d+/)) || 0;
                 return numA - numB;
