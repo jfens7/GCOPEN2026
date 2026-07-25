@@ -706,6 +706,11 @@
             const breakdownGrid = document.getElementById('analyticsBreakdownGrid');
             breakdownGrid.innerHTML = '';
             const sortedEvents = Object.keys(eventCounts).sort((a, b) => {
+                // Sort by count (highest first)
+                if (eventCounts[b] !== eventCounts[a]) {
+                    return eventCounts[b] - eventCounts[a];
+                }
+                // Tie-breaker: sort by event number logically
                 const numA = parseInt(a.match(/\d+/)) || 0;
                 const numB = parseInt(b.match(/\d+/)) || 0;
                 return numA - numB;
