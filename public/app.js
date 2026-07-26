@@ -365,7 +365,9 @@ const australianClubs = [
   "Table Tennis SA",
   "Table Tennis WA",
   "Table Tennis NT",
-  "Other"
+  "Other",
+  "ya Mum",
+  "Naoya's Mum",
 ];
 
 if (clubSelect) {
