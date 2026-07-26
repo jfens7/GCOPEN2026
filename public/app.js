@@ -513,7 +513,7 @@ function selectRcProfile(index) {
     const selectedPlayer = rcPlayersData[index];
     rcProfileInput.value = `${selectedPlayer.name} (ID: ${selectedPlayer.id})`;
     currentRcRating = selectedPlayer.rating;
-    currentRcId = selectedPlayer.id;
+    currentRcId = selectedPlayer.id; 
     
     if(typeof validateEligibility === "function") validateEligibility();
 }
@@ -837,14 +837,26 @@ function calculateTotals() {
         }
     });
 
+    let lateFee = 0;
+    const now = new Date().getTime();
+    const lateFeeStart = new Date('August 5, 2026 17:00:00').getTime();
+    if (now >= lateFeeStart) {
+        lateFee = 10.00;
+        const lfLine = document.getElementById('lateFeeLine');
+        if (lfLine) lfLine.style.display = 'block';
+    } else {
+        const lfLine = document.getElementById('lateFeeLine');
+        if (lfLine) lfLine.style.display = 'none';
+    }
+
     let computedDiscount = 0;
     if (discountType === 'percent') {
-        computedDiscount = (baseTotal + TTQ_LEVY) * (discountValue / 100.0);
+        computedDiscount = (baseTotal + TTQ_LEVY + lateFee) * (discountValue / 100.0);
     } else {
         computedDiscount = discountValue;
     }
 
-    let final = (baseTotal + TTQ_LEVY) - computedDiscount;
+    let final = (baseTotal + TTQ_LEVY + lateFee) - computedDiscount;
     if (final < 0) final = 0;
 
     if(eventsTotalEl) eventsTotalEl.innerText = baseTotal.toFixed(2);

@@ -54,13 +54,8 @@ ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "jakobwill7@gmail.com")
 
 DOUBLES_EVENT_IDS = [3, 4, 21, 33, 34]
 
-# RATING LIMITS FOR ELIGIBILITY AUDIT
 RATING_LIMITS = {
-    6: 1700,
-    7: 1400,
-    18: 1200,
-    19: 1000,
-    20: 800
+    6: 1700, 7: 1400, 18: 1200, 19: 1000, 20: 800
 }
 
 def evaluate_eligibility_warnings(rating_str, events):
@@ -92,16 +87,18 @@ def send_email(to_email, subject, body):
         print(f"CRITICAL EMAIL ERROR - Failed to send to {to_email}: {str(e)}")
         return False
 
-def generate_receipt_email(first_name, reg_id, events_str, partners_str, final_total, status):
+def generate_receipt_email(first_name, reg_id, events_str, partners_str, final_total, status, late_fee=0.0):
     is_paid = ('Paid' in status) 
     paid_amount = float(final_total) if is_paid else 0.0
     owed_amount = 0.0 if is_paid else float(final_total)
     
-    events_paid = max(0.0, paid_amount - 5.0) if paid_amount > 0 else 0.0
+    events_paid = max(0.0, paid_amount - 5.0 - late_fee) if paid_amount > 0 else 0.0
 
     owed_text = ""
     if owed_amount > 0:
         owed_text = "<p><em>*Note: You can pay your outstanding balance online at any time using the <strong>Update Registration</strong> tab on the website, or pay via Cash/EFT on arrival.</em></p>"
+
+    late_fee_text = f"<br><strong>Late Entry Surcharge:</strong> ${late_fee:.2f}" if late_fee > 0 else ""
 
     return f"""<p>Hi {first_name},</p>
     <p>Your registration for the 2026 Gold Coast Open Table Tennis Championships has been recorded!</p>
@@ -111,7 +108,7 @@ def generate_receipt_email(first_name, reg_id, events_str, partners_str, final_t
     
     <p><strong>Total Paid (Events):</strong> ${events_paid:.2f}<br>
     <strong>Total Owed:</strong> ${owed_amount:.2f}<br>
-    <strong>TTQ Tournament Levy:</strong> $5.00</p>
+    <strong>TTQ Tournament Levy:</strong> $5.00{late_fee_text}</p>
     
     {owed_text}
     
@@ -172,7 +169,6 @@ def find_missing_rc(nat_id, first, last):
     except: pass
     return "N/A", "N/A"
 
-# --- MASTER ROW GENERATOR (24 COLUMNS: A through X) ---
 def sync_to_sheet(reg_id, record):
     p = record.get('player', {})
     events = record.get('events', [])
@@ -438,6 +434,11 @@ def register():
     ttq_levy = 5.00
     discount_amount = 0
 
+    brisbane_tz = pytz.timezone('Australia/Brisbane')
+    now = datetime.now(brisbane_tz)
+    late_cutoff = brisbane_tz.localize(datetime(2026, 8, 5, 17, 0, 0))
+    late_fee = 10.0 if now >= late_cutoff else 0.0
+
     if discount_code:
         docs = list(db.collection('discount_codes').where(filter=FieldFilter('code', '==', discount_code)).stream())
         if docs:
@@ -446,12 +447,12 @@ def register():
                 dtype = d.get('discountType', 'dollar')
                 dval = float(d.get('discountAmount', 0))
                 if dtype == 'percent':
-                    discount_amount = (base_total + ttq_levy) * (dval / 100.0)
+                    discount_amount = (base_total + ttq_levy + late_fee) * (dval / 100.0)
                 else:
                     discount_amount = dval
 
     discount_amount = round(discount_amount, 2)
-    final_total = round(max(0.0, (base_total + ttq_levy) - discount_amount), 2)
+    final_total = round(max(0.0, (base_total + ttq_levy + late_fee) - discount_amount), 2)
     
     player_details['neverPlayed'] = never_played
 
@@ -496,6 +497,7 @@ def register():
         "doublesPartners": doubles_partners,
         "baseTotal": base_total,
         "ttqLevy": ttq_levy,
+        "lateFee": late_fee,
         "discountCode": discount_code,
         "discountAmount": discount_amount,
         "originalTotal": final_total,
@@ -522,7 +524,7 @@ def register():
         
         events_str = ", ".join([e['name'] for e in events])
         partners_str = ", ".join([f"{k}: {v}" for k, v in doubles_partners.items()])
-        email_body = generate_receipt_email(player_details['firstName'], registration_id, events_str, partners_str, final_total, "Pending")
+        email_body = generate_receipt_email(player_details['firstName'], registration_id, events_str, partners_str, final_total, "Pending", late_fee)
         send_email(player_details['email'], "Tournament Registration (Pending Payment)", email_body)
         
         admin_body = f"<p>New PAY LATER Registration:<br>Player: {player_details['firstName']} {player_details['lastName']}<br>Ref ID: {registration_id}<br>Total Due: ${final_total}<br>Events: {events_str}</p>"
@@ -561,6 +563,7 @@ def payment_success():
         if doc.exists:
             record = doc.to_dict()
             history = record.get('history', [])
+            late_fee = float(record.get('lateFee', 0.0))
             
             if history and len(history) > 0:
                 history[0]['paymentStatus'] = 'Paid'
@@ -588,7 +591,7 @@ def payment_success():
             
             events_str = ", ".join([e['name'] for e in updated_doc.get('events', [])])
             partners_str = ", ".join([f"{k}: {v}" for k, v in updated_doc.get('doublesPartners', {}).items()])
-            email_body = generate_receipt_email(updated_doc['player']['firstName'], reg_id, events_str, partners_str, updated_doc['finalTotal'], "Paid")
+            email_body = generate_receipt_email(updated_doc['player']['firstName'], reg_id, events_str, partners_str, updated_doc['finalTotal'], "Paid", late_fee)
             send_email(updated_doc['player']['email'], "Tournament Registration Confirmation", email_body)
             
             admin_body = f"<p>New Paid Registration:<br>Player: {updated_doc['player']['firstName']} {updated_doc['player']['lastName']}<br>Ref ID: {reg_id}<br>Total: ${updated_doc['finalTotal']}<br>Events: {events_str}<br>Partners: {partners_str}</p>"
@@ -636,9 +639,10 @@ def update_checkout():
     old_final_total = float(record.get('finalTotal', 0))
     base_total = sum(float(event['price']) for event in new_events)
     ttq_levy = 5.00
+    late_fee = float(record.get('lateFee', 0.0))
     discount_amount = float(record.get('discountAmount', 0))
     
-    new_final_total = round(max(0.0, (base_total + ttq_levy) - discount_amount), 2)
+    new_final_total = round(max(0.0, (base_total + ttq_levy + late_fee) - discount_amount), 2)
     difference = round(new_final_total - old_final_total, 2)
     
     if difference <= 0:
@@ -730,6 +734,7 @@ def update_success():
             record = doc.to_dict()
             paid_at = get_local_now_str()
             history = record.get('history', [])
+            late_fee = float(record.get('lateFee', 0.0))
             update_num = len(history)
             
             if 'pendingUpdate' in record:
@@ -773,7 +778,7 @@ def update_success():
                     
                 events_str = ", ".join([e['name'] for e in new_events])
                 partners_str = ", ".join([f"{k}: {v}" for k, v in new_partners.items()])
-                email_body = generate_receipt_email(record['player']['firstName'], reg_id, events_str, partners_str, new_final, "Paid")
+                email_body = generate_receipt_email(record['player']['firstName'], reg_id, events_str, partners_str, new_final, "Paid", late_fee)
                 send_email(record['player']['email'], "Registration Update Confirmed", email_body)
                 
             elif float(record.get('balanceDue', 0)) > 0:
@@ -933,8 +938,9 @@ def admin_resend_email(reg_id):
     partners_str = ", ".join([f"{k}: {v}" for k, v in record.get('doublesPartners', {}).items()])
     final_total = record.get('finalTotal', 0)
     status = record.get('paymentStatus', 'Pending')
+    late_fee = float(record.get('lateFee', 0.0))
     
-    email_body = generate_receipt_email(record['player']['firstName'], reg_id, events_str, partners_str, final_total, status)
+    email_body = generate_receipt_email(record['player']['firstName'], reg_id, events_str, partners_str, final_total, status, late_fee)
     success = send_email(record['player']['email'], "Tournament Registration Confirmation (Resent)", email_body)
     
     if success:
@@ -1097,10 +1103,8 @@ def manual_register():
     never_played = data.get('neverPlayed', False)
     if never_played: rc_val = "Never Played"
     
-    # Capture custom artificial rating if entered by admin
     rc_rating = data.get('rcRating', 'N/A') 
 
-    # Only overwrite it with a real fetch if it's not custom/never played and they provided a TTA
     if not never_played and data.get('nationalId') and data.get('nationalId') != 'N/A':
         found_rc, found_rating = lookup_rc_by_tta_id(data.get('nationalId'))
         if found_rc != "N/A":
@@ -1145,6 +1149,7 @@ def manual_register():
         "ttqLevy": 0,
         "discountCode": "MANUAL",
         "discountAmount": 0,
+        "lateFee": 0.0,
         "originalTotal": total_val,
         "finalTotal": total_val,
         "balanceDue": 0 if data.get('status') == 'Paid' else total_val,
