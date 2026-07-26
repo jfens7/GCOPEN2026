@@ -9,7 +9,6 @@ document.addEventListener("DOMContentLoaded", () => {
         attempts++;
         localStorage.setItem('gco_payment_attempts', attempts);
         
-        // Clean the URL so refreshing doesn't add fake strikes
         window.history.replaceState({}, document.title, window.location.pathname);
         
         if (attempts < 3) {
@@ -17,7 +16,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // If they have 3 or more strikes, unhide the Pay Later box
     if (attempts >= 3) {
         const payLaterContainer = document.getElementById('payLaterContainer');
         if(payLaterContainer) payLaterContainer.style.display = 'block';
@@ -365,9 +363,7 @@ const australianClubs = [
   "Table Tennis SA",
   "Table Tennis WA",
   "Table Tennis NT",
-  "Other",
-  "ya Mum",
-  "Naoya's Mum",
+  "Other"
 ];
 
 if (clubSelect) {
@@ -410,7 +406,6 @@ if (autoFillByIdBtn) {
                 document.getElementById('firstName').value = data.firstName;
                 document.getElementById('lastName').value = data.lastName;
                 
-                // DOB Fix: Force manual entry if only year is provided
                 if (data.dob && data.dob.length === 4) {
                     document.getElementById('dob').value = ""; 
                     alert(`We found your birth year (${data.dob}), but please manually enter your exact Date of Birth (DD/MM/YYYY).`);
@@ -518,7 +513,7 @@ function selectRcProfile(index) {
     const selectedPlayer = rcPlayersData[index];
     rcProfileInput.value = `${selectedPlayer.name} (ID: ${selectedPlayer.id})`;
     currentRcRating = selectedPlayer.rating;
-    currentRcId = selectedPlayer.id; // Store strictly for backend separation
+    currentRcId = selectedPlayer.id;
     
     if(typeof validateEligibility === "function") validateEligibility();
 }
@@ -568,10 +563,7 @@ function validateEligibility() {
     const yearMatches = dobStr.match(/\d{4}/);
     const birthYear = yearMatches ? parseInt(yearMatches[0]) : 0;
     
-    // Standard Juniors age rule
     const ageIn2026 = birthYear > 0 ? (2026 - birthYear) : 0; 
-    
-    // Veteran specific rule - eligible for age bracket they turn in 2027
     const ageIn2027 = birthYear > 0 ? (2027 - birthYear) : 0; 
     
     let selectedGender = "";
@@ -587,7 +579,6 @@ function validateEligibility() {
         let reason = "";
 
         if (rules) {
-            // STRICT GENDER LOCKING
             if (rules.gender && rules.gender !== selectedGender && selectedGender !== "") {
                 disabled = true;
                 reason = `(Requires ${rules.gender})`;
@@ -669,7 +660,7 @@ function handleDoublesPartners() {
 }
 
 // ==========================================
-// FORM SUBMISSION & REGISTRATION
+// FORM SUBMISSION & CHECKOUT
 // ==========================================
 if (form) {
     form.addEventListener('change', (e) => {
@@ -709,123 +700,131 @@ if (form) {
             calculateTotals();
         });
     }
+}
 
-    form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        
-        currentEvents = [];
-        const radios = document.querySelectorAll('input[type="radio"][name^="sat_"]:checked, input[type="radio"][name^="sun_"]:checked');
-        radios.forEach(radio => {
-            if (radio.value) currentEvents.push(JSON.parse(radio.value));
-        });
-
-        if(currentEvents.length === 0) {
-            alert("Please select at least one event!");
-            return;
-        }
-
-        let missingPartner = false;
-        currentEvents.forEach(ev => {
-            if (doublesEventIds.includes(ev.id)) {
-                const pName = document.getElementById(`partner_${ev.id}`).value.trim();
-                if (!pName) missingPartner = true;
-            }
-        });
-
-        if (missingPartner) {
-            alert("Please fill out your doubles partner details (or click 'Need Partner').");
-            return;
-        }
-
-        window.openTcModal(); 
+window.startCheckoutProcess = function() {
+    currentEvents = [];
+    const radios = document.querySelectorAll('input[type="radio"][name^="sat_"]:checked, input[type="radio"][name^="sun_"]:checked');
+    radios.forEach(radio => {
+        if (radio.value) currentEvents.push(JSON.parse(radio.value));
     });
 
-    window.submitRegistration = async function() {
-        currentEvents = [];
-        const radios = document.querySelectorAll('input[type="radio"][name^="sat_"]:checked, input[type="radio"][name^="sun_"]:checked');
-        radios.forEach(radio => {
-            if (radio.value) currentEvents.push(JSON.parse(radio.value));
-        });
+    if(currentEvents.length === 0) {
+        alert("Please select at least one event!");
+        return;
+    }
 
-        if(currentEvents.length === 0) {
-            alert("Please select at least one event!");
-            return;
+    let missingPartner = false;
+    currentEvents.forEach(ev => {
+        if (doublesEventIds.includes(ev.id)) {
+            const pInput = document.getElementById(`partner_${ev.id}`);
+            const pName = pInput ? pInput.value.trim() : "";
+            if (!pName) missingPartner = true;
         }
+    });
 
-        const doublesPartners = {};
-        let missingPartner = false;
-        currentEvents.forEach(ev => {
-            if (doublesEventIds.includes(ev.id)) {
-                const pName = document.getElementById(`partner_${ev.id}`).value.trim();
-                if (!pName) missingPartner = true;
-                doublesPartners[ev.name] = pName;
-            }
-        });
+    if (missingPartner) {
+        alert("Please fill out your doubles partner details (or click 'Need Partner').");
+        return;
+    }
 
-        if (missingPartner) {
-            alert("Please fill out your doubles partner details (or click 'Need Partner').");
-            return;
+    window.openTcModal(); 
+};
+
+window.submitRegistration = async function() {
+    currentEvents = [];
+    const radios = document.querySelectorAll('input[type="radio"][name^="sat_"]:checked, input[type="radio"][name^="sun_"]:checked');
+    radios.forEach(radio => {
+        if (radio.value) currentEvents.push(JSON.parse(radio.value));
+    });
+
+    if(currentEvents.length === 0) {
+        alert("Please select at least one event!");
+        return;
+    }
+
+    const doublesPartners = {};
+    let missingPartner = false;
+    currentEvents.forEach(ev => {
+        if (doublesEventIds.includes(ev.id)) {
+            const pInput = document.getElementById(`partner_${ev.id}`);
+            const pName = pInput ? pInput.value.trim() : "";
+            if (!pName) missingPartner = true;
+            doublesPartners[ev.name] = pName;
         }
-        
-        let finalClub = clubSelect.value;
-        if (finalClub === "Other") finalClub = clubOther.value;
+    });
 
-        let selectedGender = "N/A";
-        const genderRadios = document.getElementsByName('gender');
-        genderRadios.forEach(r => { if(r.checked) selectedGender = r.value; });
+    if (missingPartner) {
+        alert("Please fill out your doubles partner details (or click 'Need Partner').");
+        return;
+    }
+    
+    let finalClub = clubSelect.value;
+    if (finalClub === "Other") finalClub = clubOther.value;
 
-        const payLaterInput = document.getElementById('payLaterCheckbox');
-        const isPayLater = payLaterInput ? payLaterInput.checked : false;
+    let selectedGender = "N/A";
+    const genderRadios = document.getElementsByName('gender');
+    genderRadios.forEach(r => { if(r.checked) selectedGender = r.value; });
 
-        const payload = {
-            player: {
-                firstName: document.getElementById('firstName').value,
-                lastName: document.getElementById('lastName').value,
-                email: document.getElementById('email').value,
-                phone: document.getElementById('phone').value,
-                nationalId: document.getElementById('nationalId').value,
-                dob: document.getElementById('dob').value,
-                gender: selectedGender, 
-                club: finalClub,
-                rcProfile: document.getElementById('rcProfile').value,
-                rcId: currentRcId 
-            },
-            events: currentEvents,
-            doublesPartners: doublesPartners,
-            discountCode: validatedCode,
-            payLater: isPayLater
-        };
+    const payLaterInput = document.getElementById('payLaterCheckbox');
+    const isPayLater = payLaterInput ? payLaterInput.checked : false;
 
-        const btn = document.getElementById('checkoutBtn');
-        const savePayLaterBtn = document.getElementById('savePayLaterBtn');
+    const isNeverPlayed = document.getElementById('neverPlayedBox') ? document.getElementById('neverPlayedBox').checked : false;
+    let rcIdToSend = currentRcId;
+    if (isNeverPlayed) {
+        rcIdToSend = "Never Played";
+    }
+
+    const payload = {
+        player: {
+            firstName: document.getElementById('firstName').value,
+            lastName: document.getElementById('lastName').value,
+            email: document.getElementById('email').value,
+            phone: document.getElementById('phone').value,
+            nationalId: document.getElementById('nationalId').value,
+            dob: document.getElementById('dob').value,
+            gender: selectedGender, 
+            club: finalClub,
+            rcProfile: document.getElementById('rcProfile').value,
+            rcId: rcIdToSend
+        },
+        events: currentEvents,
+        doublesPartners: doublesPartners,
+        discountCode: validatedCode,
+        payLater: isPayLater
+    };
+
+    const btn = document.getElementById('checkoutBtn');
+    if (btn) {
         btn.innerText = "Processing...";
         btn.disabled = true;
-        if (savePayLaterBtn) savePayLaterBtn.disabled = true;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/register`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
         
-        try {
-            const response = await fetch(`${API_BASE}/register`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-            const data = await response.json();
-            
-            if (data.error) {
-                alert(data.error);
+        if (data.error) {
+            alert(data.error);
+            if (btn) {
                 btn.innerText = "PROCEED TO SECURE PAYMENT";
                 btn.disabled = false;
-                if (savePayLaterBtn) savePayLaterBtn.disabled = false;
-            } else if (data.url) {
-                window.location.href = data.url;
             }
-        } catch (err) {
-            alert("Network error.");
+        } else if (data.url) {
+            window.location.href = data.url;
+        }
+    } catch (err) {
+        alert("Network error.");
+        if (btn) {
             btn.innerText = "PROCEED TO SECURE PAYMENT";
             btn.disabled = false;
-            if (savePayLaterBtn) savePayLaterBtn.disabled = false;
         }
-    };
-}
+    }
+};
 
 function calculateTotals() {
     baseTotal = 0;
@@ -854,42 +853,131 @@ function calculateTotals() {
 }
 
 // ==========================================
-// ADMIN DASHBOARD
+// TERMS AND CONDITIONS MODAL LOGIC
 // ==========================================
-let allRegistrations = [];
+const tcModal = document.getElementById('tcModal');
+const tcScrollArea = document.getElementById('tcScrollArea');
+const tcAgreeBtn = document.getElementById('tcAgreeBtn');
 
-async function loadAdminData() {
-    const tableBody = document.querySelector("#adminTable tbody");
-    if (!tableBody) return;
-
-    try {
-        const response = await fetch(`${API_BASE}/admin/registrations`);
-        const registrations = await response.json();
-        allRegistrations = registrations; 
-        
-        tableBody.innerHTML = "";
-        registrations.forEach(reg => {
-            const eventNames = reg.events.map(e => e.name).join(", ");
-            const partnersStr = Object.entries(reg.doublesPartners || {}).map(([ev, p]) => `${ev}: ${p}`).join('<br>');
-            const badgeClass = reg.paymentStatus.toLowerCase() === 'paid' ? 'paid' : 'pending';
-            
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${reg.player.firstName} ${reg.player.lastName}</td>
-                <td>${reg.player.email}</td>
-                <td>${eventNames}</td>
-                <td><small>${partnersStr}</small></td>
-                <td>$${reg.finalTotal.toFixed(2)}</td>
-                <td><span class="badge ${badgeClass}">${reg.paymentStatus}</span></td>
-                <td>
-                    <button class="lookup-btn" onclick="openEditModal('${reg.id}')" style="padding: 5px 10px; font-size:12px; margin-bottom: 5px; width:100%;">Edit Record</button>
-                    <button class="lookup-btn" onclick="waiveFee('${reg.id}')" style="padding: 5px 10px; font-size:12px; width: 100%; margin-bottom: 5px; background-color: #64748B;">Waive Fee</button>
-                    <button class="lookup-btn" onclick="deleteRegistration('${reg.id}')" style="padding: 5px 10px; font-size:12px; width: 100%; background-color: #DC2626;">Delete</button>
-                </td>
-            `;
-            tableBody.appendChild(tr);
-        });
-    } catch(err) {
-        console.error("Error loading admin data", err);
+window.openTcModal = function() {
+    if(!tcModal) return;
+    tcModal.style.display = 'flex';
+    
+    if (tcAgreeBtn) {
+        tcAgreeBtn.disabled = true;
+        tcAgreeBtn.style.opacity = '0.5';
+        tcAgreeBtn.style.cursor = 'not-allowed';
     }
+    
+    if (tcScrollArea && tcScrollArea.scrollHeight <= tcScrollArea.clientHeight) {
+        enableTcButton();
+    } else if (tcScrollArea) {
+        tcScrollArea.scrollTop = 0; 
+    }
+};
+
+window.closeTcModal = function() {
+    if(tcModal) tcModal.style.display = 'none';
+};
+
+function enableTcButton() {
+    if(tcAgreeBtn) {
+        tcAgreeBtn.disabled = false;
+        tcAgreeBtn.style.opacity = '1';
+        tcAgreeBtn.style.cursor = 'pointer';
+    }
+}
+
+if (tcScrollArea) {
+    tcScrollArea.addEventListener('scroll', () => {
+        if (tcScrollArea.scrollTop + tcScrollArea.clientHeight >= tcScrollArea.scrollHeight - 5) {
+            enableTcButton();
+        }
+    });
+}
+
+if (tcAgreeBtn) {
+    tcAgreeBtn.addEventListener('click', () => {
+        closeTcModal();
+        openConfirmModal(); 
+    });
+}
+
+// ==========================================
+// CONFIRMATION MODAL LOGIC
+// ==========================================
+window.openConfirmModal = function() {
+    const fName = document.getElementById('firstName').value;
+    const lName = document.getElementById('lastName').value;
+    const total = document.getElementById('finalTotal').innerText;
+    
+    const eventNames = currentEvents.map(e => e.name).join('<br>');
+    
+    const summaryEl = document.getElementById('confirmSummary');
+    if (summaryEl) {
+        summaryEl.innerHTML = `
+            <strong>Player:</strong> ${fName} ${lName}<br>
+            <div style="margin: 10px 0;"><strong>Events Selected:</strong><br>${eventNames}</div>
+            <strong style="color: var(--gctta-navy); font-size: 16px;">Total Due: $${total}</strong>
+        `;
+    }
+    
+    const dobInp = document.getElementById('confirmDobInput');
+    if(dobInp) dobInp.value = ''; 
+    
+    const cModal = document.getElementById('confirmModal');
+    if(cModal) cModal.style.display = 'flex';
+};
+
+window.closeConfirmModal = function() {
+    const cModal = document.getElementById('confirmModal');
+    if(cModal) cModal.style.display = 'none';
+};
+
+const finalConfirmBtn = document.getElementById('finalConfirmBtn');
+if (finalConfirmBtn) {
+    finalConfirmBtn.addEventListener('click', async () => {
+        const confirmDobInput = document.getElementById('confirmDobInput');
+        const confirmDob = confirmDobInput ? confirmDobInput.value.trim() : "";
+        
+        if(!confirmDob) {
+            alert("Please re-enter your Date of Birth to confirm.");
+            return;
+        }
+        
+        const dobRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+        if (!dobRegex.test(confirmDob)) {
+            alert("Please enter your DOB in the correct format: DD/MM/YYYY");
+            return;
+        }
+
+        const originalDob = document.getElementById('dob').value.trim();
+        
+        if (confirmDob !== originalDob) {
+            document.getElementById('dob').value = confirmDob;
+            validateEligibility(); 
+            
+            let invalidated = false;
+            const radios = document.querySelectorAll('input[type="radio"][name^="sat_"], input[type="radio"][name^="sun_"]');
+            const disabledIds = [];
+            
+            radios.forEach(r => {
+                if (r.disabled && r.value) disabledIds.push(JSON.parse(r.value).id);
+            });
+            
+            currentEvents.forEach(ev => {
+                if(disabledIds.includes(ev.id)) invalidated = true;
+            });
+            
+            if (invalidated) {
+                alert("The updated Date of Birth you entered makes you ineligible for one or more of the events you originally selected. We have returned you to the Events page to adjust your selection.");
+                closeConfirmModal();
+                prevStep(); 
+                return;
+            }
+        }
+        
+        closeConfirmModal();
+        await window.submitRegistration();
+    });
 }

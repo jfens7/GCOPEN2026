@@ -752,7 +752,6 @@ def update_success():
                     "stripeSessionId": session_id
                 })
                 
-                # Re-evaluate eligibility based on new events
                 rc_rating = record.get('player', {}).get('rcRating', 'N/A')
                 warnings = evaluate_eligibility_warnings(rc_rating, new_events)
                 
@@ -1098,8 +1097,11 @@ def manual_register():
     never_played = data.get('neverPlayed', False)
     if never_played: rc_val = "Never Played"
     
-    rc_rating = "N/A"
-    if not never_played and data.get('nationalId'):
+    # Capture custom artificial rating if entered by admin
+    rc_rating = data.get('rcRating', 'N/A') 
+
+    # Only overwrite it with a real fetch if it's not custom/never played and they provided a TTA
+    if not never_played and data.get('nationalId') and data.get('nationalId') != 'N/A':
         found_rc, found_rating = lookup_rc_by_tta_id(data.get('nationalId'))
         if found_rc != "N/A":
             rc_val = found_rc
@@ -1110,18 +1112,18 @@ def manual_register():
     total_val = float(data.get('totalPaid', 0))
     pending_reason = "N/A" if data.get('status') == 'Paid' else "Manual Entry (Unpaid)"
 
+    events = data.get('events', [])
+    warnings = evaluate_eligibility_warnings(rc_rating, events)
+
     initial_history = {
         "updateNumber": 0,
         "type": "Admin Manual Entry",
         "timestamp": registered_at,
         "amountCharged": total_val,
         "paymentStatus": data.get('status', 'Paid'),
-        "events": [e['name'] for e in data.get('events', [])],
+        "events": [e['name'] for e in events],
         "notes": "Added manually by admin"
     }
-    
-    events = data.get('events', [])
-    warnings = evaluate_eligibility_warnings(rc_rating, events)
 
     registration_data = {
         "player": {
@@ -1176,7 +1178,6 @@ def update_registration(reg_id):
 
     update_payload = {}
     
-    # We must merge existing player details to properly check warnings
     current_player = record.get('player', {})
     if 'player' in data:
         for k, v in data['player'].items(): 
@@ -1188,7 +1189,6 @@ def update_registration(reg_id):
         current_events = data['events']
         update_payload['events'] = current_events
         
-    # Re-evaluate Eligibility Warnings on Edit
     rc_rating = current_player.get('rcRating', 'N/A')
     warnings = evaluate_eligibility_warnings(rc_rating, current_events)
     update_payload['eligibilityWarnings'] = warnings

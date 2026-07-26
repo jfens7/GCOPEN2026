@@ -42,7 +42,7 @@
     </div>
 
     <div class="form-container">
-        <form id="registrationForm">
+        <form id="registrationForm" onsubmit="return false;">
             <!-- STEP 1: Personal Details -->
             <div id="step1">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -221,7 +221,7 @@
                         </label>
                     </div>
 
-                    <button type="submit" id="checkoutBtn" class="btn-primary btn-block">PROCEED TO SECURE PAYMENT</button>
+                    <button type="button" id="checkoutBtn" class="btn-primary btn-block" onclick="startCheckoutProcess()">PROCEED TO SECURE PAYMENT</button>
                 </div>
             </div>
         </form>
