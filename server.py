@@ -52,8 +52,26 @@ sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1EJ5lEZs4eIkA
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", "noreply@goldcoastopen.com")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "jakobwill7@gmail.com")
 
-# Define which event IDs are doubles to automate singles/doubles tracking
 DOUBLES_EVENT_IDS = [3, 4, 21, 33, 34]
+
+# RATING LIMITS FOR ELIGIBILITY AUDIT
+RATING_LIMITS = {
+    6: 1700,
+    7: 1400,
+    18: 1200,
+    19: 1000,
+    20: 800
+}
+
+def evaluate_eligibility_warnings(rating_str, events):
+    warnings = []
+    if str(rating_str).isdigit():
+        r_val = int(rating_str)
+        for ev in events:
+            ev_id = ev.get('id')
+            if ev_id in RATING_LIMITS and r_val > RATING_LIMITS[ev_id]:
+                warnings.append(f"Rating {r_val} exceeds limit for {ev.get('name')}")
+    return warnings
 
 def get_local_now_str():
     brisbane_tz = pytz.timezone('Australia/Brisbane')
@@ -154,7 +172,7 @@ def find_missing_rc(nat_id, first, last):
     except: pass
     return "N/A", "N/A"
 
-# --- MASTER ROW GENERATOR (23 COLUMNS: A through W) ---
+# --- MASTER ROW GENERATOR (24 COLUMNS: A through X) ---
 def sync_to_sheet(reg_id, record):
     p = record.get('player', {})
     events = record.get('events', [])
@@ -164,6 +182,9 @@ def sync_to_sheet(reg_id, record):
     total_events = len(events)
     doubles_count = sum(1 for e in events if e.get('id') in DOUBLES_EVENT_IDS)
     singles_count = total_events - doubles_count
+    
+    warnings = record.get('eligibilityWarnings', [])
+    warnings_str = " | ".join(warnings) if warnings else ""
 
     row_data = [
         reg_id, 
@@ -188,13 +209,14 @@ def sync_to_sheet(reg_id, record):
         record.get('paidAt', 'N/A'),
         singles_count,
         doubles_count,
-        total_events
+        total_events,
+        warnings_str
     ]
     
     try:
         cell = sheet.find(reg_id)
         if cell:
-            cell_list = sheet.range(f"A{cell.row}:W{cell.row}")
+            cell_list = sheet.range(f"A{cell.row}:X{cell.row}")
             for i, val in enumerate(row_data):
                 cell_list[i].value = val
             sheet.update_cells(cell_list, value_input_option='USER_ENTERED')
@@ -383,8 +405,12 @@ def validate_discount(code):
     if docs:
         d = docs[0].to_dict()
         if not d.get('used', False) or d.get('isPermanent', False):
-            return jsonify({"valid": True, "discountAmount": d['discountAmount']})
-    return jsonify({"valid": False, "discountAmount": 0})
+            return jsonify({
+                "valid": True, 
+                "discountAmount": d.get('discountAmount', 0),
+                "discountType": d.get('discountType', 'dollar')
+            })
+    return jsonify({"valid": False, "discountAmount": 0, "discountType": "dollar"})
 
 # ==========================================
 # REGISTRATION API
@@ -417,9 +443,16 @@ def register():
         if docs:
             d = docs[0].to_dict()
             if not d.get('used', False) or d.get('isPermanent', False):
-                discount_amount = float(d['discountAmount'])
+                dtype = d.get('discountType', 'dollar')
+                dval = float(d.get('discountAmount', 0))
+                if dtype == 'percent':
+                    discount_amount = (base_total + ttq_levy) * (dval / 100.0)
+                else:
+                    discount_amount = dval
 
-    final_total = max(0.0, (base_total + ttq_levy) - discount_amount)
+    discount_amount = round(discount_amount, 2)
+    final_total = round(max(0.0, (base_total + ttq_levy) - discount_amount), 2)
+    
     player_details['neverPlayed'] = never_played
 
     if not player_details.get('gender'):
@@ -455,6 +488,8 @@ def register():
         "notes": "Initial player registration"
     }
 
+    warnings = evaluate_eligibility_warnings(rc_rating, events)
+
     registration_data = {
         "player": player_details,
         "events": events,
@@ -468,6 +503,7 @@ def register():
         "balanceDue": final_total if final_total > 0 else 0,
         "paymentStatus": "Paid" if final_total == 0 else "Pending",
         "pendingReason": pending_reason,
+        "eligibilityWarnings": warnings,
         "registeredAt": registered_at,
         "paidAt": paid_at,
         "history": [initial_history_entry],
@@ -500,7 +536,7 @@ def register():
             line_items=[{
                 'price_data': {
                     'currency': 'aud',
-                    'unit_amount': int(final_total * 100),
+                    'unit_amount': int(round(final_total * 100)),
                     'product_data': {'name': '2026 Gold Coast Open Registration'},
                 },
                 'quantity': 1,
@@ -601,8 +637,8 @@ def update_checkout():
     base_total = sum(float(event['price']) for event in new_events)
     ttq_levy = 5.00
     discount_amount = float(record.get('discountAmount', 0))
-    new_final_total = max(0.0, (base_total + ttq_levy) - discount_amount)
-        
+    
+    new_final_total = round(max(0.0, (base_total + ttq_levy) - discount_amount), 2)
     difference = round(new_final_total - old_final_total, 2)
     
     if difference <= 0:
@@ -614,7 +650,7 @@ def update_checkout():
             line_items=[{
                 'price_data': {
                     'currency': 'aud',
-                    'unit_amount': int(difference * 100),
+                    'unit_amount': int(round(difference * 100)),
                     'product_data': {'name': '2026 Gold Coast Open - Registration Update'},
                 },
                 'quantity': 1,
@@ -668,7 +704,7 @@ def pay_balance():
             line_items=[{
                 'price_data': {
                     'currency': 'aud',
-                    'unit_amount': int(balance * 100),
+                    'unit_amount': int(round(balance * 100)),
                     'product_data': {'name': '2026 Gold Coast Open - Outstanding Balance'},
                 },
                 'quantity': 1,
@@ -716,6 +752,10 @@ def update_success():
                     "stripeSessionId": session_id
                 })
                 
+                # Re-evaluate eligibility based on new events
+                rc_rating = record.get('player', {}).get('rcRating', 'N/A')
+                warnings = evaluate_eligibility_warnings(rc_rating, new_events)
+                
                 doc_ref.update({
                     "events": new_events,
                     "doublesPartners": new_partners,
@@ -724,6 +764,7 @@ def update_success():
                     "paidAt": paid_at,
                     "balanceDue": 0,
                     "pendingReason": "N/A",
+                    "eligibilityWarnings": warnings,
                     "history": history,
                     "pendingUpdate": firestore.DELETE_FIELD
                 })
@@ -827,7 +868,6 @@ def sync_from_sheet():
 
 @app.route('/api/admin/push-to-sheet', methods=['POST'])
 def push_to_sheet():
-    """Safely updates existing rows in Google Sheets and appends new ones without wiping the formatting."""
     try:
         docs = db.collection('registrations').stream()
         reg_map = {doc.id: doc.to_dict() for doc in docs}
@@ -849,6 +889,9 @@ def push_to_sheet():
                 doubles_count = sum(1 for e in events if e.get('id') in DOUBLES_EVENT_IDS)
                 singles_count = total_events - doubles_count
 
+                warnings = rec.get('eligibilityWarnings', [])
+                warnings_str = " | ".join(warnings) if warnings else ""
+
                 new_row = [
                     reg_id, p.get('firstName',''), p.get('lastName',''), p.get('email',''),
                     p.get('phone',''), p.get('dob','N/A'), p.get('gender','N/A'),
@@ -857,11 +900,11 @@ def push_to_sheet():
                     e_str, pt_str, rec.get('ttqLevy', 5.0), rec.get('discountAmount', 0),
                     rec.get('finalTotal', 0), rec.get('paymentStatus', 'Pending'),
                     rec.get('registeredAt', 'N/A'), rec.get('paidAt', 'N/A'),
-                    singles_count, doubles_count, total_events
+                    singles_count, doubles_count, total_events, warnings_str
                 ]
                 
                 row_num = i + 1
-                cell_list = sheet.range(f"A{row_num}:W{row_num}")
+                cell_list = sheet.range(f"A{row_num}:X{row_num}")
                 for j, val in enumerate(new_row):
                     cell_list[j].value = val
                 cells_to_update.extend(cell_list)
@@ -874,7 +917,7 @@ def push_to_sheet():
         for reg_id, rec in reg_map.items():
             sync_to_sheet(reg_id, rec)
             
-        return jsonify({"status": "success", "updated": (len(cells_to_update)//23) + len(reg_map)})
+        return jsonify({"status": "success", "updated": (len(cells_to_update)//24) + len(reg_map)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -909,6 +952,7 @@ def admin_resync(reg_id):
         
     record = doc.to_dict()
     p = record.get('player', {})
+    events = record.get('events', [])
     rc_val = p.get('rcId', '').strip()
     never_played = p.get('neverPlayed', False)
     
@@ -919,12 +963,17 @@ def admin_resync(reg_id):
         if found_rc != "N/A":
             p['rcId'] = found_rc
             p['rcRating'] = found_rating
+            
+            warnings = evaluate_eligibility_warnings(found_rating, events)
+            
             doc_ref.update({
                 "player.rcId": found_rc,
-                "player.rcRating": found_rating
+                "player.rcRating": found_rating,
+                "eligibilityWarnings": warnings
             })
             record['player']['rcId'] = found_rc
             record['player']['rcRating'] = found_rating
+            record['eligibilityWarnings'] = warnings
 
     sync_to_sheet(reg_id, record)
     return jsonify({"status": "success", "newRcId": p.get('rcId', rc_val)})
@@ -938,21 +987,29 @@ def bulk_fix_rc():
         record = doc.to_dict()
         reg_id = doc.id
         p = record.get('player', {})
+        events = record.get('events', [])
         
         tta_id = p.get('nationalId', '')
         never_played = p.get('neverPlayed', False)
         
+        found_rc, found_rating = p.get('rcId', 'N/A'), p.get('rcRating', 'N/A')
+        
         if not never_played and tta_id and tta_id != "N/A":
-            found_rc, found_rating = lookup_rc_by_tta_id(tta_id)
-            if found_rc == "N/A":
-                found_rc, found_rating = find_missing_rc(tta_id, p.get('firstName', ''), p.get('lastName', ''))
+            fetched_rc, fetched_rating = lookup_rc_by_tta_id(tta_id)
+            if fetched_rc == "N/A":
+                fetched_rc, fetched_rating = find_missing_rc(tta_id, p.get('firstName', ''), p.get('lastName', ''))
                 
-            if found_rc != "N/A":
-                db.collection('registrations').document(reg_id).update({
-                    "player.rcId": found_rc,
-                    "player.rcRating": found_rating
-                })
-                updated_count += 1
+            if fetched_rc != "N/A":
+                found_rc, found_rating = fetched_rc, fetched_rating
+
+        warnings = evaluate_eligibility_warnings(found_rating, events)
+
+        db.collection('registrations').document(reg_id).update({
+            "player.rcId": found_rc,
+            "player.rcRating": found_rating,
+            "eligibilityWarnings": warnings
+        })
+        updated_count += 1
 
     all_docs = db.collection('registrations').order_by('timestamp', direction=firestore.Query.DESCENDING).stream()
     rows_data = []
@@ -967,6 +1024,9 @@ def bulk_fix_rc():
         total_events = len(events)
         doubles_count = sum(1 for e in events if e.get('id') in DOUBLES_EVENT_IDS)
         singles_count = total_events - doubles_count
+        
+        warns = rec.get('eligibilityWarnings', [])
+        warnings_str = " | ".join(warns) if warns else ""
 
         row = [
             rid, pl.get('firstName',''), pl.get('lastName',''), pl.get('email',''),
@@ -976,13 +1036,13 @@ def bulk_fix_rc():
             e_str, pt_str, rec.get('ttqLevy', 5.0), rec.get('discountAmount', 0),
             rec.get('finalTotal', 0), rec.get('paymentStatus', 'Pending'),
             rec.get('registeredAt', 'N/A'), rec.get('paidAt', 'N/A'),
-            singles_count, doubles_count, total_events
+            singles_count, doubles_count, total_events, warnings_str
         ]
         rows_data.append(row)
         
-    sheet.batch_clear(["A2:W1000"])
+    sheet.batch_clear(["A2:X1000"])
     if rows_data:
-        cell_list = sheet.range(f"A2:W{len(rows_data)+1}")
+        cell_list = sheet.range(f"A2:X{len(rows_data)+1}")
         flat_data = [item for sublist in rows_data for item in sublist]
         for i, val in enumerate(flat_data):
             cell_list[i].value = val
@@ -1006,6 +1066,9 @@ def rebuild_sheet():
         doubles_count = sum(1 for e in events if e.get('id') in DOUBLES_EVENT_IDS)
         singles_count = total_events - doubles_count
 
+        warns = rec.get('eligibilityWarnings', [])
+        warnings_str = " | ".join(warns) if warns else ""
+
         row = [
             rid, pl.get('firstName',''), pl.get('lastName',''), pl.get('email',''),
             pl.get('phone',''), pl.get('dob','N/A'), pl.get('gender','N/A'),
@@ -1014,13 +1077,13 @@ def rebuild_sheet():
             e_str, pt_str, rec.get('ttqLevy', 5.0), rec.get('discountAmount', 0),
             rec.get('finalTotal', 0), rec.get('paymentStatus', 'Pending'),
             rec.get('registeredAt', 'N/A'), rec.get('paidAt', 'N/A'),
-            singles_count, doubles_count, total_events
+            singles_count, doubles_count, total_events, warnings_str
         ]
         rows_data.append(row)
         
-    sheet.batch_clear(["A2:W1000"])
+    sheet.batch_clear(["A2:X1000"])
     if rows_data:
-        cell_list = sheet.range(f"A2:W{len(rows_data)+1}")
+        cell_list = sheet.range(f"A2:X{len(rows_data)+1}")
         flat_data = [item for sublist in rows_data for item in sublist]
         for i, val in enumerate(flat_data):
             cell_list[i].value = val
@@ -1056,6 +1119,9 @@ def manual_register():
         "events": [e['name'] for e in data.get('events', [])],
         "notes": "Added manually by admin"
     }
+    
+    events = data.get('events', [])
+    warnings = evaluate_eligibility_warnings(rc_rating, events)
 
     registration_data = {
         "player": {
@@ -1071,7 +1137,7 @@ def manual_register():
             "club": data.get('club', 'N/A'),
             "neverPlayed": never_played
         },
-        "events": data.get('events', []),
+        "events": events,
         "doublesPartners": {},
         "baseTotal": total_val,
         "ttqLevy": 0,
@@ -1082,6 +1148,7 @@ def manual_register():
         "balanceDue": 0 if data.get('status') == 'Paid' else total_val,
         "paymentStatus": data.get('status', 'Paid'),
         "pendingReason": pending_reason,
+        "eligibilityWarnings": warnings,
         "registeredAt": registered_at,
         "paidAt": paid_at,
         "history": [initial_history],
@@ -1108,12 +1175,24 @@ def update_registration(reg_id):
     now_str = get_local_now_str()
 
     update_payload = {}
+    
+    # We must merge existing player details to properly check warnings
+    current_player = record.get('player', {})
     if 'player' in data:
         for k, v in data['player'].items(): 
+            current_player[k] = v
             update_payload[f'player.{k}'] = v
             
+    current_events = record.get('events', [])
     if 'events' in data: 
-        update_payload['events'] = data['events']
+        current_events = data['events']
+        update_payload['events'] = current_events
+        
+    # Re-evaluate Eligibility Warnings on Edit
+    rc_rating = current_player.get('rcRating', 'N/A')
+    warnings = evaluate_eligibility_warnings(rc_rating, current_events)
+    update_payload['eligibilityWarnings'] = warnings
+        
     if 'doublesPartners' in data: 
         update_payload['doublesPartners'] = data['doublesPartners']
     if 'finalTotal' in data: 
@@ -1157,17 +1236,19 @@ def delete_registration(reg_id):
 def create_discount_code():
     data = request.json
     amount = float(data.get('amount', 5.0))
+    discount_type = data.get('discountType', 'dollar')
     is_perm = data.get('isPermanent', False)
     code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
     
     db.collection('discount_codes').add({
         "code": code,
         "discountAmount": amount,
+        "discountType": discount_type,
         "used": False,
         "isPermanent": is_perm,
         "timestamp": firestore.SERVER_TIMESTAMP
     })
-    return jsonify({"code": code, "amount": amount, "isPermanent": is_perm})
+    return jsonify({"code": code, "amount": amount, "discountType": discount_type, "isPermanent": is_perm})
 
 @app.route('/api/admin/discount-codes', methods=['GET'])
 def get_discount_codes():

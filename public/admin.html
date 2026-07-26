@@ -107,7 +107,7 @@
                     <button id="tabAnalytics" onclick="switchTab('analytics')">Event Analytics</button>
                 </div>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button id="btnBulkFix" class="btn-secondary-small" style="background: #0284C7; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="bulkFixRc()">🔍 Auto-Fetch RC IDs</button>
+                    <button id="btnBulkFix" class="btn-secondary-small" style="background: #0284C7; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="bulkFixRc()">🔍 Auto-Fetch RC IDs & Audit Ratings</button>
                     <button id="btnPullSheets" class="btn-secondary-small" style="background: #10B981; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="pullFromSheets()">📥 Pull GSheet Edits</button>
                     <button id="btnPushSheets" class="btn-secondary-small" style="background: #3B82F6; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="pushToSheets()">📤 Push to GSheet</button>
                     <button id="btnRebuildSheet" class="btn-secondary-small" style="background: #DC2626; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="rebuildSheet()">⚠️ Rebuild Entire Sheet</button>
@@ -201,13 +201,19 @@
                     <h3 style="margin: 0; color: var(--gctta-navy);">Active & Used Discount Codes</h3>
                     
                     <div style="display: flex; gap: 15px; align-items: center; background: #F1F5F9; padding: 15px; border-radius: 6px;">
+                        <select id="newDiscountType" style="padding: 10px; border-radius: 6px; border: 1px solid #CBD5E1; background: white; font-weight: bold; color: var(--gctta-navy);">
+                            <option value="dollar">$ Off</option>
+                            <option value="percent">% Off</option>
+                        </select>
+
+                        <div style="position: relative;">
+                            <input type="number" id="newDiscountAmount" placeholder="Value" value="5" step="0.01" style="padding: 10px; width: 100px; border-radius: 6px; border: 1px solid #CBD5E1;">
+                        </div>
+
                         <label style="display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: bold; color: var(--gctta-navy); cursor: pointer;">
                             <input type="checkbox" id="newDiscountPerm"> Permanent (Multi-Use)
                         </label>
-                        <div style="position: relative;">
-                            <span style="position: absolute; left: 12px; top: 10px; font-weight: bold; color: #64748B;">$</span>
-                            <input type="number" id="newDiscountAmount" placeholder="Amount" value="5" style="padding: 10px 10px 10px 25px; width: 100px; border-radius: 6px; border: 1px solid #CBD5E1;">
-                        </div>
+
                         <button class="btn-primary" style="padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer;" onclick="generateDiscountCode()">Generate New Code</button>
                     </div>
                 </div>
@@ -326,7 +332,7 @@
                     <div style="display: flex; gap: 15px; margin-bottom: 10px;">
                         <div style="flex: 1;">
                             <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Total Paid / Owed ($)</label>
-                            <input type="number" id="editTotal" required style="width: 100%; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px; box-sizing: border-box;">
+                            <input type="number" id="editTotal" required step="0.01" style="width: 100%; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px; box-sizing: border-box;">
                         </div>
                         <div style="flex: 1;">
                             <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Payment Status</label>
@@ -419,7 +425,7 @@
                     <div style="display: flex; gap: 15px; margin-bottom: 10px;">
                         <div style="flex: 1;">
                             <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Total Paid / Owed ($)</label>
-                            <input type="number" id="manPaid" placeholder="0" value="0" required style="width: 100%; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px; box-sizing: border-box;">
+                            <input type="number" id="manPaid" placeholder="0" value="0" required step="0.01" style="width: 100%; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px; box-sizing: border-box;">
                         </div>
                         <div style="flex: 1;">
                             <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Payment Status</label>
@@ -441,6 +447,7 @@
 
     <script>
         let allRegistrations = [];
+        window.currentEditReg = null;
 
         // ==========================================
         // AUTO-LOGIN LOGIC
@@ -489,7 +496,7 @@
                 .then(data => {
                     allRegistrations = data; 
                     renderTable(data);
-                    renderAnalytics(data); // Build the new Analytics tab!
+                    renderAnalytics(data); 
                 });
         }
 
@@ -516,10 +523,13 @@
                     badgeClass = 'badge-paid';
                 } else {
                     let reason = reg.pendingReason || 'Original Unpaid Entry';
-                    // Retroactive fallback for old updates
                     if (reg.pendingUpdate) reason = 'Unpaid Event Update';
-                    
                     reasonHtml = `<div style="font-size: 10px; color: #854D0E; margin-top: 4px; text-align: center; font-weight: bold;">${reason}</div>`;
+                }
+
+                let warningsHtml = '';
+                if (reg.eligibilityWarnings && reg.eligibilityWarnings.length > 0) {
+                    warningsHtml = `<div style="color: #DC2626; font-size: 10px; font-weight: bold; margin-top: 5px;">⚠️ RATING WARNING</div>`;
                 }
 
                 const row = `
@@ -528,7 +538,10 @@
                         <td style="font-weight: bold;">${reg.player.firstName} ${reg.player.lastName}</td>
                         <td style="color: #64748B;">${reg.player.dob || 'N/A'}</td>
                         <td style="color: #64748B; font-weight: bold;">${reg.player.gender || 'N/A'}</td>
-                        <td style="color: #B45309; font-weight: bold; font-size: 14px;">${reg.player.rcRating || 'N/A'}</td>
+                        <td style="color: #B45309; font-weight: bold; font-size: 14px;">
+                            ${reg.player.rcRating || 'N/A'}
+                            ${warningsHtml}
+                        </td>
                         <td style="font-size: 11px; line-height: 1.4;">${eventsList}</td>
                         <td style="font-size: 11px; line-height: 1.4; color: #0F172A;">${partnersList}</td>
                         <td style="font-weight: bold;">$${parseFloat(reg.finalTotal || 0).toFixed(2)}</td>
@@ -570,7 +583,6 @@
             document.getElementById('viewDiscounts').style.display = 'none';
             document.getElementById('viewAnalytics').style.display = 'none';
             
-            // Hide Player action buttons by default
             document.getElementById('btnBulkFix').style.display = 'none';
             document.getElementById('btnPullSheets').style.display = 'none';
             document.getElementById('btnPushSheets').style.display = 'none';
@@ -622,18 +634,15 @@
             const doublesIds = [3, 4, 21, 33, 34];
 
             dataArray.forEach(reg => {
-                // Gender
                 let g = reg.player.gender || 'N/A';
                 if (g === 'Male') maleCount++;
                 else if (g === 'Female') femaleCount++;
 
-                // Club
                 let c = reg.player.club || 'N/A';
                 if(c === 'Independent / None') c = 'None';
                 if(!clubCounts[c]) clubCounts[c] = 0;
                 clubCounts[c]++;
 
-                // Rating
                 let r = reg.player.rcRating;
                 if (!r || r === 'N/A' || isNaN(r)) {
                     unratedCount++;
@@ -644,7 +653,6 @@
                     else over1500Count++;
                 }
 
-                // Age
                 if (reg.player.dob && reg.player.dob !== 'N/A') {
                     const yearMatch = reg.player.dob.match(/\d{4}/);
                     if (yearMatch) {
@@ -655,7 +663,6 @@
                     }
                 }
 
-                // Events
                 if(reg.events) {
                     reg.events.forEach(e => {
                         totalOverall++;
@@ -675,22 +682,18 @@
             document.getElementById('analyticsTotalDoubles').innerText = totalDoubles;
             document.getElementById('analyticsTotalOverall').innerText = totalOverall;
             
-            // Render Genders
             document.getElementById('analyticsMale').innerText = maleCount;
             document.getElementById('analyticsFemale').innerText = femaleCount;
 
-            // Render Ages
             document.getElementById('analyticsJunior').innerText = juniorCount;
             document.getElementById('analyticsAdult').innerText = adultCount;
             document.getElementById('analyticsVet').innerText = vetCount;
 
-            // Render Ratings
             document.getElementById('analyticsUnrated').innerText = unratedCount;
             document.getElementById('analyticsU1000').innerText = u1000Count;
             document.getElementById('analyticsU1500').innerText = u1500Count;
             document.getElementById('analyticsO1500').innerText = over1500Count;
 
-            // Render Clubs
             const clubGrid = document.getElementById('analyticsClubGrid');
             clubGrid.innerHTML = '';
             Object.keys(clubCounts).sort((a,b) => clubCounts[b] - clubCounts[a]).forEach(club => {
@@ -702,15 +705,12 @@
                 `;
             });
 
-            // Render Event Popularity
             const breakdownGrid = document.getElementById('analyticsBreakdownGrid');
             breakdownGrid.innerHTML = '';
             const sortedEvents = Object.keys(eventCounts).sort((a, b) => {
-                // Sort by count (highest first)
                 if (eventCounts[b] !== eventCounts[a]) {
                     return eventCounts[b] - eventCounts[a];
                 }
-                // Tie-breaker: sort by event number logically
                 const numA = parseInt(a.match(/\d+/)) || 0;
                 const numB = parseInt(b.match(/\d+/)) || 0;
                 return numA - numB;
@@ -738,7 +738,6 @@
 
             let csvContent = "data:text/csv;charset=utf-8,";
             
-            // Zermelo standard headers + our custom data
             const headers = [
                 "Ref ID", "First Name", "Last Name", "Email", "Phone", "DOB", "Gender", 
                 "TTA ID", "Club", "RC ID", "RC Rating", "Never Played", "Events", 
@@ -801,20 +800,20 @@
                         window.location.reload();
                     } else {
                         alert("Error running bulk query.");
-                        btn.textContent = "🔍 Auto-Fetch RC IDs";
+                        btn.textContent = "🔍 Auto-Fetch RC IDs & Audit Ratings";
                         btn.disabled = false;
                     }
                 })
                 .catch(() => {
                     alert("Error running bulk query.");
-                    btn.textContent = "🔍 Auto-Fetch RC IDs";
+                    btn.textContent = "🔍 Auto-Fetch RC IDs & Audit Ratings";
                     btn.disabled = false;
                 });
             }
         }
 
         function rebuildSheet() {
-            if(confirm("⚠️ WARNING: This will completely wipe Google Sheets Rows 2-1000 and rebuild it from the Firebase Database. Make sure your Row 1 headers A through W are perfectly correct! Proceed?")) {
+            if(confirm("⚠️ WARNING: This will completely wipe Google Sheets Rows 2-1000 and rebuild it from the Firebase Database. Make sure your Row 1 headers A through X are perfectly correct! Proceed?")) {
                 fetch('/api/admin/rebuild-sheet', { method: 'POST' })
                 .then(res => res.json())
                 .then(data => {
@@ -946,7 +945,6 @@
             let liveRating = reg.player.rcRating && reg.player.rcRating !== 'N/A' ? reg.player.rcRating : 'Fetching...';
             let liveRcId = reg.player.rcId || 'N/A';
 
-            // Attempt a live fetch if the DB rating is blank but they have an RC ID
             if (liveRating === 'Fetching...' && liveRcId !== 'N/A' && liveRcId !== 'Never Played') {
                 try {
                     const res = await fetch(`/api/ratings-central/search?query=${liveRcId}`);
@@ -976,7 +974,6 @@
                 partnersList = Object.entries(reg.doublesPartners).map(([k,v]) => `<li style="margin-bottom:6px; padding-bottom: 6px; border-bottom: 1px dashed #E2E8F0;"><b style="color: var(--gctta-navy);">${k}:</b> ${v}</li>`).join('');
             }
 
-            // Build History HTML
             let historyHtml = '<p style="color: #64748B; font-style: italic;">No updates recorded yet.</p>';
             if (reg.history && reg.history.length > 0) {
                 historyHtml = reg.history.map((h, idx) => {
@@ -1003,7 +1000,20 @@
                 }).join('');
             }
 
+            let warningsAlert = '';
+            if (reg.eligibilityWarnings && reg.eligibilityWarnings.length > 0) {
+                warningsAlert = `
+                    <div style="background: #FEE2E2; color: #991B1B; padding: 15px; border-radius: 4px; margin-bottom: 20px; border-left: 4px solid #DC2626;">
+                        <strong style="display: block; margin-bottom: 5px;">⚠️ RATING ELIGIBILITY WARNING:</strong>
+                        <ul style="margin: 0; padding-left: 20px; font-size: 13px;">
+                            ${reg.eligibilityWarnings.map(w => `<li>${w}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
             content.innerHTML = `
+                ${warningsAlert}
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; font-size: 14px; color: #334155;">
                     <div style="background: #F8FAFC; padding: 20px; border-radius: 6px; border: 1px solid #E2E8F0;">
                         <h4 style="margin-top: 0; color: var(--gctta-navy); border-bottom: 2px solid var(--gctta-gold); padding-bottom: 5px;">Personal Details</h4>
@@ -1053,6 +1063,8 @@
         function openEditModal(id) {
             const reg = allRegistrations.find(r => r.id === id);
             if (!reg) return;
+            
+            window.currentEditReg = reg; // Store globally for auto-calc
 
             document.getElementById('editRegId').value = reg.id;
             document.getElementById('editFirst').value = reg.player.firstName || '';
@@ -1083,13 +1095,27 @@
                 });
             }
             
+            // Auto-Calc logic attached to checkboxes
+            document.querySelectorAll('#editEventsContainer input[type="checkbox"]').forEach(cb => {
+                cb.onchange = () => {
+                    let newBase = 0;
+                    document.querySelectorAll('#editEventsContainer input[type="checkbox"]:checked').forEach(chk => {
+                        newBase += JSON.parse(chk.value).price;
+                    });
+                    const discount = window.currentEditReg.discountAmount || 0;
+                    let newTotal = (newBase + 5.00) - discount;
+                    if (newTotal < 0) newTotal = 0;
+                    document.getElementById('editTotal').value = newTotal.toFixed(2);
+                };
+            });
+            
             let partnersStr = '';
             if (reg.doublesPartners) {
                 partnersStr = Object.entries(reg.doublesPartners).map(([k, v]) => `${k}: ${v}`).join(', ');
             }
             document.getElementById('editPartners').value = partnersStr;
             
-            document.getElementById('editTotal').value = reg.finalTotal || 0;
+            document.getElementById('editTotal').value = parseFloat(reg.finalTotal || 0).toFixed(2);
             const statusSelect = document.getElementById('editStatus');
             if(Array.from(statusSelect.options).some(opt => opt.value === reg.paymentStatus)) {
                 statusSelect.value = reg.paymentStatus;
@@ -1230,6 +1256,9 @@
                             } catch(e) {}
                         }
 
+                        const dType = code.discountType || 'dollar';
+                        const valDisplay = dType === 'percent' ? `${parseFloat(code.discountAmount)}%` : `$${parseFloat(code.discountAmount).toFixed(2)}`;
+
                         const usedAction = code.used ? `<button style="background: #E2E8F0; color: #334155; padding: 4px 8px; font-size: 11px; border: none; border-radius: 4px; cursor: pointer;" onclick="updateDiscountCode('${code.id}', {used: false})">Reactivate Code</button>` 
                                                      : `<button style="background: #DC2626; color: white; padding: 4px 8px; font-size: 11px; border: none; border-radius: 4px; cursor: pointer;" onclick="updateDiscountCode('${code.id}', {used: true})">Expire Now</button>`;
                         
@@ -1239,7 +1268,7 @@
                         const row = `
                             <tr>
                                 <td><span class="ref-code" style="font-size: 16px;">${code.code}</span></td>
-                                <td style="font-weight: bold; font-size: 16px;">$${parseFloat(code.discountAmount).toFixed(2)}</td>
+                                <td style="font-weight: bold; font-size: 16px;">${valDisplay}</td>
                                 <td><span class="badge ${badgeClass}">${statusText}</span></td>
                                 <td style="color: #64748B;">${dateStr}</td>
                                 <td>
@@ -1257,17 +1286,19 @@
 
         function generateDiscountCode() {
             const amount = document.getElementById('newDiscountAmount').value;
+            const type = document.getElementById('newDiscountType') ? document.getElementById('newDiscountType').value : 'dollar';
             const isPerm = document.getElementById('newDiscountPerm').checked;
-            if(!amount || amount <= 0) return alert("Please enter a valid amount.");
+            if(!amount || amount <= 0) return alert("Please enter a valid value.");
             
             fetch('/api/admin/discount-codes', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({amount: parseFloat(amount), isPermanent: isPerm})
+                body: JSON.stringify({amount: parseFloat(amount), discountType: type, isPermanent: isPerm})
             })
             .then(res => res.json())
             .then(res => {
-                alert(`New Code Generated: ${res.code} for $${res.amount} ${isPerm ? '(Permanent)' : '(1-Time Use)'}`);
+                const label = res.discountType === 'percent' ? `${res.amount}%` : `$${res.amount}`;
+                alert(`New Code Generated: ${res.code} for ${label} off ${isPerm ? '(Permanent)' : '(1-Time Use)'}`);
                 loadDiscounts();
             });
         }

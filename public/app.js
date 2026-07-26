@@ -66,6 +66,7 @@ const clubOther = document.getElementById('clubOther');
 let currentEvents = [];
 let baseTotal = 0;
 let discountValue = 0;
+let discountType = "dollar";
 let validatedCode = "";
 let currentRcRating = 0;
 let currentRcId = "";
@@ -406,9 +407,15 @@ if (autoFillByIdBtn) {
             if (data.success) {
                 document.getElementById('firstName').value = data.firstName;
                 document.getElementById('lastName').value = data.lastName;
-                if (data.dob) {
-                    document.getElementById('dob').value = data.dob.length === 4 ? `01/01/${data.dob}` : data.dob;
+                
+                // DOB Fix: Force manual entry if only year is provided
+                if (data.dob && data.dob.length === 4) {
+                    document.getElementById('dob').value = ""; 
+                    alert(`We found your birth year (${data.dob}), but please manually enter your exact Date of Birth (DD/MM/YYYY).`);
+                } else if (data.dob) {
+                    document.getElementById('dob').value = data.dob;
                 }
+
                 ttaIdFeedback.innerHTML = `<span style="color:green; font-weight:bold;">✓ Details populated! Welcome ${data.firstName}.</span>`;
                 if(typeof validateEligibility === "function") validateEligibility();
             } else {
@@ -558,7 +565,12 @@ function validateEligibility() {
     const dobStr = dobInput.value.trim();
     const yearMatches = dobStr.match(/\d{4}/);
     const birthYear = yearMatches ? parseInt(yearMatches[0]) : 0;
+    
+    // Standard Juniors age rule
     const ageIn2026 = birthYear > 0 ? (2026 - birthYear) : 0; 
+    
+    // Veteran specific rule - eligible for age bracket they turn in 2027
+    const ageIn2027 = birthYear > 0 ? (2027 - birthYear) : 0; 
     
     let selectedGender = "";
     genderRadios.forEach(r => { if(r.checked) selectedGender = r.value; });
@@ -582,9 +594,9 @@ function validateEligibility() {
                 disabled = true;
                 reason = `(Too old - Age ${ageIn2026})`;
             }
-            if (rules.minAge && ageIn2026 < rules.minAge && ageIn2026 > 0) {
+            if (rules.minAge && ageIn2027 < rules.minAge && ageIn2027 > 0) {
                 disabled = true;
-                reason = `(Too young - Age ${ageIn2026})`;
+                reason = `(Too young - Age in 2027: ${ageIn2027})`;
             }
             if (rules.maxRating && currentRcRating > rules.maxRating) {
                 disabled = true;
@@ -598,7 +610,7 @@ function validateEligibility() {
             radio.checked = false;
             radio.disabled = true; 
             label.style.color = "#ccc";
-            label.style.pointerEvents = "none"; // Hard lock to prevent bypass
+            label.style.pointerEvents = "none"; 
             label.style.textDecoration = "line-through";
             if (!label.innerHTML.includes("reason-text")) {
                 label.innerHTML += ` <span class="reason-text" style="color:red; font-size: 12px; text-decoration: none;">${reason}</span>`;
@@ -675,10 +687,16 @@ if (form) {
                 const data = await response.json();
                 if (data.valid) {
                     discountValue = data.discountAmount;
+                    discountType = data.discountType || 'dollar';
                     validatedCode = code;
-                    alert(`Discount Code Applied! $${discountValue.toFixed(2)} off.`);
+                    if (discountType === 'percent') {
+                        alert(`Discount Code Applied! ${discountValue}% off.`);
+                    } else {
+                        alert(`Discount Code Applied! $${discountValue.toFixed(2)} off.`);
+                    }
                 } else {
                     discountValue = 0;
+                    discountType = 'dollar';
                     validatedCode = "";
                     alert("Invalid or already used code.");
                 }
@@ -693,7 +711,6 @@ if (form) {
     form.addEventListener('submit', (e) => {
         e.preventDefault();
         
-        // 1. Run standard validation first before showing T&Cs
         currentEvents = [];
         const radios = document.querySelectorAll('input[type="radio"][name^="sat_"]:checked, input[type="radio"][name^="sun_"]:checked');
         radios.forEach(radio => {
@@ -718,8 +735,7 @@ if (form) {
             return;
         }
 
-        // 2. If valid, open the Terms & Conditions Modal instead of submitting directly
-        openTcModal(); 
+        window.openTcModal(); 
     });
 
     window.submitRegistration = async function() {
@@ -752,12 +768,10 @@ if (form) {
         let finalClub = clubSelect.value;
         if (finalClub === "Other") finalClub = clubOther.value;
 
-        // Extract the Gender
         let selectedGender = "N/A";
         const genderRadios = document.getElementsByName('gender');
         genderRadios.forEach(r => { if(r.checked) selectedGender = r.value; });
 
-        // Check if Pay Later is explicitly triggered
         const payLaterInput = document.getElementById('payLaterCheckbox');
         const isPayLater = payLaterInput ? payLaterInput.checked : false;
 
@@ -772,7 +786,7 @@ if (form) {
                 gender: selectedGender, 
                 club: finalClub,
                 rcProfile: document.getElementById('rcProfile').value,
-                rcId: currentRcId // Explicitly sent for GSheet separation
+                rcId: currentRcId 
             },
             events: currentEvents,
             doublesPartners: doublesPartners,
@@ -822,11 +836,18 @@ function calculateTotals() {
         }
     });
 
-    let final = (baseTotal + TTQ_LEVY) - discountValue;
+    let computedDiscount = 0;
+    if (discountType === 'percent') {
+        computedDiscount = (baseTotal + TTQ_LEVY) * (discountValue / 100.0);
+    } else {
+        computedDiscount = discountValue;
+    }
+
+    let final = (baseTotal + TTQ_LEVY) - computedDiscount;
     if (final < 0) final = 0;
 
     if(eventsTotalEl) eventsTotalEl.innerText = baseTotal.toFixed(2);
-    if(discountAmountEl) discountAmountEl.innerText = discountValue.toFixed(2);
+    if(discountAmountEl) discountAmountEl.innerText = computedDiscount.toFixed(2);
     if(finalTotalEl) finalTotalEl.innerText = final.toFixed(2);
 }
 
@@ -842,7 +863,7 @@ async function loadAdminData() {
     try {
         const response = await fetch(`${API_BASE}/admin/registrations`);
         const registrations = await response.json();
-        allRegistrations = registrations; // store in memory for editing
+        allRegistrations = registrations; 
         
         tableBody.innerHTML = "";
         registrations.forEach(reg => {
@@ -869,284 +890,4 @@ async function loadAdminData() {
     } catch(err) {
         console.error("Error loading admin data", err);
     }
-}
-
-// Edit Modal Handling
-function openEditModal(regId) {
-    const reg = allRegistrations.find(r => r.id === regId);
-    if (!reg) return;
-
-    if (document.getElementById('playerProfileDetails')) {
-        const p = reg.player;
-        document.getElementById('playerProfileDetails').innerHTML = `
-            <div><strong>DOB:</strong> ${p.dob || 'N/A'}</div>
-            <div><strong>Phone:</strong> ${p.phone || 'N/A'}</div>
-            <div><strong>Club:</strong> ${p.club || 'N/A'}</div>
-            <div><strong>TTA ID:</strong> ${p.nationalId || 'N/A'}</div>
-            <div><strong>Ratings Central ID:</strong> ${p.rcId || 'N/A'}</div>
-            <div><strong>Ratings Central Profile:</strong> ${p.rcProfile ? `<a href="${p.rcProfile}" target="_blank">View</a>` : 'N/A'}</div>
-        `;
-    }
-
-    document.getElementById('editRegId').value = reg.id;
-    document.getElementById('editFirstName').value = reg.player.firstName;
-    document.getElementById('editLastName').value = reg.player.lastName;
-    document.getElementById('editEmail').value = reg.player.email;
-    document.getElementById('editTotal').value = reg.finalTotal;
-    document.getElementById('editStatus').value = reg.paymentStatus;
-    if (document.getElementById('editBalance')) {
-        document.getElementById('editBalance').value = reg.balanceDue || 0;
-    }
-    
-    if (document.getElementById('copyPaymentLinkBtn')) {
-        document.getElementById('copyPaymentLinkBtn').onclick = () => {
-            const url = new URL('/update.html', window.location.origin);
-            url.searchParams.set('email', reg.player.email);
-            url.searchParams.set('dob', reg.player.dob);
-            navigator.clipboard.writeText(url.toString()).then(() => {
-                alert("Payment/Update link copied to clipboard!");
-            });
-        };
-    }
-
-    // Populate Events Checkboxes (Allows Bypassing Rules)
-    const eventsList = document.getElementById('editEventsList');
-    eventsList.innerHTML = "";
-    const regEventIds = reg.events.map(e => e.id);
-    
-    masterEventsList.forEach(ev => {
-        const isChecked = regEventIds.includes(ev.id) ? "checked" : "";
-        eventsList.innerHTML += `
-            <div style="margin-bottom: 5px;">
-                <label style="cursor: pointer; font-weight: normal; font-size: 13px;">
-                    <input type="checkbox" name="edit_event" value='${JSON.stringify(ev)}' ${isChecked}>
-                    ${ev.name}
-                </label>
-            </div>
-        `;
-    });
-
-    document.getElementById('editModal').style.display = 'flex';
-}
-
-function closeEditModal() {
-    document.getElementById('editModal').style.display = 'none';
-}
-
-async function saveRegistrationEdit() {
-    const regId = document.getElementById('editRegId').value;
-    const fName = document.getElementById('editFirstName').value;
-    const lName = document.getElementById('editLastName').value;
-    const email = document.getElementById('editEmail').value;
-    const total = parseFloat(document.getElementById('editTotal').value);
-    const status = document.getElementById('editStatus').value;
-    const balanceEl = document.getElementById('editBalance');
-    let balance = balanceEl ? parseFloat(balanceEl.value) : 0;
-    if (isNaN(balance)) balance = 0;
-
-    const checkedEvents = [];
-    document.querySelectorAll('input[name="edit_event"]:checked').forEach(chk => {
-        checkedEvents.push(JSON.parse(chk.value));
-    });
-
-    const payload = {
-        "player.firstName": fName,
-        "player.lastName": lName,
-        "player.email": email,
-        "finalTotal": total,
-        "paymentStatus": status,
-        "balanceDue": balance,
-        "events": checkedEvents
-    };
-
-    try {
-        await fetch(`${API_BASE}/admin/registrations/${regId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        alert("Registration successfully updated! Google Sheets in sync.");
-        closeEditModal();
-        loadAdminData();
-        loadStats();
-    } catch(err) {
-        alert("Failed to update registration.");
-    }
-}
-
-async function deleteRegistration(regId = null) {
-    if (typeof regId !== 'string') {
-        regId = document.getElementById('editRegId').value;
-    }
-    if (!confirm("Are you sure you want to permanently delete this registration? This action cannot be undone and will remove it from the database and Google Sheets.")) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`${API_BASE}/admin/registrations/${regId}`, {
-            method: 'DELETE'
-        });
-        if (response.ok) {
-            alert("Registration deleted successfully.");
-            closeEditModal();
-            loadAdminData();
-            loadStats();
-        } else {
-            alert("Failed to delete registration.");
-        }
-    } catch (err) {
-        alert("Error deleting registration.");
-        console.error(err);
-    }
-}
-
-async function waiveFee(regId) {
-    if(confirm("Are you sure you want to waive the fee and mark this as Paid?")) {
-        await fetch(`${API_BASE}/admin/registrations/${regId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ finalTotal: 0, paymentStatus: 'Paid' })
-        });
-        alert("Fee waived and updated.");
-        loadAdminData();
-        loadStats();
-    }
-}
-
-// Zermelo CSV Export
-function exportZermeloCSV() {
-    fetch(`${API_BASE}/admin/registrations`)
-        .then(res => res.json())
-        .then(data => {
-            let csvContent = "data:text/csv;charset=utf-8,";
-            // Zermelo optimal headers
-            csvContent += "FirstName,LastName,NationalID,RatingsCentralID,Club,Events\n";
-            
-            data.forEach(reg => {
-                const fName = `"${reg.player.firstName}"`;
-                const lName = `"${reg.player.lastName}"`;
-                const natId = `"${reg.player.nationalId || ''}"`;
-                const rcId = `"${reg.player.rcId || ''}"`;
-                
-                let club = reg.player.club || '';
-                if(club === 'Independent / None') club = 'None';
-                club = `"${club}"`;
-                
-                const events = `"${reg.events.map(e => e.name).join('; ')}"`;
-                
-                csvContent += [fName, lName, natId, rcId, club, events].join(",") + "\n";
-            });
-            
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "GCOpen2026_Zermelo_Export.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        });
-}
-
-// Discount & Stats Handlers
-async function loadDiscountCodes() {
-    const tableBody = document.querySelector("#discountTable tbody");
-    if (!tableBody) return;
-
-    try {
-        const response = await fetch(`${API_BASE}/admin/discount-codes`);
-        const codes = await response.json();
-        
-        tableBody.innerHTML = "";
-        codes.forEach(c => {
-            const badgeClass = c.used ? 'pending' : 'paid'; 
-            const statusText = c.used ? 'Used' : 'Active';
-            
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><strong>${c.code}</strong></td>
-                <td>$${c.discountAmount.toFixed(2)}</td>
-                <td><span class="badge ${badgeClass}">${statusText}</span></td>
-            `;
-            tableBody.appendChild(tr);
-        });
-    } catch(err) {
-        console.error("Error loading discount codes", err);
-    }
-}
-
-async function generateCode() {
-    const amount = document.getElementById('newDiscountAmount').value;
-    try {
-        await fetch(`${API_BASE}/admin/discount-codes`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount: amount })
-        });
-        alert("New unique discount code generated!");
-        loadDiscountCodes();
-    } catch(err) {
-        alert("Failed to generate code.");
-    }
-}
-
-async function loadStats() {
-    try {
-        const res = await fetch('/api/admin/stats');
-        const data = await res.json();
-        const revEl = document.getElementById('statRevenue');
-        if (revEl) revEl.innerText = `$${data.totalRevenue.toFixed(2)}`;
-        const playersEl = document.getElementById('statPlayers');
-        if (playersEl) playersEl.innerText = data.totalPlayers;
-        const pendingEl = document.getElementById('statPending');
-        if (pendingEl) pendingEl.innerText = data.pendingPayments;
-    } catch (err) { console.error(err); }
-}
-
-// ==========================================
-// TERMS AND CONDITIONS MODAL LOGIC
-// ==========================================
-const tcModal = document.getElementById('tcModal');
-const tcScrollArea = document.getElementById('tcScrollArea');
-const tcAgreeBtn = document.getElementById('tcAgreeBtn');
-
-window.openTcModal = function() {
-    tcModal.style.display = 'flex';
-    
-    // Reset button state every time modal opens
-    tcAgreeBtn.disabled = true;
-    tcAgreeBtn.style.opacity = '0.5';
-    tcAgreeBtn.style.cursor = 'not-allowed';
-    
-    // Check if text is short enough that it doesn't need scrolling
-    if (tcScrollArea.scrollHeight <= tcScrollArea.clientHeight) {
-        enableTcButton();
-    } else {
-        tcScrollArea.scrollTop = 0; // Reset scroll to top
-    }
-};
-
-window.closeTcModal = function() {
-    tcModal.style.display = 'none';
-};
-
-function enableTcButton() {
-    tcAgreeBtn.disabled = false;
-    tcAgreeBtn.style.opacity = '1';
-    tcAgreeBtn.style.cursor = 'pointer';
-}
-
-if (tcScrollArea) {
-    tcScrollArea.addEventListener('scroll', () => {
-        // We use -5 as a buffer in case of decimal pixel rendering on some zoom levels
-        if (tcScrollArea.scrollTop + tcScrollArea.clientHeight >= tcScrollArea.scrollHeight - 5) {
-            enableTcButton();
-        }
-    });
-}
-
-if (tcAgreeBtn) {
-    tcAgreeBtn.addEventListener('click', async () => {
-        closeTcModal();
-        await window.submitRegistration(); // Now process the actual payment API
-    });
 }
