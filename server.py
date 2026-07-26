@@ -239,6 +239,9 @@ def serve_admin(): return send_from_directory(app.static_folder, 'admin.html')
 @app.route('/success.html')
 def serve_success(): return send_from_directory(app.static_folder, 'success.html')
 
+@app.route('/draws')
+def serve_draws(): return send_from_directory(app.static_folder, 'draws.html')
+
 # ==========================================
 # LOOKUP API ENDPOINTS
 # ==========================================
@@ -1270,6 +1273,60 @@ def update_discount_code(doc_id):
     data = request.json
     db.collection('discount_codes').document(doc_id).update(data)
     return jsonify({"status": "updated"})
+
+@app.route('/api/admin/export-zermelo-players', methods=['GET'])
+def export_zermelo_players():
+    docs = db.collection('registrations').where(filter=FieldFilter('zermeloExported', '!=', True)).stream()
+    
+    players_data = []
+    doc_ids_to_update = []
+    
+    for doc in docs:
+        d = doc.to_dict()
+        p = d.get('player', {})
+        
+        rc_id = p.get('rcId', '').strip()
+        never_played = p.get('neverPlayed', False)
+        
+        if never_played or rc_id.lower() in ["", "n/a", "never played", "none"]:
+            continue
+            
+        events = d.get('events', [])
+        event_ids = [str(e.get('id')) for e in events if 'id' in e]
+        events_str = " ".join(event_ids)
+        
+        last_name = p.get('lastName', '').strip()
+        first_name = p.get('firstName', '').strip()
+        full_name = f"{last_name}, {first_name}" if last_name and first_name else last_name or first_name
+        
+        players_data.append({
+            "Name": full_name,
+            "Ratings Central ID": rc_id,
+            "Events": events_str,
+            "Look up Ratings": "RC",
+            "Look Up Personal Info": "RC",
+            "Check In": "Here Now",
+            "Draw Club": "",
+            "Use Club For Draw Club": "Y"
+        })
+        doc_ids_to_update.append(doc.id)
+        
+    return jsonify({
+        "players": players_data,
+        "docIds": doc_ids_to_update
+    })
+
+@app.route('/api/admin/mark-exported', methods=['POST'])
+def mark_exported():
+    data = request.json
+    doc_ids = data.get('docIds', [])
+    
+    for doc_id in doc_ids:
+        db.collection('registrations').document(doc_id).update({
+            "zermeloExported": True
+        })
+        
+    return jsonify({"status": "success", "updatedCount": len(doc_ids)})
 
 if __name__ == '__main__':
     print("Starting server on port 5000")
