@@ -248,7 +248,8 @@ def serve_draws(): return send_from_directory(app.static_folder, 'draws.html')
 @app.route('/api/national-id/search', methods=['GET'])
 def search_national_id():
     name = request.args.get('name')
-    if not name: return jsonify({"error": "Missing name"}), 400
+    if not name: 
+        return jsonify({"error": "Missing name"}), 400
     
     name_parts = name.strip().split(' ')
     first_name = name_parts[0] if len(name_parts) > 0 else ''
@@ -256,32 +257,65 @@ def search_national_id():
     
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
+            # headless=False and slow_mo=1000 keeps it visible and slow enough to watch
+            browser = p.chromium.launch(
+                headless=False, 
+                slow_mo=1000,
+                args=['--no-sandbox', '--disable-setuid-sandbox']
+            )
             page = browser.new_page()
+            
+            # --- ONE-TIME POPUP BURNER ---
+            print("[DEBUG] Navigating to homepage to trigger the one-time popup...")
+            page.goto('https://www.tabletennis.org.au/')
+            
+            print("[DEBUG] Waiting 3 seconds for popup to load...")
+            page.wait_for_timeout(3000)
+            
+            try:
+                # Look for an 'X' button
+                close_btn = page.locator('.close, button[aria-label="Close"], .ui-dialog-titlebar-close, text="×"').first
+                if close_btn.is_visible():
+                    print("[DEBUG] Clicking popup 'X' on homepage...")
+                    close_btn.click(force=True)
+                else:
+                    print("[DEBUG] No 'X' found. Clicking center of the screen to dismiss...")
+                    viewport = page.viewport_size
+                    if viewport:
+                        page.mouse.click(viewport['width'] / 2, viewport['height'] / 2)
+            except Exception as e:
+                print(f"[DEBUG] Homepage popup interaction skipped/failed: {e}")
+            
+            page.wait_for_timeout(1000)
+            # -------------------------------
+
+            print("[DEBUG] Navigating to login page...")
             page.goto('https://www.tabletennis.org.au/login')
             
-            # Dismiss popup if present
-            try:
-                close_btn = page.locator('button.close, .close, [aria-label="Close"], text="×", text="x"').first
-                close_btn.wait_for(state="visible", timeout=3000)
-                close_btn.click()
-            except Exception:
-                pass
-
+            print("[DEBUG] Filling login form...")
             page.wait_for_selector('input[name="username"]')
             page.fill('input[name="username"]', 'jfensom3')
             page.fill('input[name="password"]', 'Pizza1200!')
-            with page.expect_navigation(): page.click('button#submit')
+            
+            with page.expect_navigation(): 
+                page.click('button#submit')
+            print("[DEBUG] Login successful.")
                 
+            print("[DEBUG] Navigating to member finder...")
             page.goto('https://www.tabletennis.org.au/member-finder/')
+            
             page.wait_for_selector('input[placeholder*="First name"]')
             page.fill('input[placeholder*="First name"]', first_name)
-            if last_name: page.fill('input[placeholder*="last name"]', last_name)
+            if last_name: 
+                page.fill('input[placeholder*="last name"]', last_name)
                 
+            print(f"[DEBUG] Searching for member: {first_name} {last_name}")
             page.get_by_role("button", name="SEARCH").click()
             page.wait_for_timeout(2500)
             
             content = page.content()
+            
+            time.sleep(2)
             browser.close()
             
             soup = BeautifulSoup(content, 'html.parser')
@@ -299,44 +333,84 @@ def search_national_id():
                             "status": "Active" if "Active" in text else "Unknown"
                         }
                         break
-            if found_data: return jsonify(found_data)
+                        
+            if found_data: 
+                return jsonify(found_data)
             return jsonify({"error": "No matching National ID found."}), 404
+            
     except Exception as e:
+        print(f"[ERROR] Exception in search_national_id: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
 
 @app.route('/api/national-id/lookup-by-id', methods=['GET'])
 def lookup_national_id_by_id():
     nat_id = request.args.get('id')
-    if not nat_id: return jsonify({"error": "Missing National ID"}), 400
+    if not nat_id: 
+        return jsonify({"error": "Missing National ID"}), 400
     
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
+            # headless=False and slow_mo=1000 keeps it visible and slow enough to watch
+            browser = p.chromium.launch(
+                headless=False, 
+                slow_mo=1000,
+                args=['--no-sandbox', '--disable-setuid-sandbox']
+            )
             page = browser.new_page()
+            
+            # --- ONE-TIME POPUP BURNER ---
+            print("[DEBUG] Navigating to homepage to trigger the one-time popup...")
+            page.goto('https://www.tabletennis.org.au/')
+            
+            print("[DEBUG] Waiting 3 seconds for popup to load...")
+            page.wait_for_timeout(3000)
+            
+            try:
+                # Look for an 'X' button
+                close_btn = page.locator('.close, button[aria-label="Close"], .ui-dialog-titlebar-close, text="×"').first
+                if close_btn.is_visible():
+                    print("[DEBUG] Clicking popup 'X' on homepage...")
+                    close_btn.click(force=True)
+                else:
+                    print("[DEBUG] No 'X' found. Clicking center of the screen to dismiss...")
+                    viewport = page.viewport_size
+                    if viewport:
+                        page.mouse.click(viewport['width'] / 2, viewport['height'] / 2)
+            except Exception as e:
+                print(f"[DEBUG] Homepage popup interaction skipped/failed: {e}")
+            
+            page.wait_for_timeout(1000)
+            # -------------------------------
+            
+            print("[DEBUG] Navigating to login page...")
             page.goto('https://www.tabletennis.org.au/login')
             
-            # Dismiss popup if present
-            try:
-                close_btn = page.locator('button.close, .close, [aria-label="Close"], text="×", text="x"').first
-                close_btn.wait_for(state="visible", timeout=3000)
-                close_btn.click()
-            except Exception:
-                pass
-
+            print("[DEBUG] Filling login form...")
             page.wait_for_selector('input[name="username"]')
             page.fill('input[name="username"]', 'jfensom3')
             page.fill('input[name="password"]', 'Pizza1200!')
-            with page.expect_navigation(): page.click('button#submit')
+            
+            with page.expect_navigation(): 
+                page.click('button#submit')
+            print("[DEBUG] Login successful.")
                 
+            print("[DEBUG] Navigating to member finder...")
             page.goto('https://www.tabletennis.org.au/member-finder/')
+            
             id_input = page.locator('input[placeholder*="National Member ID"]')
-            if id_input.count() == 0: id_input = page.locator('input[type="text"]').first
+            if id_input.count() == 0: 
+                id_input = page.locator('input[type="text"]').first
                 
+            print(f"[DEBUG] Filling National ID field with #{nat_id}...")
             id_input.fill(str(nat_id))
+            
             page.get_by_role("button", name="SEARCH").click()
             page.wait_for_timeout(2500)
             
             content = page.content()
+            
+            time.sleep(2)
             browser.close()
             
             soup = BeautifulSoup(content, 'html.parser')
@@ -373,11 +447,14 @@ def lookup_national_id_by_id():
                         "state": match_state.group(1).strip() if match_state else "Unknown",
                     }
                     break
-            if found_data: return jsonify(found_data)
+                    
+            if found_data: 
+                return jsonify(found_data)
             return jsonify({"error": f"No TTA member found with ID #{nat_id}."}), 404
+            
     except Exception as e:
+        print(f"[ERROR] Exception in lookup_national_id_by_id: {str(e)}")
         return jsonify({"error": "Failed to search National ID", "details": str(e)}), 500
-
 @app.route('/api/ratings-central/search', methods=['GET'])
 def search_ratings_central():
     query = request.args.get('query')
