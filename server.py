@@ -96,7 +96,7 @@ def generate_receipt_email(first_name, reg_id, events_str, partners_str, final_t
 
     owed_text = ""
     if owed_amount > 0:
-        owed_text = "<p><em>*Note: You can pay your outstanding balance online at any time using the <strong>Update Registration</strong> tab on the website, or pay via Cash/EFT on arrival.</em></p>"
+        owed_text = "<p><em>*Note: *Note: please pay your outstanding balance online at any time using the <strong>Update Registration</strong> tab on the website. Make sure to pay your balance by the close of entries. Any outstanding online payments will incur a $10 late admin fee per event. Thanks for your understanding!</em></p>"
 
     late_fee_text = f"<br><strong>Late Entry Surcharge:</strong> ${late_fee:.2f}" if late_fee > 0 else ""
 
