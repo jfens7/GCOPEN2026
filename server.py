@@ -259,7 +259,7 @@ def search_national_id():
         with sync_playwright() as p:
             # headless=False and slow_mo=1000 keeps it visible and slow enough to watch
             browser = p.chromium.launch(
-                headless=False, 
+                headless=True, 
                 slow_mo=1000,
                 args=['--no-sandbox', '--disable-setuid-sandbox']
             )
@@ -353,7 +353,7 @@ def lookup_national_id_by_id():
         with sync_playwright() as p:
             # headless=False and slow_mo=1000 keeps it visible and slow enough to watch
             browser = p.chromium.launch(
-                headless=False, 
+                headless=True, 
                 slow_mo=1000,
                 args=['--no-sandbox', '--disable-setuid-sandbox']
             )
