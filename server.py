@@ -259,6 +259,15 @@ def search_national_id():
             browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
             page = browser.new_page()
             page.goto('https://www.tabletennis.org.au/login')
+            
+            # Dismiss popup if present
+            try:
+                close_btn = page.locator('button.close, .close, [aria-label="Close"], text="×", text="x"').first
+                close_btn.wait_for(state="visible", timeout=3000)
+                close_btn.click()
+            except Exception:
+                pass
+
             page.wait_for_selector('input[name="username"]')
             page.fill('input[name="username"]', 'jfensom3')
             page.fill('input[name="password"]', 'Pizza1200!')
@@ -305,6 +314,15 @@ def lookup_national_id_by_id():
             browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
             page = browser.new_page()
             page.goto('https://www.tabletennis.org.au/login')
+            
+            # Dismiss popup if present
+            try:
+                close_btn = page.locator('button.close, .close, [aria-label="Close"], text="×", text="x"').first
+                close_btn.wait_for(state="visible", timeout=3000)
+                close_btn.click()
+            except Exception:
+                pass
+
             page.wait_for_selector('input[name="username"]')
             page.fill('input[name="username"]', 'jfensom3')
             page.fill('input[name="password"]', 'Pizza1200!')
