@@ -105,16 +105,20 @@
         <div class="content-container" style="max-width: 1500px; margin: 40px auto; padding: 0 20px;">
             <div class="stats-container">
                 <div class="stat-card">
-                    <h3>Total Revenue</h3>
-                    <h1 id="totalRev">$0.00</h1>
+                    <h3>Total Registration Value</h3>
+                    <h1 id="totalValue">$0.00</h1>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" style="border-left: 6px solid #10B981;">
+                    <h3>Actual Cash/EFT Collected</h3>
+                    <h1 id="collectedRevenue" style="color: #10B981;">$0.00</h1>
+                </div>
+                <div class="stat-card" style="border-left: 6px solid #EF4444;">
+                    <h3>Outstanding Balance (Unpaid)</h3>
+                    <h1 id="outstandingBalance" style="color: #EF4444;">$0.00</h1>
+                </div>
+                <div class="stat-card" style="border-left: 6px solid #3B82F6;">
                     <h3>Total Players</h3>
-                    <h1 id="totalPlayers">0</h1>
-                </div>
-                <div class="stat-card">
-                    <h3>Pending Payments</h3>
-                    <h1 id="pendingPayments">0</h1>
+                    <h1 id="totalPlayers" style="color: #3B82F6;">0</h1>
                 </div>
             </div>
 
@@ -129,7 +133,8 @@
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;" id="globalActionButtons">
                     <button id="btnBulkFix" class="btn-secondary-small" style="background: #0284C7; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="bulkFixRc()">🔍 Auto-Fetch RC IDs & Audit Ratings</button>
                     <button id="btnPullSheets" class="btn-secondary-small" style="background: #10B981; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="pullFromSheets()">📥 Pull GSheet Edits</button>
-                    <button id="btnPushSheets" class="btn-secondary-small" style="background: #3B82F6; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="pushToSheets()">📤 Push to GSheet</button>
+                    <button id="btnPushSheets" class="btn-secondary-small" style="background: #3B82F6; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="pushToSheets()">📤 Push to Master GSheet</button>
+                    <button id="btnPushZermelo" class="btn-secondary-small" style="background: #8B5CF6; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="pushToZermeloSheet()">🌐 Push to Zermelo GSheet</button>
                     <button id="btnRebuildSheet" class="btn-secondary-small" style="background: #DC2626; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="rebuildSheet()">⚠️ Rebuild Entire Sheet</button>
                     <button id="btnManualEntry" class="btn-secondary-small" style="background: var(--gctta-gold); color: var(--gctta-navy); padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="document.getElementById('manualModal').style.display='flex'">+ Add Manual Entry</button>
                     <div style="display: flex; gap: 5px;">
@@ -142,7 +147,15 @@
             <!-- PLAYER REGISTRATIONS VIEW -->
             <div id="viewPlayers" class="admin-table-container">
                 <h3 style="margin-top: 0; margin-bottom: 20px; color: var(--gctta-navy);">Recent Registrations</h3>
-                <input type="text" id="searchInput" placeholder="Search by name, email, or status..." style="width: 100%; padding: 12px; border: 1px solid #CBD5E1; border-radius: 6px; margin-bottom: 20px; box-sizing: border-box;" onkeyup="filterTable()">
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <input type="text" id="searchInput" placeholder="Search by name, email, or status..." style="flex: 1; padding: 12px; border: 1px solid #CBD5E1; border-radius: 6px; box-sizing: border-box;" onkeyup="filterTable()">
+                    <select id="statusFilter" onchange="filterTable()" style="padding: 12px; border-radius: 6px; border: 1px solid #CBD5E1; font-weight: bold; color: var(--gctta-navy);">
+                        <option value="all">All Registrations</option>
+                        <option value="paid">Paid</option>
+                        <option value="pending">Pending (Owes Money)</option>
+                    </select>
+                    <button class="btn-secondary-small" style="background: #475569; color: white; padding: 12px 20px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold;" onclick="printUnpaidList()">🖨️ Print Unpaid List</button>
+                </div>
                 
                 <table class="admin-table" id="registrationsTable">
                     <thead>
@@ -154,7 +167,7 @@
                             <th style="width: 8%;">Rating</th>
                             <th style="width: 20%;">Events</th>
                             <th style="width: 15%;">Partners</th>
-                            <th style="width: 8%;">Total Paid</th>
+                            <th style="width: 8%;">Total / Owes</th>
                             <th style="width: 7%;">Status</th>
                             <th style="width: 8%; text-align: center;">Actions</th>
                         </tr>
@@ -412,14 +425,14 @@
                     <h4 style="margin-bottom: 10px; margin-top: 20px; color: var(--gctta-navy); border-top: 1px solid #E2E8F0; padding-top: 15px;">Payment Details</h4>
                     <div style="display: flex; gap: 15px; margin-bottom: 10px;">
                         <div style="flex: 1;">
-                            <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Total Paid / Owed ($)</label>
+                            <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Total Registration Value ($)</label>
                             <input type="number" id="editTotal" required step="0.01" style="width: 100%; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px; box-sizing: border-box;">
                         </div>
                         <div style="flex: 1;">
                             <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Payment Status</label>
                             <select id="editStatus" style="width: 100%; padding: 10px; border: 1px solid #CBD5E1; box-sizing: border-box; background: white;">
                                 <option value="Paid">Paid</option>
-                                <option value="Pending">Pending</option>
+                                <option value="Pending">Pending (Owes Money)</option>
                                 <option value="Paid (Waived)">Paid (Waived)</option>
                             </select>
                         </div>
@@ -506,7 +519,7 @@
                     <h4 style="margin-bottom: 10px; margin-top: 20px; color: var(--gctta-navy); border-top: 1px solid #E2E8F0; padding-top: 15px;">Payment Details</h4>
                     <div style="display: flex; gap: 15px; margin-bottom: 10px;">
                         <div style="flex: 1;">
-                            <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Total Paid / Owed ($)</label>
+                            <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 5px;">Total Registration Value ($)</label>
                             <input type="number" id="manPaid" placeholder="0" value="0" required step="0.01" style="width: 100%; padding: 10px; border: 1px solid #CBD5E1; border-radius: 4px; box-sizing: border-box;">
                         </div>
                         <div style="flex: 1;">
@@ -608,9 +621,10 @@
             fetch('/api/admin/stats')
                 .then(res => res.json())
                 .then(data => {
-                    document.getElementById('totalRev').innerText = '$' + data.totalRevenue.toFixed(2);
+                    document.getElementById('totalValue').innerText = '$' + data.totalValue.toFixed(2);
+                    document.getElementById('collectedRevenue').innerText = '$' + data.collectedRevenue.toFixed(2);
+                    document.getElementById('outstandingBalance').innerText = '$' + data.outstandingBalance.toFixed(2);
                     document.getElementById('totalPlayers').innerText = data.totalPlayers;
-                    document.getElementById('pendingPayments').innerText = data.pendingPayments;
                 });
 
             fetch('/api/admin/registrations')
@@ -654,6 +668,14 @@
                     warningsHtml = `<div style="color: #DC2626; font-size: 10px; font-weight: bold; margin-top: 5px;">⚠️ RATING WARNING</div>`;
                 }
 
+                let owedAmount = parseFloat(reg.balanceDue || 0);
+                let owedStr = owedAmount > 0 ? `<br><span style="color:#EF4444; font-size:10px;">Owes $${owedAmount.toFixed(2)}</span>` : '';
+                let totalDisplay = `$${parseFloat(reg.finalTotal || 0).toFixed(2)}${owedStr}`;
+                
+                let waiveFeeBtn = parseFloat(reg.lateFee || 0) > 0 && owedAmount > 0 
+                    ? `<button class="btn-waive" style="background:#8B5CF6;" onclick="waiveManualFee('${reg.id}')">Waive $10/Evt Fee</button>` 
+                    : '';
+
                 const row = `
                     <tr>
                         <td><span class="ref-code">${reg.id}</span></td>
@@ -666,7 +688,7 @@
                         </td>
                         <td style="font-size: 11px; line-height: 1.4;">${eventsList}</td>
                         <td style="font-size: 11px; line-height: 1.4; color: #0F172A;">${partnersList}</td>
-                        <td style="font-weight: bold;">$${parseFloat(reg.finalTotal || 0).toFixed(2)}</td>
+                        <td style="font-weight: bold;">${totalDisplay}</td>
                         <td>
                             <span class="badge ${badgeClass}">${reg.paymentStatus}</span>
                             ${reasonHtml}
@@ -677,7 +699,8 @@
                                 <button class="btn-edit" onclick="openEditModal('${reg.id}')">Edit</button>
                                 <button class="btn-sync" onclick="resyncSheet('${reg.id}')">Resync/Fix</button>
                                 <button class="btn-resend" onclick="resendEmail('${reg.id}')">Resend Email</button>
-                                <button class="btn-waive" onclick="waiveFee('${reg.id}')">Waive Fee</button>
+                                ${waiveFeeBtn}
+                                <button class="btn-waive" onclick="waiveFee('${reg.id}')">Waive Balance</button>
                                 <button class="btn-delete" onclick="deleteReg('${reg.id}')">Delete</button>
                             </div>
                         </td>
@@ -689,11 +712,74 @@
 
         function filterTable() {
             const query = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            
             const filtered = allRegistrations.filter(r => {
                 const searchString = `${r.id} ${r.player.firstName} ${r.player.lastName} ${r.player.email} ${r.paymentStatus}`.toLowerCase();
-                return searchString.includes(query);
+                const matchesSearch = searchString.includes(query);
+                
+                let matchesStatus = true;
+                if (statusFilter === 'paid') matchesStatus = r.paymentStatus.includes('Paid');
+                if (statusFilter === 'pending') matchesStatus = !r.paymentStatus.includes('Paid') || parseFloat(r.balanceDue) > 0;
+                
+                return matchesSearch && matchesStatus;
             });
             renderTable(filtered);
+        }
+
+        function printUnpaidList() {
+            const unpaid = allRegistrations.filter(r => !r.paymentStatus.includes('Paid') || parseFloat(r.balanceDue) > 0);
+            if (unpaid.length === 0) {
+                alert("All players are fully paid! No one owes money.");
+                return;
+            }
+            
+            let printWindow = window.open('', '_blank');
+            let html = `
+                <html><head><title>Unpaid Players - Gold Coast Open</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+                    th, td { border: 1px solid #000; padding: 10px; text-align: left; }
+                    th { background-color: #f2f2f2; }
+                    h1 { text-align: center; margin-bottom: 5px; }
+                    p { text-align: center; margin-top: 0; color: #555; }
+                </style>
+                </head><body>
+                <h1>Unpaid Players / Pay On Day</h1>
+                <p>2026 Gold Coast Open Table Tennis Championships</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Player Name</th>
+                            <th>Amount Owed</th>
+                            <th>Events Selected</th>
+                            <th>Paid (Tick)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            unpaid.sort((a, b) => a.player.firstName.localeCompare(b.player.firstName)).forEach(r => {
+                const events = r.events ? r.events.map(e => e.name).join('<br>') : '';
+                const owes = parseFloat(r.balanceDue || r.finalTotal || 0).toFixed(2);
+                html += `
+                    <tr>
+                        <td style="font-weight: bold;">${r.player.firstName} ${r.player.lastName}</td>
+                        <td style="color: red; font-weight: bold; font-size: 16px;">$${owes}</td>
+                        <td style="font-size: 12px; line-height: 1.4;">${events}</td>
+                        <td style="width: 80px;"></td>
+                    </tr>
+                `;
+            });
+            
+            html += `</tbody></table></body></html>`;
+            printWindow.document.write(html);
+            printWindow.document.close();
+            
+            printWindow.onload = function() {
+                printWindow.print();
+            };
         }
 
         function switchTab(tabName) {
@@ -1252,6 +1338,33 @@
                 .catch(err => alert("Error exporting players: " + err));
         }
 
+        function pushToZermeloSheet() {
+            if(confirm("This will automatically clear and rebuild your Zermelo Google Sheet with all valid players, formatted perfectly for import. Proceed?")) {
+                const btn = document.getElementById('btnPushZermelo');
+                btn.textContent = "Pushing to Zermelo...";
+                btn.disabled = true;
+
+                fetch('/api/admin/push-to-zermelo-sheet', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.status === 'success') {
+                        alert(`Successfully pushed ${data.count} players to your Zermelo Google Sheet!`);
+                        btn.textContent = "🌐 Push to Zermelo GSheet";
+                        btn.disabled = false;
+                    } else {
+                        alert('Error pushing data: ' + data.error);
+                        btn.textContent = "🌐 Push to Zermelo GSheet";
+                        btn.disabled = false;
+                    }
+                })
+                .catch(err => {
+                    alert("Error reaching server.");
+                    btn.textContent = "🌐 Push to Zermelo GSheet";
+                    btn.disabled = false;
+                });
+            }
+        }
+
         // ==========================================
         // EXPORT CSV LOGIC (Full Backup)
         // ==========================================
@@ -1388,17 +1501,17 @@
                 .then(data => {
                     if(data.status === 'success') {
                         alert(`Successfully pushed data to Google Sheets! Synced ${data.updated} records.`);
-                        btn.textContent = "📤 Push to GSheet";
+                        btn.textContent = "📤 Push to Master GSheet";
                         btn.disabled = false;
                     } else {
                         alert('Error pushing data: ' + data.error);
-                        btn.textContent = "📤 Push to GSheet";
+                        btn.textContent = "📤 Push to Master GSheet";
                         btn.disabled = false;
                     }
                 })
                 .catch(err => {
                     alert("Error reaching server.");
-                    btn.textContent = "📤 Push to GSheet";
+                    btn.textContent = "📤 Push to Master GSheet";
                     btn.disabled = false;
                 });
             }
@@ -1436,8 +1549,32 @@
             }
         }
 
+        function waiveManualFee(id) {
+            const reg = allRegistrations.find(r => r.id === id);
+            let currentFee = parseFloat(reg.lateFee || 0);
+            if (currentFee === 0) {
+                alert("No manual processing fee applied to this registration.");
+                return;
+            }
+            if (confirm(`Are you sure you want to completely waive the $${currentFee.toFixed(2)} manual processing fee for this player?`)) {
+                let newBalance = parseFloat(reg.balanceDue || 0) - currentFee;
+                if (newBalance < 0) newBalance = 0;
+                let newTotal = parseFloat(reg.finalTotal || 0) - currentFee;
+                
+                fetch(`/api/admin/registrations/${id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        lateFee: 0,
+                        balanceDue: newBalance,
+                        finalTotal: newTotal
+                    })
+                }).then(() => window.location.reload());
+            }
+        }
+
         function waiveFee(id) {
-            if(confirm("Are you sure you want to Waive the fee for this registration? This will mark their status as 'Paid (Waived)' and balance as $0.00.")) {
+            if(confirm("Are you sure you want to waive the ENTIRE entry fee/balance for this registration? This will mark their status as 'Paid (Waived)' and balance as $0.00.")) {
                 fetch(`/api/admin/registrations/${id}`, {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
@@ -1537,7 +1674,19 @@
                 `;
             }
 
+            let pUpdateAlert = '';
+            if (reg.pendingUpdate) {
+                pUpdateAlert = `
+                    <div style="background: #FEF3C7; color: #92400E; padding: 15px; border-radius: 4px; margin-bottom: 20px; border-left: 4px solid #D97706;">
+                        <strong style="display: block; margin-bottom: 5px;">⚠️ PENDING UNPAID EVENT UPDATE:</strong>
+                        <p style="margin: 0; font-size: 13px;">This player modified their entry but abandoned checkout before paying the $${parseFloat(reg.pendingUpdate.difference).toFixed(2)} difference.<br>
+                        <b>If they pay on the day:</b> Click 'Edit', manually check the boxes for their new events, and save the update to finalize it.</p>
+                    </div>
+                `;
+            }
+
             content.innerHTML = `
+                ${pUpdateAlert}
                 ${warningsAlert}
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; font-size: 14px; color: #334155;">
                     <div style="background: #F8FAFC; padding: 20px; border-radius: 6px; border: 1px solid #E2E8F0;">

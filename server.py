@@ -1404,13 +1404,12 @@ def export_zermelo_players():
             continue
             
         events = d.get('events', [])
-        event_ids = [str(e.get('id')) for e in events if 'id' in e]
+        # Exclude doubles events from Zermelo strings
+        event_ids = [str(e.get('id')) for e in events if 'id' in e and e.get('id') not in DOUBLES_EVENT_IDS]
         events_str = " ".join(event_ids)
         
         last_name = p.get('lastName', '').strip()
         first_name = p.get('firstName', '').strip()
-        
-        # Change this line to output First Last instead of Last, First
         full_name = f"{first_name} {last_name}".strip()
         
         players_data.append({
@@ -1429,18 +1428,6 @@ def export_zermelo_players():
         "players": players_data,
         "docIds": doc_ids_to_update
     })
-
-@app.route('/api/admin/mark-exported', methods=['POST'])
-def mark_exported():
-    data = request.json
-    doc_ids = data.get('docIds', [])
-    
-    for doc_id in doc_ids:
-        db.collection('registrations').document(doc_id).update({
-            "zermeloExported": True
-        })
-        
-    return jsonify({"status": "success", "updatedCount": len(doc_ids)})
 
 @app.route('/api/admin/push-to-zermelo-sheet', methods=['POST'])
 def push_zermelo_sheet():
@@ -1461,7 +1448,8 @@ def push_zermelo_sheet():
                 continue
                 
             events = d.get('events', [])
-            event_ids = [str(e.get('id')) for e in events if 'id' in e]
+            # Exclude doubles events from Zermelo strings
+            event_ids = [str(e.get('id')) for e in events if 'id' in e and e.get('id') not in DOUBLES_EVENT_IDS]
             events_str = " ".join(event_ids)
             
             last_name = p.get('lastName', '').strip()
