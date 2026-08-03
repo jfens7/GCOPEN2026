@@ -53,6 +53,24 @@
         .analytics-item { background: #F8FAFC; border: 1px solid #E2E8F0; padding: 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
         .analytics-item h4 { margin: 0; color: #334155; font-size: 14px; }
         .analytics-item span { font-weight: bold; font-size: 20px; color: var(--gctta-navy); background: #E2E8F0; padding: 5px 12px; border-radius: 20px; }
+        
+        /* Event Entry Styling */
+        .event-group { margin-bottom: 15px; border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; }
+        .event-group-header { background: #F1F5F9; padding: 15px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: bold; color: var(--gctta-navy); transition: background 0.2s; }
+        .event-group-header:hover { background: #E2E8F0; }
+        .event-group-content { display: none; padding: 0; background: white; }
+        .event-group-content.active { display: block; }
+        .event-group-table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        .event-group-table th { background: #F8FAFC; color: #475569; padding: 12px 20px; text-align: left; font-size: 12px; text-transform: uppercase; border-bottom: 1px solid #E2E8F0; border-top: 1px solid #E2E8F0;}
+        .event-group-table td { padding: 12px 20px; border-bottom: 1px solid #F1F5F9; font-size: 13px; color: #334155; }
+
+        /* Draw Builder Styling */
+        .draw-editor-card { background: white; border: 1px solid #CBD5E1; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .draw-editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #E2E8F0; padding-bottom: 10px; }
+        .draw-input { padding: 8px; border: 1px solid #CBD5E1; border-radius: 4px; font-family: inherit; }
+        .draw-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        .draw-table th, .draw-table td { padding: 8px; text-align: left; }
+        .match-row { display: flex; align-items: center; gap: 10px; background: #F8FAFC; padding: 10px; border: 1px solid #E2E8F0; border-radius: 6px; margin-bottom: 8px; }
     </style>
 </head>
 <body style="background-color: #F8FAFC; margin: 0;">
@@ -103,10 +121,12 @@
             <div class="admin-controls">
                 <div class="admin-tabs">
                     <button id="tabPlayers" class="active" onclick="switchTab('players')">Player Registrations</button>
+                    <button id="tabEventEntries" onclick="switchTab('eventEntries')">Event Entries</button>
+                    <button id="tabDraws" onclick="switchTab('draws')">Draws Manager</button>
                     <button id="tabDiscounts" onclick="switchTab('discounts')">Discount Codes</button>
                     <button id="tabAnalytics" onclick="switchTab('analytics')">Event Analytics</button>
                 </div>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;" id="globalActionButtons">
                     <button id="btnBulkFix" class="btn-secondary-small" style="background: #0284C7; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="bulkFixRc()">🔍 Auto-Fetch RC IDs & Audit Ratings</button>
                     <button id="btnPullSheets" class="btn-secondary-small" style="background: #10B981; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="pullFromSheets()">📥 Pull GSheet Edits</button>
                     <button id="btnPushSheets" class="btn-secondary-small" style="background: #3B82F6; color: white; padding: 10px 15px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold;" onclick="pushToSheets()">📤 Push to GSheet</button>
@@ -143,6 +163,57 @@
                         <tr><td colspan="10" style="text-align: center; padding: 30px;">Loading registrations...</td></tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- EVENT ENTRIES VIEW -->
+            <div id="viewEventEntries" class="admin-table-container" style="display: none;">
+                <h3 style="margin-top: 0; margin-bottom: 20px; color: var(--gctta-navy);">Registrations by Event</h3>
+                <div id="eventEntriesList">
+                    <div style="text-align: center; padding: 30px;">Loading event entries...</div>
+                </div>
+            </div>
+
+            <!-- DRAWS MANAGER VIEW -->
+            <div id="viewDraws" class="admin-table-container" style="display: none;">
+                <h3 style="margin-top: 0; margin-bottom: 20px; color: var(--gctta-navy);">Tournament Draws & Results Builder</h3>
+                
+                <div style="background: #F1F5F9; padding: 20px; border-radius: 8px; display: flex; gap: 15px; align-items: center; margin-bottom: 25px;">
+                    <select id="drawEventSelect" style="flex: 1; padding: 12px; border-radius: 6px; border: 1px solid #CBD5E1; font-size: 16px; font-weight: bold; color: var(--gctta-navy);">
+                        <!-- Injected via JS -->
+                    </select>
+                    <button class="btn-primary" style="padding: 12px 25px; border-radius: 6px; border: none; cursor: pointer;" onclick="loadDrawEditor()">Load Event Editor</button>
+                </div>
+
+                <div id="drawEditorArea" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--gctta-gold); padding-bottom: 15px; margin-bottom: 20px;">
+                        <h2 id="drawEditorTitle" style="margin: 0; color: var(--gctta-navy);">Editing Event</h2>
+                        <div style="display: flex; gap: 20px; font-weight: bold; color: #334155;">
+                            <label style="cursor: pointer;"><input type="checkbox" id="drawHasGroups" onchange="toggleDrawState('hasGroups', this.checked)"> Enable Group Stage (Round Robin)</label>
+                            <label style="cursor: pointer;"><input type="checkbox" id="drawHasKnockout" onchange="toggleDrawState('hasKnockout', this.checked)"> Enable Knockout Stage (Bracket)</label>
+                        </div>
+                    </div>
+
+                    <div id="groupsEditorContainer" style="display: none; margin-bottom: 40px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3 style="margin: 0; color: #D97706; text-transform: uppercase;">Group Stage Pools</h3>
+                            <button class="btn-secondary-small" style="background: #10B981; color: white; border: none;" onclick="addGroup()">+ Add New Group / Pool</button>
+                        </div>
+                        <div id="groupsListEditor"></div>
+                    </div>
+
+                    <div id="knockoutEditorContainer" style="display: none; margin-bottom: 40px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3 style="margin: 0; color: #0284C7; text-transform: uppercase;">Knockout Bracket Rounds</h3>
+                            <button class="btn-secondary-small" style="background: #10B981; color: white; border: none;" onclick="addKnockoutRound()">+ Add Knockout Round</button>
+                        </div>
+                        <div id="knockoutListEditor"></div>
+                    </div>
+
+                    <div style="background: #E2E8F0; padding: 20px; border-radius: 8px; text-align: center;">
+                        <button class="btn-primary" style="font-size: 18px; padding: 15px 40px; border-radius: 6px; border: none; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" onclick="saveLiveDraw()">💾 Publish Draw to Live Website</button>
+                        <p style="margin: 10px 0 0 0; color: #64748B; font-size: 13px;">Changes will be instantly visible on the public Live Draws page.</p>
+                    </div>
+                </div>
             </div>
 
             <!-- EVENT ANALYTICS VIEW -->
@@ -298,6 +369,7 @@
                     
                     <h4 style="margin-bottom: 10px; color: var(--gctta-navy); border-top: 1px solid #E2E8F0; padding-top: 15px;">Select Events</h4>
                     <div class="event-checkbox-list" id="editEventsContainer">
+                        <!-- Reuses JS logic to check these boxes -->
                         <label><input type="checkbox" value='{"id":1, "name":"Event #1: Men’s Open Singles", "price":25}'> Event #1: Men’s Open Singles</label>
                         <label><input type="checkbox" value='{"id":2, "name":"Event #2: Women’s Open Singles", "price":20}'> Event #2: Women’s Open Singles</label>
                         <label><input type="checkbox" value='{"id":3, "name":"Event #3: Men’s Open Doubles", "price":12}'> Event #3: Men’s Open Doubles</label>
@@ -459,6 +531,44 @@
         let allRegistrations = [];
         window.currentEditReg = null;
 
+        // Master Events List for Dropdown mapping
+        const adminMasterEventsList = [
+            {"id":1, "name":"Event #1: Men's Open Singles"},
+            {"id":2, "name":"Event #2: Women's Open Singles"},
+            {"id":3, "name":"Event #3: Men's Open Doubles"},
+            {"id":4, "name":"Event #4: Women's Open Doubles"},
+            {"id":5, "name":"Event #5: Para Open Singles"},
+            {"id":6, "name":"Event #6: Under 1700 Singles"},
+            {"id":7, "name":"Event #7: Under 1400 Singles"},
+            {"id":8, "name":"Event #8: Under 19 Boy's Singles"},
+            {"id":9, "name":"Event #9: Under 19 Girl's Singles"},
+            {"id":10, "name":"Event #10: Under 17 Boy's Singles"},
+            {"id":11, "name":"Event #11: Under 17 Girl's Singles"},
+            {"id":12, "name":"Event #12: Under 15 Boy's Singles"},
+            {"id":13, "name":"Event #13: Under 15 Girl's Singles"},
+            {"id":14, "name":"Event #14: Under 13 Boy's Singles"},
+            {"id":15, "name":"Event #15: Under 13 Girl's Singles"},
+            {"id":16, "name":"Event #16: Under 11 Boy's Singles"},
+            {"id":17, "name":"Event #17: Under 11 Girl's Singles"},
+            {"id":18, "name":"Event #18: Under 1200 Singles"},
+            {"id":19, "name":"Event #19: Under 1000 Singles"},
+            {"id":20, "name":"Event #20: Under 800 Singles"},
+            {"id":21, "name":"Event #21: Open Rating Doubles"},
+            {"id":22, "name":"Event #22: Over 30 Men's Singles"},
+            {"id":23, "name":"Event #23: Over 30 Women's Singles"},
+            {"id":24, "name":"Event #24: Over 40 Men's Singles"},
+            {"id":25, "name":"Event #25: Over 40 Women's Singles"},
+            {"id":26, "name":"Event #26: Over 50 Men's Singles"},
+            {"id":27, "name":"Event #27: Over 50 Women's Singles"},
+            {"id":28, "name":"Event #28: Over 60 Men's Singles"},
+            {"id":29, "name":"Event #29: Over 60 Women's Singles"},
+            {"id":30, "name":"Event #30: Over 70 Men's Singles"},
+            {"id":31, "name":"Event #31: Over 70 Women's Singles"},
+            {"id":32, "name":"Event #32: Over 80 Singles"},
+            {"id":33, "name":"Event #33: Veteran Women's Doubles"},
+            {"id":34, "name":"Event #34: Veteran Men's Doubles"}
+        ];
+
         // ==========================================
         // AUTO-LOGIN LOGIC
         // ==========================================
@@ -467,6 +577,7 @@
                 document.getElementById('adminLoginOverlay').style.display = 'none';
                 document.getElementById('adminDashboardContent').style.display = 'block';
                 loadDashboardData();
+                initDrawsTab();
             }
         });
 
@@ -479,6 +590,7 @@
                 document.getElementById('adminLoginOverlay').style.display = 'none';
                 document.getElementById('adminDashboardContent').style.display = 'block';
                 loadDashboardData(); 
+                initDrawsTab();
             } else {
                 document.getElementById('adminLoginError').style.display = 'block';
             }
@@ -585,40 +697,361 @@
         }
 
         function switchTab(tabName) {
-            document.getElementById('tabPlayers').classList.remove('active');
-            document.getElementById('tabDiscounts').classList.remove('active');
-            document.getElementById('tabAnalytics').classList.remove('active');
+            const tabs = ['tabPlayers', 'tabEventEntries', 'tabDraws', 'tabDiscounts', 'tabAnalytics'];
+            const views = ['viewPlayers', 'viewEventEntries', 'viewDraws', 'viewDiscounts', 'viewAnalytics'];
             
-            document.getElementById('viewPlayers').style.display = 'none';
-            document.getElementById('viewDiscounts').style.display = 'none';
-            document.getElementById('viewAnalytics').style.display = 'none';
+            tabs.forEach(t => document.getElementById(t).classList.remove('active'));
+            views.forEach(v => document.getElementById(v).style.display = 'none');
             
-            document.getElementById('btnBulkFix').style.display = 'none';
-            document.getElementById('btnPullSheets').style.display = 'none';
-            document.getElementById('btnPushSheets').style.display = 'none';
-            document.getElementById('btnRebuildSheet').style.display = 'none';
-            document.getElementById('btnManualEntry').style.display = 'none';
-            document.getElementById('btnExportNew').style.display = 'none';
-            document.getElementById('btnExportAll').style.display = 'none';
-
+            const globalActions = document.getElementById('globalActionButtons');
+            
             if(tabName === 'players') {
                 document.getElementById('tabPlayers').classList.add('active');
                 document.getElementById('viewPlayers').style.display = 'block';
-                
-                document.getElementById('btnBulkFix').style.display = 'inline-block';
-                document.getElementById('btnPullSheets').style.display = 'inline-block';
-                document.getElementById('btnPushSheets').style.display = 'inline-block';
-                document.getElementById('btnRebuildSheet').style.display = 'inline-block';
-                document.getElementById('btnManualEntry').style.display = 'inline-block';
-                document.getElementById('btnExportNew').style.display = 'inline-block';
-                document.getElementById('btnExportAll').style.display = 'inline-block';
+                globalActions.style.display = 'flex';
+            } else if (tabName === 'eventEntries') {
+                document.getElementById('tabEventEntries').classList.add('active');
+                document.getElementById('viewEventEntries').style.display = 'block';
+                globalActions.style.display = 'none';
+                loadEventEntries();
+            } else if (tabName === 'draws') {
+                document.getElementById('tabDraws').classList.add('active');
+                document.getElementById('viewDraws').style.display = 'block';
+                globalActions.style.display = 'none';
             } else if (tabName === 'discounts') {
                 document.getElementById('tabDiscounts').classList.add('active');
                 document.getElementById('viewDiscounts').style.display = 'block';
+                globalActions.style.display = 'none';
                 loadDiscounts();
             } else if (tabName === 'analytics') {
                 document.getElementById('tabAnalytics').classList.add('active');
                 document.getElementById('viewAnalytics').style.display = 'block';
+                globalActions.style.display = 'none';
+            }
+        }
+
+        // ==========================================
+        // DRAWS BUILDER LOGIC
+        // ==========================================
+        let currentDrawState = null;
+        let currentDrawEventId = null;
+
+        function initDrawsTab() {
+            const sel = document.getElementById('drawEventSelect');
+            sel.innerHTML = '<option value="">-- Select Event to Manage --</option>';
+            adminMasterEventsList.sort((a,b)=>a.id-b.id).forEach(e => {
+                sel.innerHTML += `<option value="${e.id}">${e.name}</option>`;
+            });
+        }
+
+        async function loadDrawEditor() {
+            const eventId = document.getElementById('drawEventSelect').value;
+            if(!eventId) return alert("Please select an event from the dropdown.");
+
+            const eventName = adminMasterEventsList.find(e=>e.id == eventId).name;
+            currentDrawEventId = eventId;
+
+            document.getElementById('drawEditorTitle').innerText = `Editing: ${eventName}`;
+            
+            try {
+                const res = await fetch('/api/draws');
+                const data = await res.json();
+                
+                if (data.status === 'success' && data.draws && data.draws[eventId]) {
+                    currentDrawState = JSON.parse(JSON.stringify(data.draws[eventId])); // deep copy
+                } else {
+                    currentDrawState = {
+                        name: eventName,
+                        hasGroups: false,
+                        hasKnockout: false,
+                        groups: [],
+                        knockout: []
+                    };
+                }
+            } catch (err) {
+                alert("Failed to load existing draws. Starting fresh.");
+                currentDrawState = {
+                    name: eventName,
+                    hasGroups: false,
+                    hasKnockout: false,
+                    groups: [],
+                    knockout: []
+                };
+            }
+
+            document.getElementById('drawEditorArea').style.display = 'block';
+            renderDrawEditor();
+        }
+
+        function toggleDrawState(field, value) {
+            if(!currentDrawState) return;
+            currentDrawState[field] = value;
+            renderDrawEditor();
+        }
+
+        function renderDrawEditor() {
+            if(!currentDrawState) return;
+
+            document.getElementById('drawHasGroups').checked = currentDrawState.hasGroups;
+            document.getElementById('drawHasKnockout').checked = currentDrawState.hasKnockout;
+
+            const grpContainer = document.getElementById('groupsEditorContainer');
+            const kContainer = document.getElementById('knockoutEditorContainer');
+            
+            grpContainer.style.display = currentDrawState.hasGroups ? 'block' : 'none';
+            kContainer.style.display = currentDrawState.hasKnockout ? 'block' : 'none';
+
+            // Render Groups
+            const gList = document.getElementById('groupsListEditor');
+            gList.innerHTML = '';
+            if(currentDrawState.hasGroups) {
+                currentDrawState.groups.forEach((g, gIdx) => {
+                    let playerRows = g.players.map((p, pIdx) => `
+                        <tr>
+                            <td><input type="text" class="draw-input" style="width:90%;" value="${p.name}" onchange="updateGroupPlayer(${gIdx}, ${pIdx}, 'name', this.value)" placeholder="Player Name"></td>
+                            <td><input type="number" class="draw-input" style="width:50px;" value="${p.wins}" onchange="updateGroupPlayer(${gIdx}, ${pIdx}, 'wins', this.value)"></td>
+                            <td><input type="number" class="draw-input" style="width:50px;" value="${p.losses}" onchange="updateGroupPlayer(${gIdx}, ${pIdx}, 'losses', this.value)"></td>
+                            <td><input type="number" class="draw-input" style="width:50px;" value="${p.pts}" onchange="updateGroupPlayer(${gIdx}, ${pIdx}, 'pts', this.value)"></td>
+                            <td style="text-align:center;"><input type="checkbox" ${p.advance ? 'checked' : ''} onchange="updateGroupPlayer(${gIdx}, ${pIdx}, 'advance', this.checked)"></td>
+                            <td><button style="background:#EF4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" onclick="removeGroupPlayer(${gIdx}, ${pIdx})">X</button></td>
+                        </tr>
+                    `).join('');
+
+                    gList.innerHTML += `
+                        <div class="draw-editor-card">
+                            <div class="draw-editor-header">
+                                <input type="text" class="draw-input" style="font-size:16px; font-weight:bold; color:#D97706; border:none; background:transparent;" value="${g.name}" onchange="updateGroupName(${gIdx}, this.value)">
+                                <div>
+                                    <button class="btn-secondary-small" style="background:#3B82F6; color:white; border:none; margin-right:5px;" onclick="addPlayerToGroup(${gIdx})">+ Add Player Row</button>
+                                    <button class="btn-secondary-small" style="background:#EF4444; color:white; border:none;" onclick="removeGroup(${gIdx})">Delete Group</button>
+                                </div>
+                            </div>
+                            <table class="draw-table">
+                                <thead><tr><th style="width:40%;">Player / Pair</th><th>W</th><th>L</th><th>Pts</th><th style="text-align:center;">Advance?</th><th></th></tr></thead>
+                                <tbody>${playerRows}</tbody>
+                            </table>
+                        </div>
+                    `;
+                });
+            }
+
+            // Render Knockouts
+            const kList = document.getElementById('knockoutListEditor');
+            kList.innerHTML = '';
+            if(currentDrawState.hasKnockout) {
+                currentDrawState.knockout.forEach((r, rIdx) => {
+                    let matchRows = r.matches.map((m, mIdx) => `
+                        <div class="match-row">
+                            <span style="font-weight:bold; color:#64748B; width: 20px;">M${mIdx+1}</span>
+                            <div style="flex:1;">
+                                <input type="text" class="draw-input" style="width:80%; margin-bottom:4px;" value="${m.p1}" placeholder="Player 1 (or BYE)" onchange="updateMatch(${rIdx}, ${mIdx}, 'p1', this.value)">
+                                <input type="text" class="draw-input" style="width:80%;" value="${m.p2}" placeholder="Player 2 (or BYE)" onchange="updateMatch(${rIdx}, ${mIdx}, 'p2', this.value)">
+                            </div>
+                            <div style="width:60px;">
+                                <input type="text" class="draw-input" style="width:100%; margin-bottom:4px; font-family:monospace;" value="${m.s1}" placeholder="S1" onchange="updateMatch(${rIdx}, ${mIdx}, 's1', this.value)">
+                                <input type="text" class="draw-input" style="width:100%; font-family:monospace;" value="${m.s2}" placeholder="S2" onchange="updateMatch(${rIdx}, ${mIdx}, 's2', this.value)">
+                            </div>
+                            <div style="width:120px; display:flex; flex-direction:column; gap:4px;">
+                                <label style="font-size:11px;"><input type="radio" name="win_${rIdx}_${mIdx}" ${m.winner===1 ? 'checked':''} onchange="updateMatch(${rIdx}, ${mIdx}, 'winner', 1)"> P1 Wins</label>
+                                <label style="font-size:11px;"><input type="radio" name="win_${rIdx}_${mIdx}" ${m.winner===2 ? 'checked':''} onchange="updateMatch(${rIdx}, ${mIdx}, 'winner', 2)"> P2 Wins</label>
+                                <label style="font-size:11px;"><input type="radio" name="win_${rIdx}_${mIdx}" ${m.winner===0 ? 'checked':''} onchange="updateMatch(${rIdx}, ${mIdx}, 'winner', 0)"> TBD</label>
+                            </div>
+                            <button style="background:#EF4444; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer;" onclick="removeMatch(${rIdx}, ${mIdx})">Delete</button>
+                        </div>
+                    `).join('');
+
+                    kList.innerHTML += `
+                        <div class="draw-editor-card" style="border-left: 4px solid #0284C7;">
+                            <div class="draw-editor-header">
+                                <input type="text" class="draw-input" style="font-size:16px; font-weight:bold; color:#0284C7; border:none; background:transparent;" value="${r.roundName}" onchange="updateRoundName(${rIdx}, this.value)">
+                                <div>
+                                    <button class="btn-secondary-small" style="background:#3B82F6; color:white; border:none; margin-right:5px;" onclick="addMatchToRound(${rIdx})">+ Add Match</button>
+                                    <button class="btn-secondary-small" style="background:#EF4444; color:white; border:none;" onclick="removeRound(${rIdx})">Delete Round</button>
+                                </div>
+                            </div>
+                            <div style="padding-left:10px;">${matchRows}</div>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        // --- Group State Handlers ---
+        function addGroup() {
+            currentDrawState.groups.push({ name: `Group ${currentDrawState.groups.length + 1}`, players: [] });
+            renderDrawEditor();
+        }
+        function removeGroup(gIdx) {
+            currentDrawState.groups.splice(gIdx, 1);
+            renderDrawEditor();
+        }
+        function updateGroupName(gIdx, val) {
+            currentDrawState.groups[gIdx].name = val;
+        }
+        function addPlayerToGroup(gIdx) {
+            currentDrawState.groups[gIdx].players.push({ name: "", wins: 0, losses: 0, pts: 0, advance: false });
+            renderDrawEditor();
+        }
+        function removeGroupPlayer(gIdx, pIdx) {
+            currentDrawState.groups[gIdx].players.splice(pIdx, 1);
+            renderDrawEditor();
+        }
+        function updateGroupPlayer(gIdx, pIdx, field, val) {
+            if(field === 'wins' || field === 'losses' || field === 'pts') val = parseInt(val) || 0;
+            currentDrawState.groups[gIdx].players[pIdx][field] = val;
+        }
+
+        // --- Knockout State Handlers ---
+        function addKnockoutRound() {
+            currentDrawState.knockout.push({ roundName: "New Round", matches: [] });
+            renderDrawEditor();
+        }
+        function removeRound(rIdx) {
+            currentDrawState.knockout.splice(rIdx, 1);
+            renderDrawEditor();
+        }
+        function updateRoundName(rIdx, val) {
+            currentDrawState.knockout[rIdx].roundName = val;
+        }
+        function addMatchToRound(rIdx) {
+            currentDrawState.knockout[rIdx].matches.push({ p1: "", s1: "0", p2: "", s2: "0", winner: 0 });
+            renderDrawEditor();
+        }
+        function removeMatch(rIdx, mIdx) {
+            currentDrawState.knockout[rIdx].matches.splice(mIdx, 1);
+            renderDrawEditor();
+        }
+        function updateMatch(rIdx, mIdx, field, val) {
+            currentDrawState.knockout[rIdx].matches[mIdx][field] = val;
+        }
+
+        // --- Save to Backend ---
+        async function saveLiveDraw() {
+            if(!currentDrawEventId || !currentDrawState) return;
+            
+            if(confirm("Are you sure you want to publish these changes? The live draws page will update instantly for everyone.")) {
+                try {
+                    const res = await fetch(`/api/admin/draws/${currentDrawEventId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(currentDrawState)
+                    });
+                    const data = await res.json();
+                    if(data.status === 'success') {
+                        alert("Draw successfully published to the live website!");
+                    } else {
+                        alert("Error saving draw.");
+                    }
+                } catch(err) {
+                    alert("Network error while saving.");
+                }
+            }
+        }
+
+        // ==========================================
+        // EVENT ENTRIES LOGIC
+        // ==========================================
+        function loadEventEntries() {
+            const container = document.getElementById('eventEntriesList');
+            container.innerHTML = '<div style="text-align: center; padding: 30px;">Loading event entries...</div>';
+
+            fetch('/api/admin/event-entries')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        renderEventEntries(data.events);
+                    } else {
+                        container.innerHTML = `<div style="color: red; text-align: center; padding: 20px;">Error loading events: ${data.error}</div>`;
+                    }
+                })
+                .catch(err => {
+                    container.innerHTML = `<div style="color: red; text-align: center; padding: 20px;">Failed to fetch events.</div>`;
+                });
+        }
+
+        function renderEventEntries(events) {
+            const container = document.getElementById('eventEntriesList');
+            container.innerHTML = '';
+
+            if (!events || events.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 30px; color: #64748B;">No event entries found.</div>';
+                return;
+            }
+
+            events.forEach((ev, index) => {
+                const isDoubles = [3, 4, 21, 33, 34].includes(ev.eventId);
+                const playerCount = ev.players.length;
+                const headerId = `eventHeader_${index}`;
+                const contentId = `eventContent_${index}`;
+
+                let html = `
+                    <div class="event-group">
+                        <div class="event-group-header" id="${headerId}" onclick="toggleEventGroup('${contentId}')">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 18px;">${isDoubles ? '👯' : '👤'}</span>
+                                <span>${ev.eventName}</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <span style="background: var(--gctta-navy); color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px;">${playerCount} Entries</span>
+                                <span>▼</span>
+                            </div>
+                        </div>
+                        <div class="event-group-content" id="${contentId}">
+                            <div style="overflow-x: auto;">
+                                <table class="event-group-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 25%;">Player Name</th>
+                                            <th style="width: 15%;">RC Rating</th>
+                                            <th style="width: 25%;">Email</th>
+                                            <th style="width: 15%;">Phone</th>
+                                            <th style="width: 20%;">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                `;
+
+                if (playerCount === 0) {
+                    html += `<tr><td colspan="5" style="text-align: center; color: #64748B;">No entries yet.</td></tr>`;
+                } else {
+                    // Sort players alphabetically by name
+                    ev.players.sort((a, b) => a.playerName.localeCompare(b.playerName));
+
+                    ev.players.forEach(p => {
+                        const badgeClass = p.paymentStatus && p.paymentStatus.includes('Paid') ? 'badge-paid' : 'badge-pending';
+                        html += `
+                            <tr>
+                                <td style="font-weight: bold; color: var(--gctta-navy);">
+                                    <a href="#" onclick="openViewModal('${p.regId}'); return false;" style="color: inherit; text-decoration: none;">
+                                        ${p.playerName}
+                                    </a>
+                                </td>
+                                <td style="color: #B45309; font-weight: bold;">${p.rcRating}</td>
+                                <td><a href="mailto:${p.email}" style="color: #0284C7;">${p.email}</a></td>
+                                <td>${p.phone}</td>
+                                <td><span class="badge ${badgeClass}">${p.paymentStatus}</span></td>
+                            </tr>
+                        `;
+                    });
+                }
+
+                html += `
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += html;
+            });
+        }
+
+        function toggleEventGroup(contentId) {
+            const content = document.getElementById(contentId);
+            if (content.classList.contains('active')) {
+                content.classList.remove('active');
+            } else {
+                content.classList.add('active');
             }
         }
 

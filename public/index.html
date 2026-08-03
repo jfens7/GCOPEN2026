@@ -36,7 +36,7 @@
 
         <!-- LIVE COUNTDOWN BANNER -->
         <div style="background-color: #FEF2F2; border: 2px solid #DC2626; border-radius: 8px; padding: 20px; text-align: center; margin-top: 40px;">
-            <h3 style="color: #DC2626; font-weight: 900; margin: 0; letter-spacing: 1px;">REGISTRATIONS OPEN AT 7:00 PM</h3>
+            <h3 style="color: #DC2626; font-weight: 900; margin: 0; letter-spacing: 1px;">REGISTRATIONS CLOSE ON WEDNESDAY AUG 5 AT 11:59PM</h3>
             <h2 id="indexCountdown" style="color: var(--gctta-navy); font-size: 32px; margin: 10px 0 0 0;">--:--:--</h2>
         </div>
 
@@ -81,7 +81,7 @@
 
     <!-- SCRIPT FOR INDEX COUNTDOWN -->
     <script>
-        const targetTimeIndex = new Date('July 23, 2026 19:00:00').getTime();
+        const targetTimeIndex = new Date('August 5, 2026 23:59:59 GMT+1000').getTime();
         
         function updateIndexCountdown() {
             const now = new Date().getTime();
@@ -89,15 +89,16 @@
             const el = document.getElementById('indexCountdown');
             
             if (distance < 0) {
-                if(el) el.innerText = "REGISTRATIONS ARE OPEN!";
+                if(el) el.innerText = "REGISTRATIONS ARE CLOSED!";
                 return;
             }
             
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
             const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((distance % (1000 * 60)) / 1000);
             
-            if(el) el.innerText = (hours > 0 ? hours + "h " : "") + minutes + "m " + seconds + "s";
+            if(el) el.innerText = (days > 0 ? days + "d " : "") + (hours > 0 ? hours + "h " : "") + minutes + "m " + seconds + "s";
         }
         setInterval(updateIndexCountdown, 1000);
         updateIndexCountdown();

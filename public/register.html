@@ -26,11 +26,11 @@
     </nav>
 
     <!-- COUNTDOWN LOCK OVERLAY -->
-    <div id="countdownOverlay" class="login-overlay" style="display: flex;">
+    <div id="countdownOverlay" class="login-overlay" style="display: none;">
         <div class="login-box" style="text-align: center;">
-            <h2 style="margin-top: 0; color: var(--gctta-navy);">Registrations Locked</h2>
-            <p style="color: #475569;">Registrations open at 7:00 PM today.</p>
-            <h1 id="registerCountdown" style="color: var(--gctta-gold); font-size: 40px; margin: 20px 0; font-weight: 900;">--:--:--</h1>
+            <h2 style="margin-top: 0; color: var(--gctta-navy);">Registrations Closed</h2>
+            <p style="color: #475569;">The deadline for entries has passed.</p>
+            <h1 id="registerCountdown" style="color: var(--gctta-gold); font-size: 40px; margin: 20px 0; font-weight: 900;">00:00:00</h1>
             
             <hr style="margin: 25px 0; border: none; border-top: 1px solid #CBD5E1;">
             
@@ -42,6 +42,11 @@
     </div>
 
     <div class="form-container">
+        <!-- Floating Active Countdown Banner -->
+        <div id="closingBanner" style="background: #FEF2F2; border: 1px solid #DC2626; color: #DC2626; padding: 10px; text-align: center; border-radius: 4px; margin-bottom: 20px; font-weight: bold;">
+            Registrations close in: <span id="topCountdown">--:--:--</span>
+        </div>
+
         <form id="registrationForm" onsubmit="return false;">
             <!-- STEP 1: Personal Details -->
             <div id="step1">
@@ -362,8 +367,9 @@
         }
 
         // COUNTDOWN LOGIC
-        const targetTimeReg = new Date('July 23, 2026 19:00:00').getTime();
+        const targetTimeReg = new Date('August 5, 2026 23:59:59 GMT+1000').getTime();
         const overlay = document.getElementById('countdownOverlay');
+        const topCountdown = document.getElementById('topCountdown');
         
         function updateRegCountdown() {
             const now = new Date().getTime();
@@ -371,15 +377,27 @@
             const el = document.getElementById('registerCountdown');
             
             if (distance < 0) {
-                if (overlay) overlay.style.display = 'none'; 
+                if (overlay) {
+                    overlay.style.display = 'flex';
+                    document.querySelector('#countdownOverlay h2').innerText = 'Registrations Closed';
+                    document.querySelector('#countdownOverlay p').innerText = 'The deadline for entries has passed.';
+                    if(el) el.innerText = '00:00:00';
+                }
+                if(topCountdown) topCountdown.innerText = 'CLOSED';
                 return;
+            } else {
+                if (overlay) overlay.style.display = 'none';
             }
             
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
             const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((distance % (1000 * 60)) / 1000);
             
-            if(el) el.innerText = (hours > 0 ? hours + "h " : "") + minutes + "m " + seconds + "s";
+            const timeStr = (days > 0 ? days + "d " : "") + (hours > 0 ? hours + "h " : "") + minutes + "m " + seconds + "s";
+            
+            if(el) el.innerText = timeStr;
+            if(topCountdown) topCountdown.innerText = timeStr;
         }
         
         setInterval(updateRegCountdown, 1000);

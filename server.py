@@ -427,6 +427,7 @@ def lookup_national_id_by_id():
             
     except Exception as e:
         return jsonify({"error": "Failed to search National ID", "details": str(e)}), 500
+
 @app.route('/api/ratings-central/search', methods=['GET'])
 def search_ratings_central():
     query = request.args.get('query')
@@ -905,6 +906,45 @@ def get_registrations():
         data['id'] = doc.id
         registrations.append(data)
     return jsonify(registrations)
+
+@app.route('/api/admin/event-entries', methods=['GET'])
+def get_event_entries():
+    try:
+        docs = db.collection('registrations').stream()
+        events_map = {}
+        
+        for doc in docs:
+            d = doc.to_dict()
+            player = d.get('player', {})
+            first_name = player.get('firstName', '').strip()
+            last_name = player.get('lastName', '').strip()
+            player_name = f"{first_name} {last_name}".strip()
+            
+            events = d.get('events', [])
+            for ev in events:
+                ev_name = ev.get('name', 'Unknown Event')
+                if ev_name not in events_map:
+                    events_map[ev_name] = {
+                        "eventId": ev.get('id', 0),
+                        "eventName": ev_name,
+                        "players": []
+                    }
+                
+                events_map[ev_name]["players"].append({
+                    "regId": doc.id,
+                    "playerName": player_name,
+                    "email": player.get('email', 'N/A'),
+                    "phone": player.get('phone', 'N/A'),
+                    "rcRating": player.get('rcRating', 'N/A'),
+                    "paymentStatus": d.get('paymentStatus', 'Pending')
+                })
+        
+        event_list = list(events_map.values())
+        event_list.sort(key=lambda x: x['eventName'])
+        
+        return jsonify({"status": "success", "events": event_list})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/admin/sync-from-sheet', methods=['POST'])
 def sync_from_sheet():
@@ -1394,6 +1434,24 @@ def mark_exported():
         })
         
     return jsonify({"status": "success", "updatedCount": len(doc_ids)})
+
+# ==========================================
+# DRAWS API ENDPOINTS
+# ==========================================
+@app.route('/api/draws', methods=['GET'])
+def get_draws():
+    docs = db.collection('draws').stream()
+    draws_data = {}
+    for doc in docs:
+        draws_data[doc.id] = doc.to_dict()
+    return jsonify({"status": "success", "draws": draws_data})
+
+@app.route('/api/admin/draws/<event_id>', methods=['POST', 'PUT'])
+def save_draw(event_id):
+    data = request.json
+    db.collection('draws').document(str(event_id)).set(data)
+    return jsonify({"status": "success"})
+
 
 if __name__ == '__main__':
     print("Starting server on port 5000")

@@ -238,9 +238,7 @@
         
         <div class="event-selector">
             <select id="eventSelect" onchange="renderSelectedEvent()">
-                <option value="1">Event #1: Men's Open Singles (Knockout R32 + Byes)</option>
-                <option value="3">Event #3: Men's Open Doubles (Pairs Format)</option>
-                <option value="20">Event #20: Under 800 Singles (Group Stage Only - 3 Players)</option>
+                <!-- Populated dynamically via JS -->
             </select>
         </div>
 
@@ -263,7 +261,7 @@
     </div>
 
     <script>
-        // MOCK DATA DEMONSTRATING VARIOUS TOURNAMENT FORMATS
+        // MOCK DATA FALLBACK
         const mockDrawData = {
             "1": {
                 name: "Event #1: Men's Open Singles",
@@ -336,7 +334,7 @@
             "20": {
                 name: "Event #20: Under 800 Singles",
                 hasGroups: true,
-                hasKnockout: false, // Pure 3-player round robin
+                hasKnockout: false,
                 groups: [
                     {
                         name: "Pool A (3-Player Pool)",
@@ -351,9 +349,41 @@
             }
         };
 
+        let liveDrawData = {};
+
+        async function loadDraws() {
+            try {
+                const response = await fetch('/api/draws');
+                const data = await response.json();
+                
+                if (data.status === 'success' && Object.keys(data.draws).length > 0) {
+                    liveDrawData = data.draws;
+                } else {
+                    liveDrawData = mockDrawData; // Fallback to mock data if DB is empty
+                }
+            } catch (err) {
+                console.error("Error loading live draws:", err);
+                liveDrawData = mockDrawData;
+            }
+
+            populateEventSelector();
+            renderSelectedEvent();
+        }
+
+        function populateEventSelector() {
+            const select = document.getElementById('eventSelect');
+            select.innerHTML = '';
+            Object.keys(liveDrawData).forEach(eventId => {
+                const ev = liveDrawData[eventId];
+                select.innerHTML += `<option value="${eventId}">${ev.name}</option>`;
+            });
+        }
+
         function renderSelectedEvent() {
             const eventId = document.getElementById('eventSelect').value;
-            const eventData = mockDrawData[eventId];
+            const eventData = liveDrawData[eventId];
+
+            if (!eventData) return;
 
             const stageToggles = document.getElementById('stageToggles');
             const btnGroup = document.getElementById('btnGroup');
@@ -376,7 +406,7 @@
             // Render Groups HTML
             const groupsGrid = document.getElementById('groupsGrid');
             groupsGrid.innerHTML = '';
-            if (eventData.hasGroups) {
+            if (eventData.hasGroups && eventData.groups) {
                 eventData.groups.forEach(g => {
                     let rows = g.players.map(p => `
                         <tr class="${p.advance ? 'advancing-tr' : ''}">
@@ -402,7 +432,7 @@
             // Render Knockout Bracket HTML
             const knockoutSection = document.getElementById('knockoutSection');
             knockoutSection.innerHTML = '';
-            if (eventData.hasKnockout) {
+            if (eventData.hasKnockout && eventData.knockout) {
                 eventData.knockout.forEach(rd => {
                     let matchCards = rd.matches.map(m => `
                         <div class="matchup">
@@ -446,8 +476,8 @@
             }
         }
 
-        // Initial Load
-        document.addEventListener("DOMContentLoaded", renderSelectedEvent);
+        // Fetch Live Data on initial Load
+        document.addEventListener("DOMContentLoaded", loadDraws);
     </script>
 </body>
 </html>
