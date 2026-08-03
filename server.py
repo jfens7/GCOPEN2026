@@ -43,11 +43,14 @@ firebase_cred = credentials.Certificate(get_secret_path("gc-open-2026-firebase-a
 firebase_admin.initialize_app(firebase_cred)
 db = firestore.client()
 
-# Google Sheets Setup
+# Google Sheets Setup (Master Sheet + Zermelo Sync Sheet)
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 gs_creds = ServiceAccountCredentials.from_json_keyfile_name(get_secret_path("gc-open-2026-260340b13caf.json"), scope)
 client = gspread.authorize(gs_creds)
 sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1EJ5lEZs4eIkAUmYIbpssjhMTkJjWWsA5B2-cHO36gyA/edit?gid=0#gid=0").sheet1
+
+# Connect to the new dedicated Zermelo export sheet
+zermelo_sheet = client.open_by_key("1Rb3HHQxw8qubkA4FNjGxJ6-05Ifjl37C0own4E-ldTE").sheet1
 
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", "noreply@goldcoastopen.com")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "jakobwill7@gmail.com")
@@ -96,7 +99,7 @@ def generate_receipt_email(first_name, reg_id, events_str, partners_str, final_t
 
     owed_text = ""
     if owed_amount > 0:
-        owed_text = "<p><em>*Note: *Note: please pay your outstanding balance online at any time using the <strong>Update Registration</strong> tab on the website. Make sure to pay your balance by the close of entries. Any outstanding online payments will incur a $10 late admin fee per event. Thanks for your understanding!</em></p>"
+        owed_text = "<p><em>*Note: please pay your outstanding balance online at any time using the <strong>Update Registration</strong> tab on the website. Make sure to pay your balance by the close of entries. Any outstanding online payments will incur a $10 late admin fee per event. Thanks for your understanding!</em></p>"
 
     late_fee_text = f"<br><strong>Late Entry Surcharge:</strong> ${late_fee:.2f}" if late_fee > 0 else ""
 
@@ -257,13 +260,9 @@ def search_national_id():
     
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=True, 
-                args=['--no-sandbox', '--disable-setuid-sandbox']
-            )
+            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
             page = browser.new_page()
             
-            # --- ONE-TIME POPUP BURNER ---
             page.goto('https://www.tabletennis.org.au/')
             page.wait_for_timeout(3000)
             
@@ -279,10 +278,7 @@ def search_national_id():
                 pass
             
             page.wait_for_timeout(1000)
-            # -------------------------------
-
             page.goto('https://www.tabletennis.org.au/login')
-            
             page.wait_for_selector('input[name="username"]')
             page.fill('input[name="username"]', 'jfensom3')
             page.fill('input[name="password"]', 'Pizza1200!')
@@ -292,7 +288,6 @@ def search_national_id():
                 
             page.goto('https://www.tabletennis.org.au/member-finder/')
             
-            # Use Playwright's native placeholder locator based on your screenshot
             page.get_by_placeholder(re.compile("First name", re.IGNORECASE)).wait_for(state="visible")
             page.get_by_placeholder(re.compile("First name", re.IGNORECASE)).fill(first_name)
             
@@ -337,13 +332,9 @@ def lookup_national_id_by_id():
     
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=True, 
-                args=['--no-sandbox', '--disable-setuid-sandbox']
-            )
+            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
             page = browser.new_page()
             
-            # --- ONE-TIME POPUP BURNER ---
             page.goto('https://www.tabletennis.org.au/')
             page.wait_for_timeout(3000)
             
@@ -359,10 +350,7 @@ def lookup_national_id_by_id():
                 pass
             
             page.wait_for_timeout(1000)
-            # -------------------------------
-            
             page.goto('https://www.tabletennis.org.au/login')
-            
             page.wait_for_selector('input[name="username"]')
             page.fill('input[name="username"]', 'jfensom3')
             page.fill('input[name="password"]', 'Pizza1200!')
@@ -372,7 +360,6 @@ def lookup_national_id_by_id():
                 
             page.goto('https://www.tabletennis.org.au/member-finder/')
             
-            # Target the ID field specifically using a regex ignore-case match
             id_input = page.get_by_placeholder(re.compile("National Member ID", re.IGNORECASE))
             if id_input.count() == 0: 
                 id_input = page.locator('input[type="text"]').first
@@ -855,7 +842,6 @@ def update_success():
             elif float(record.get('balanceDue', 0)) > 0:
                 old_total = float(record.get('finalTotal', 0))
                 balance = float(record.get('balanceDue', 0))
-                new_total = old_total + balance
                 
                 history.append({
                     "updateNumber": update_num,
@@ -863,13 +849,12 @@ def update_success():
                     "timestamp": paid_at,
                     "amountPaid": balance,
                     "previousTotal": old_total,
-                    "newTotal": new_total,
+                    "newTotal": old_total, # BUG FIXED: Does not add balance to the total value of the entry
                     "paymentStatus": "Paid",
                     "stripeSessionId": session_id
                 })
                 
                 doc_ref.update({
-                    "finalTotal": new_total,
                     "paymentStatus": "Paid",
                     "paidAt": paid_at,
                     "balanceDue": 0,
@@ -889,13 +874,33 @@ def update_success():
 @app.route('/api/admin/stats', methods=['GET'])
 def get_admin_stats():
     docs = db.collection('registrations').stream()
-    rev, players, pending = 0, 0, 0
+    total_value = 0
+    collected = 0
+    outstanding = 0
+    players = 0
+    pending = 0
+    
     for doc in docs:
         d = doc.to_dict()
         players += 1
-        if 'Paid' in d.get('paymentStatus', ''): rev += float(d.get('finalTotal', 0))
-        else: pending += 1
-    return jsonify({"totalRevenue": rev, "totalPlayers": players, "pendingPayments": pending})
+        
+        f_total = float(d.get('finalTotal', 0))
+        b_due = float(d.get('balanceDue', 0))
+        
+        total_value += f_total
+        outstanding += b_due
+        collected += (f_total - b_due)
+        
+        if b_due > 0 or 'Pending' in d.get('paymentStatus', ''): 
+            pending += 1
+            
+    return jsonify({
+        "totalValue": total_value, 
+        "collectedRevenue": collected,
+        "outstandingBalance": outstanding,
+        "totalPlayers": players, 
+        "pendingPayments": pending
+    })
 
 @app.route('/api/admin/registrations', methods=['GET'])
 def get_registrations():
@@ -1404,7 +1409,9 @@ def export_zermelo_players():
         
         last_name = p.get('lastName', '').strip()
         first_name = p.get('firstName', '').strip()
-        full_name = f"{last_name}, {first_name}" if last_name and first_name else last_name or first_name
+        
+        # Change this line to output First Last instead of Last, First
+        full_name = f"{first_name} {last_name}".strip()
         
         players_data.append({
             "Name": full_name,
@@ -1434,6 +1441,47 @@ def mark_exported():
         })
         
     return jsonify({"status": "success", "updatedCount": len(doc_ids)})
+
+@app.route('/api/admin/push-to-zermelo-sheet', methods=['POST'])
+def push_zermelo_sheet():
+    try:
+        docs = db.collection('registrations').stream()
+        
+        rows_data = []
+        headers = ["Name", "Ratings Central ID", "Events", "Look up Ratings", "Look Up Personal Info", "Check In", "Draw Club", "Use Club For Draw Club"]
+        rows_data.append(headers)
+        
+        for doc in docs:
+            d = doc.to_dict()
+            p = d.get('player', {})
+            rc_id = p.get('rcId', '').strip()
+            never_played = p.get('neverPlayed', False)
+            
+            if never_played or rc_id.lower() in ["", "n/a", "never played", "none"]:
+                continue
+                
+            events = d.get('events', [])
+            event_ids = [str(e.get('id')) for e in events if 'id' in e]
+            events_str = " ".join(event_ids)
+            
+            last_name = p.get('lastName', '').strip()
+            first_name = p.get('firstName', '').strip()
+            full_name = f"{first_name} {last_name}".strip()
+            
+            row = [full_name, rc_id, events_str, "RC", "RC", "Here Now", "", "Y"]
+            rows_data.append(row)
+            
+        zermelo_sheet.batch_clear(["A1:H1000"])
+        if len(rows_data) > 1:
+            cell_list = zermelo_sheet.range(f"A1:H{len(rows_data)}")
+            flat_data = [item for sublist in rows_data for item in sublist]
+            for i, val in enumerate(flat_data):
+                cell_list[i].value = val
+            zermelo_sheet.update_cells(cell_list, value_input_option='USER_ENTERED')
+            
+        return jsonify({"status": "success", "count": len(rows_data)-1})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ==========================================
 # DRAWS API ENDPOINTS
