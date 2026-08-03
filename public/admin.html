@@ -108,8 +108,11 @@
                     <h3>Total Registration Value</h3>
                     <h1 id="totalValue">$0.00</h1>
                 </div>
-                <div class="stat-card" style="border-left: 6px solid #10B981;">
-                    <h3>Actual Cash/EFT Collected</h3>
+                <div class="stat-card" style="border-left: 6px solid #10B981; position: relative;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <h3>Actual Cash/EFT Collected</h3>
+                        <button onclick="editCollectedRevenue()" style="background: none; border: none; cursor: pointer; font-size: 14px; opacity: 0.5;" title="Override Value">✏️</button>
+                    </div>
                     <h1 id="collectedRevenue" style="color: #10B981;">$0.00</h1>
                 </div>
                 <div class="stat-card" style="border-left: 6px solid #EF4444;">
@@ -147,14 +150,14 @@
             <!-- PLAYER REGISTRATIONS VIEW -->
             <div id="viewPlayers" class="admin-table-container">
                 <h3 style="margin-top: 0; margin-bottom: 20px; color: var(--gctta-navy);">Recent Registrations</h3>
-                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                    <input type="text" id="searchInput" placeholder="Search by name, email, or status..." style="flex: 1; padding: 12px; border: 1px solid #CBD5E1; border-radius: 6px; box-sizing: border-box;" onkeyup="filterTable()">
-                    <select id="statusFilter" onchange="filterTable()" style="padding: 12px; border-radius: 6px; border: 1px solid #CBD5E1; font-weight: bold; color: var(--gctta-navy);">
+                <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; width: 100%;">
+                    <input type="text" id="searchInput" placeholder="Search by name, email, or status..." style="flex: 1 1 300px; width: 100%; padding: 12px; border: 1px solid #CBD5E1; border-radius: 6px; box-sizing: border-box;" onkeyup="filterTable()">
+                    <select id="statusFilter" onchange="filterTable()" style="padding: 12px; border-radius: 6px; border: 1px solid #CBD5E1; font-weight: bold; color: var(--gctta-navy); min-width: 180px;">
                         <option value="all">All Registrations</option>
                         <option value="paid">Paid</option>
                         <option value="pending">Pending (Owes Money)</option>
                     </select>
-                    <button class="btn-secondary-small" style="background: #475569; color: white; padding: 12px 20px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold;" onclick="printUnpaidList()">🖨️ Print Unpaid List</button>
+                    <button class="btn-secondary-small" style="background: #475569; color: white; padding: 12px 20px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; min-width: 160px;" onclick="printUnpaidList()">🖨️ Print Unpaid List</button>
                 </div>
                 
                 <table class="admin-table" id="registrationsTable">
@@ -636,6 +639,27 @@
                 });
         }
 
+        function editCollectedRevenue() {
+            const code = prompt("Enter Admin Passcode to edit Revenue:");
+            if (code === "228415") {
+                const val = prompt("Enter the actual collected value from Stripe (e.g. 5898.00).\nLeave blank and click OK to reset back to automatic calculation:");
+                if (val !== null) {
+                    fetch('/api/admin/override-revenue', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({code: code, value: val})
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if(data.status === 'success') loadDashboardData();
+                        else alert(data.error);
+                    });
+                }
+            } else if (code !== null) {
+                alert("Incorrect passcode.");
+            }
+        }
+
         function renderTable(dataArray) {
             const tbody = document.getElementById('adminTableBody');
             tbody.innerHTML = '';
@@ -762,11 +786,25 @@
             
             unpaid.sort((a, b) => a.player.firstName.localeCompare(b.player.firstName)).forEach(r => {
                 const events = r.events ? r.events.map(e => e.name).join('<br>') : '';
-                const owes = parseFloat(r.balanceDue || r.finalTotal || 0).toFixed(2);
+                const owesBase = parseFloat(r.balanceDue || r.finalTotal || 0);
+                
+                let numEvents = r.events ? r.events.length : 0;
+                if (r.pendingUpdate && r.pendingUpdate.addedEvents) {
+                     numEvents = r.pendingUpdate.addedEvents.length;
+                }
+                
+                let manualFee = 0;
+                if (!r.manualFeeWaived) {
+                    manualFee = numEvents * 10;
+                }
+                
+                const totalOwes = (owesBase + manualFee).toFixed(2);
+                let feeText = manualFee > 0 ? `<br><small style="color:#64748B;">(Includes $${manualFee} manual fee)</small>` : '';
+
                 html += `
                     <tr>
                         <td style="font-weight: bold;">${r.player.firstName} ${r.player.lastName}</td>
-                        <td style="color: red; font-weight: bold; font-size: 16px;">$${owes}</td>
+                        <td style="color: red; font-weight: bold; font-size: 16px;">$${totalOwes} ${feeText}</td>
                         <td style="font-size: 12px; line-height: 1.4;">${events}</td>
                         <td style="width: 80px;"></td>
                     </tr>

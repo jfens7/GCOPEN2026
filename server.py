@@ -48,8 +48,6 @@ scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/au
 gs_creds = ServiceAccountCredentials.from_json_keyfile_name(get_secret_path("gc-open-2026-260340b13caf.json"), scope)
 client = gspread.authorize(gs_creds)
 sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1EJ5lEZs4eIkAUmYIbpssjhMTkJjWWsA5B2-cHO36gyA/edit?gid=0#gid=0").sheet1
-
-# Connect to the new dedicated Zermelo export sheet
 zermelo_sheet = client.open_by_key("1Rb3HHQxw8qubkA4FNjGxJ6-05Ifjl37C0own4E-ldTE").sheet1
 
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", "noreply@goldcoastopen.com")
@@ -893,6 +891,12 @@ def get_admin_stats():
         
         if b_due > 0 or 'Pending' in d.get('paymentStatus', ''): 
             pending += 1
+
+    settings_doc = db.collection('settings').document('financials').get()
+    if settings_doc.exists:
+        override_val = settings_doc.to_dict().get('collectedOverride')
+        if override_val is not None:
+            collected = float(override_val)
             
     return jsonify({
         "totalValue": total_value, 
@@ -901,6 +905,23 @@ def get_admin_stats():
         "totalPlayers": players, 
         "pendingPayments": pending
     })
+
+@app.route('/api/admin/override-revenue', methods=['POST'])
+def override_revenue():
+    data = request.json
+    if data.get('code') != '228415':
+        return jsonify({"error": "Invalid passcode."}), 403
+    
+    val = data.get('value')
+    if val is None or str(val).strip() == "":
+        db.collection('settings').document('financials').set({"collectedOverride": None}, merge=True)
+    else:
+        try:
+            db.collection('settings').document('financials').set({"collectedOverride": float(val)}, merge=True)
+        except ValueError:
+            return jsonify({"error": "Invalid number format."}), 400
+            
+    return jsonify({"status": "success"})
 
 @app.route('/api/admin/registrations', methods=['GET'])
 def get_registrations():
@@ -1315,8 +1336,19 @@ def update_registration(reg_id):
         
     if 'doublesPartners' in data: 
         update_payload['doublesPartners'] = data['doublesPartners']
+        
+    if 'lateFee' in data:
+        update_payload['lateFee'] = data['lateFee']
+        
+    if 'balanceDue' in data:
+        update_payload['balanceDue'] = data['balanceDue']
+        
     if 'finalTotal' in data: 
         update_payload['finalTotal'] = data['finalTotal']
+        
+    if 'manualFeeWaived' in data:
+        update_payload['manualFeeWaived'] = data['manualFeeWaived']
+        
     if 'paymentStatus' in data: 
         update_payload['paymentStatus'] = data['paymentStatus']
         if 'Paid' in data['paymentStatus']:
@@ -1324,19 +1356,21 @@ def update_registration(reg_id):
             update_payload['balanceDue'] = 0
             update_payload['pendingReason'] = 'N/A'
         elif 'Pending' in data['paymentStatus']:
-            update_payload['balanceDue'] = data.get('finalTotal', record.get('finalTotal', 0))
+            update_payload['balanceDue'] = data.get('balanceDue', data.get('finalTotal', record.get('finalTotal', 0)))
             update_payload['pendingReason'] = 'Admin Overwrite (Unpaid)'
 
-    update_num = len(history)
-    history.append({
-        "updateNumber": update_num,
-        "type": f"Admin Overwrite #{update_num}",
-        "timestamp": now_str,
-        "newTotal": data.get('finalTotal', record.get('finalTotal', 0)),
-        "paymentStatus": data.get('paymentStatus', record.get('paymentStatus', 'Pending')),
-        "notes": "Full overwrite updated via Admin Panel"
-    })
-    update_payload['history'] = history
+    # Only add history if it's a full data update, skip if it's just a waive action
+    if 'events' in data or 'paymentStatus' in data:
+        update_num = len(history)
+        history.append({
+            "updateNumber": update_num,
+            "type": f"Admin Overwrite #{update_num}",
+            "timestamp": now_str,
+            "newTotal": data.get('finalTotal', record.get('finalTotal', 0)),
+            "paymentStatus": data.get('paymentStatus', record.get('paymentStatus', 'Pending')),
+            "notes": "Full overwrite updated via Admin Panel"
+        })
+        update_payload['history'] = history
 
     doc_ref.update(update_payload)
     updated_record = doc_ref.get().to_dict()
@@ -1404,7 +1438,7 @@ def export_zermelo_players():
             continue
             
         events = d.get('events', [])
-        # Exclude doubles events from Zermelo strings
+        # Exclude doubles events
         event_ids = [str(e.get('id')) for e in events if 'id' in e and e.get('id') not in DOUBLES_EVENT_IDS]
         events_str = " ".join(event_ids)
         
@@ -1429,6 +1463,18 @@ def export_zermelo_players():
         "docIds": doc_ids_to_update
     })
 
+@app.route('/api/admin/mark-exported', methods=['POST'])
+def mark_exported():
+    data = request.json
+    doc_ids = data.get('docIds', [])
+    
+    for doc_id in doc_ids:
+        db.collection('registrations').document(doc_id).update({
+            "zermeloExported": True
+        })
+        
+    return jsonify({"status": "success", "updatedCount": len(doc_ids)})
+
 @app.route('/api/admin/push-to-zermelo-sheet', methods=['POST'])
 def push_zermelo_sheet():
     try:
@@ -1448,7 +1494,7 @@ def push_zermelo_sheet():
                 continue
                 
             events = d.get('events', [])
-            # Exclude doubles events from Zermelo strings
+            # Exclude doubles events
             event_ids = [str(e.get('id')) for e in events if 'id' in e and e.get('id') not in DOUBLES_EVENT_IDS]
             events_str = " ".join(event_ids)
             
