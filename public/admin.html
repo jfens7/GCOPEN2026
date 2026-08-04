@@ -936,49 +936,132 @@
                     if(isNaN(rating)) rating = 0;
                     
                     let pName = `${reg.player.firstName} ${reg.player.lastName}`;
+                    let club = reg.player.club || 'None';
                     
-                    if(isDoubles && reg.doublesPartners && reg.doublesPartners[eventNameStr]) {
-                        pName += ` / ${reg.doublesPartners[eventNameStr]}`;
+                    if(isDoubles) {
+                        let partnerName = "Partner Required";
+                        if (reg.doublesPartners && reg.doublesPartners[eventNameStr]) {
+                            partnerName = reg.doublesPartners[eventNameStr];
+                        }
+                        pName += ` / ${partnerName}`;
                     }
 
-                    eventPlayers.push({ name: pName, rating: rating });
+                    eventPlayers.push({ name: pName, rating: rating, club: club });
                 }
             });
 
             if(eventPlayers.length === 0) return alert("No players registered for this event.");
 
+            // Sort by rating descending
             eventPlayers.sort((a, b) => b.rating - a.rating);
 
-            const numStr = prompt(`Found ${eventPlayers.length} players/pairs. How many round-robin groups do you want to create?`);
+            // Determine optimal groups (groups of 3)
+            const optimalGroups = Math.ceil(eventPlayers.length / 3);
+            const numStr = prompt(`Found ${eventPlayers.length} players for this ${isDoubles ? 'Doubles' : 'Singles'} event.\nHow many groups do you want to create? (Calculated for ~3 per group)`, optimalGroups);
             const numGroups = parseInt(numStr);
             if(isNaN(numGroups) || numGroups <= 0) return;
 
             const newGroups = Array.from({length: numGroups}, (_, i) => ({ name: `Group ${i + 1}`, players: [] }));
             
-            for (let i = 0; i < eventPlayers.length; i++) {
-                const round = Math.floor(i / numGroups);
-                const remainder = i % numGroups;
-                const groupIndex = (round % 2 === 0) ? remainder : (numGroups - 1 - remainder);
+            // 1. Zermelo/ITTF True Seeding for Position 1 (Group Heads)
+            let groupHeads = eventPlayers.slice(0, numGroups);
+            let unassignedHeads = [...groupHeads];
+            
+            const headAssignments = new Array(numGroups).fill(null);
+            
+            // Seed 1 to Group 1, Seed 2 to Group 2
+            if(unassignedHeads.length > 0) headAssignments[0] = unassignedHeads[0];
+            if(unassignedHeads.length > 1) headAssignments[1] = unassignedHeads[1];
+            
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+
+            // Assign remaining heads in ITTF blocks (3-4, 5-8, 9-16, 17-32)
+            const blocks = [[2, 4], [4, 8], [8, 16], [16, 32], [32, 64]];
+            blocks.forEach(block => {
+                let start = block[0];
+                let end = Math.min(block[1], numGroups);
+                if (start < numGroups) {
+                    let blockPlayers = unassignedHeads.slice(start, end);
+                    blockPlayers = shuffleArray(blockPlayers); 
+                    for(let i = 0; i < blockPlayers.length; i++) {
+                        headAssignments[start + i] = blockPlayers[i];
+                    }
+                }
+            });
+
+            // Place heads into groups
+            for(let i=0; i<numGroups; i++) {
+                if(headAssignments[i]) {
+                    newGroups[i].players.push({
+                        name: `${headAssignments[i].name} (${headAssignments[i].rating})`, 
+                        wins: 0, losses: 0, pts: 0, advance: false,
+                        club: headAssignments[i].club
+                    });
+                }
+            }
+
+            // 2. Snake Assignment with Club Separation for remaining players
+            let remainingPlayers = eventPlayers.slice(numGroups);
+            let position = 2; // Start placing position 2
+            
+            while(remainingPlayers.length > 0) {
+                // Determine direction of snake for this tier
+                let isLeftToRight = (position % 2 !== 0); 
+                let groupIndices = Array.from({length: numGroups}, (_, i) => i);
+                if (!isLeftToRight) groupIndices.reverse();
+
+                let tierPlayers = remainingPlayers.splice(0, numGroups);
                 
-                newGroups[groupIndex].players.push({
-                    name: `${eventPlayers[i].name} (${eventPlayers[i].rating})`, 
-                    wins: 0, losses: 0, pts: 0, advance: false
+                // For each slot in this tier, find the best player from tierPlayers that doesn't violate club sep
+                groupIndices.forEach(gIdx => {
+                    if (tierPlayers.length === 0) return;
+                    
+                    let groupClubs = newGroups[gIdx].players.map(p => p.club).filter(c => c !== 'None');
+                    
+                    // Find highest rated player in tierPlayers who does NOT share a club
+                    let selectedPlayerIdx = -1;
+                    for(let i=0; i<tierPlayers.length; i++) {
+                        if(!groupClubs.includes(tierPlayers[i].club) || tierPlayers[i].club === 'None') {
+                            selectedPlayerIdx = i;
+                            break;
+                        }
+                    }
+                    
+                    // If all players violate club separation, just take the highest rated (first one)
+                    if(selectedPlayerIdx === -1) selectedPlayerIdx = 0;
+
+                    let p = tierPlayers.splice(selectedPlayerIdx, 1)[0];
+                    newGroups[gIdx].players.push({
+                        name: `${p.name} (${p.rating})`, 
+                        wins: 0, losses: 0, pts: 0, advance: false,
+                        club: p.club
+                    });
                 });
+                
+                position++;
             }
 
             currentDrawState.groups = newGroups;
             document.getElementById('drawHasGroups').checked = true;
             currentDrawState.hasGroups = true;
-            renderDrawEditor();
+            
+            // Auto generate knockout size based on groups (1 advances per group)
+            if(confirm(`Successfully generated ${numGroups} seeded groups with club separation!\n\nDo you want to automatically create a Knockout Bracket for the ${numGroups} players that will advance?`)) {
+                let size = 2;
+                while(size < numGroups) size *= 2; // Find next power of 2
+                generateKnockoutSize(size);
+            } else {
+                renderDrawEditor();
+            }
         }
 
-        function autoGenerateKnockout() {
-            const sizeStr = prompt("Enter knockout draw size (e.g., 4, 8, 16, 32, 64):", "8");
-            const size = parseInt(sizeStr);
-            if(isNaN(size) || size <= 1 || (Math.log2(size) % 1 !== 0)) {
-                return alert("Size must be a valid power of 2 (2, 4, 8, 16, etc.)");
-            }
-
+        function generateKnockoutSize(size) {
             const roundsCount = Math.log2(size);
             const knockout = [];
             const roundNames = {1: "Grand Final", 2: "Semi Finals", 3: "Quarter Finals", 4: "Round of 16", 5: "Round of 32", 6: "Round of 64"};
@@ -997,6 +1080,15 @@
             document.getElementById('drawHasKnockout').checked = true;
             currentDrawState.hasKnockout = true;
             renderDrawEditor();
+        }
+
+        function autoGenerateKnockout() {
+            const sizeStr = prompt("Enter knockout draw size (e.g., 4, 8, 16, 32, 64):", "8");
+            const size = parseInt(sizeStr);
+            if(isNaN(size) || size <= 1 || (Math.log2(size) % 1 !== 0)) {
+                return alert("Size must be a valid power of 2 (2, 4, 8, 16, etc.)");
+            }
+            generateKnockoutSize(size);
         }
 
         function renderDrawEditor() {
