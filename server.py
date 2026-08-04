@@ -26,6 +26,9 @@ CORS(app)
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
 resend.api_key = os.getenv("RESEND_API_KEY", "")
 
+# URL of your free FTP bucket holding raw Zermelo HTML output
+ZERMELO_HOST_URL = os.getenv("ZERMELO_HOST_URL", "http://gcopen-draws.infinityfreeapp.com").rstrip("/")
+
 raw_url = os.getenv("BASE_URL", "https://goldcoastopen.com").strip()
 if not raw_url.startswith("http"):
     BASE_URL = f"https://{raw_url}"
@@ -241,7 +244,9 @@ def serve_admin(): return send_from_directory(app.static_folder, 'admin.html')
 def serve_success(): return send_from_directory(app.static_folder, 'success.html')
 
 @app.route('/draws')
-def serve_draws(): return send_from_directory(app.static_folder, 'draws.html')
+def serve_draws(): 
+    # Redirect directly to beautified live Zermelo results
+    return redirect('/results/Tournament.htm')
 
 # ==========================================
 # LOOKUP API ENDPOINTS
@@ -847,7 +852,7 @@ def update_success():
                     "timestamp": paid_at,
                     "amountPaid": balance,
                     "previousTotal": old_total,
-                    "newTotal": old_total, # BUG FIXED: Does not add balance to the total value of the entry
+                    "newTotal": old_total,
                     "paymentStatus": "Paid",
                     "stripeSessionId": session_id
                 })
@@ -897,6 +902,7 @@ def get_admin_stats():
         override_val = settings_doc.to_dict().get('collectedOverride')
         if override_val is not None:
             collected = float(override_val)
+            total_value = collected + outstanding
             
     return jsonify({
         "totalValue": total_value, 
@@ -1359,7 +1365,6 @@ def update_registration(reg_id):
             update_payload['balanceDue'] = data.get('balanceDue', data.get('finalTotal', record.get('finalTotal', 0)))
             update_payload['pendingReason'] = 'Admin Overwrite (Unpaid)'
 
-    # Only add history if it's a full data update, skip if it's just a waive action
     if 'events' in data or 'paymentStatus' in data:
         update_num = len(history)
         history.append({
@@ -1438,7 +1443,6 @@ def export_zermelo_players():
             continue
             
         events = d.get('events', [])
-        # Exclude doubles events
         event_ids = [str(e.get('id')) for e in events if 'id' in e and e.get('id') not in DOUBLES_EVENT_IDS]
         events_str = " ".join(event_ids)
         
@@ -1494,7 +1498,6 @@ def push_zermelo_sheet():
                 continue
                 
             events = d.get('events', [])
-            # Exclude doubles events
             event_ids = [str(e.get('id')) for e in events if 'id' in e and e.get('id') not in DOUBLES_EVENT_IDS]
             events_str = " ".join(event_ids)
             
@@ -1533,6 +1536,91 @@ def save_draw(event_id):
     data = request.json
     db.collection('draws').document(str(event_id)).set(data)
     return jsonify({"status": "success"})
+
+# ==========================================
+# ZERMELO PROXY & BEAUTIFIER
+# ==========================================
+@app.route('/results/<path:filename>')
+def serve_zermelo_results(filename):
+    try:
+        resp = requests.get(f"{ZERMELO_HOST_URL}/{filename}")
+        
+        if resp.status_code != 200:
+            return "Results not available yet.", 404
+            
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        
+        for tag in soup.find_all(['font', 'center']):
+            tag.unwrap()
+            
+        for tag in soup.find_all(True):
+            tag.attrs = {k: v for k, v in tag.attrs.items() if k not in ['bgcolor', 'color', 'style', 'background', 'border', 'cellpadding', 'cellspacing']}
+            
+        custom_css = """
+        <style>
+            body { 
+                background-color: #0F172A; 
+                color: #E2E8F0; 
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+                padding: 30px; 
+            }
+            a { color: #FDE68A; text-decoration: none; font-weight: bold; transition: 0.2s; }
+            a:hover { color: #D97706; text-decoration: underline; }
+            h1, h2, h3, h4 { color: #D97706; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #1E3A8A; padding-bottom: 10px; }
+            
+            table { 
+                width: 100%; 
+                max-width: 1200px;
+                border-collapse: collapse; 
+                margin: 20px 0 40px 0; 
+                background: rgba(255, 255, 255, 0.03); 
+                border-radius: 8px; 
+                overflow: hidden; 
+                box-shadow: 0 4px 6px rgba(0,0,0,0.3); 
+            }
+            th { 
+                background: #1E3A8A; 
+                color: #F8FAFC; 
+                padding: 15px; 
+                text-align: left; 
+                text-transform: uppercase; 
+                font-size: 13px; 
+                letter-spacing: 1px; 
+            }
+            td { 
+                padding: 12px 15px; 
+                border-bottom: 1px solid #334155; 
+                border-right: 1px solid #334155;
+                font-size: 14px; 
+            }
+            tr:hover td { background: rgba(255,255,255,0.05); }
+            
+            td[colspan] { text-align: center; font-weight: bold; background: rgba(30,58,138,0.2); color: #FDE68A; }
+            
+            @media (max-width: 768px) {
+                body { padding: 15px; }
+                table { font-size: 12px; }
+                th, td { padding: 8px; }
+            }
+        </style>
+        """
+        
+        if soup.head:
+            soup.head.append(BeautifulSoup(custom_css, 'html.parser'))
+        else:
+            head_tag = soup.new_tag("head")
+            head_tag.append(BeautifulSoup(custom_css, 'html.parser'))
+            soup.insert(0, head_tag)
+            
+        for a_tag in soup.find_all('a', href=True):
+            href = a_tag['href']
+            if href.endswith('.htm') or href.endswith('.html'):
+                a_tag['href'] = f"/results/{href}"
+                
+        return str(soup)
+
+    except Exception as e:
+        return f"Error loading live results: {str(e)}", 500
 
 
 if __name__ == '__main__':
