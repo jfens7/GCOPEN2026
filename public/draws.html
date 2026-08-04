@@ -225,15 +225,22 @@
         <div class="nav-links">
             <a href="/">Home</a>
             <a href="/registration">Registration</a>
-            <a href="/update.html">Update</a>
             <a href="/schedule">Schedule</a>
             <a href="/draws" class="active">Live Draws</a>
+            <a href="/admin">Admin Portal</a>
         </div>
-        <a href="/admin" class="btn-mobile-app">Admin</a>
+        <a href="#" class="btn-mobile-app">Mobile App</a>
     </nav>
 
     <div class="draw-header">
         <h1><span class="live-pulse"></span> Live Results & Draws</h1>
+        
+        <!-- DRAFT WARNING BANNER -->
+        <div style="background-color: rgba(239, 68, 68, 0.15); border: 1px solid #EF4444; color: #FCA5A5; padding: 12px; border-radius: 6px; margin: 20px auto; max-width: 600px; font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+            <span style="font-size: 18px;">⚠️</span> 
+            <div>DRAFT VERSION ONLY: These draws are for testing and simulation purposes. They are NOT the official tournament draws.</div>
+        </div>
+
         <p>Select an event below to view current round robin pools and knockout brackets.</p>
         
         <div class="event-selector">
@@ -373,7 +380,11 @@
         function populateEventSelector() {
             const select = document.getElementById('eventSelect');
             select.innerHTML = '';
-            Object.keys(liveDrawData).forEach(eventId => {
+            
+            // Sort by event ID before appending
+            const sortedEventIds = Object.keys(liveDrawData).sort((a, b) => parseInt(a) - parseInt(b));
+            
+            sortedEventIds.forEach(eventId => {
                 const ev = liveDrawData[eventId];
                 select.innerHTML += `<option value="${eventId}">${ev.name}</option>`;
             });
