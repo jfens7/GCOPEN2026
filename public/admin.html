@@ -437,6 +437,9 @@
                         <label><input type="checkbox" value='{"id":34, "name":"Event #34: Veteran Men’s Doubles", "price":10}'> Event #34: Veteran Men’s Doubles</label>
                     </div>
                     
+                    <h4 style="margin-bottom: 10px; margin-top: 20px; color: var(--gctta-navy); border-top: 1px solid #E2E8F0; padding-top: 15px;">Doubles Partners (Format -> Event Name: Partner Name)</h4>
+                    <textarea id="editPartners" class="full-width-text" rows="3" placeholder="e.g. Event #3: Men's Open Doubles: Lukas Kozak"></textarea>
+                    
                     <h4 style="margin-bottom: 10px; margin-top: 20px; color: var(--gctta-navy); border-top: 1px solid #E2E8F0; padding-top: 15px;">Payment Details</h4>
                     <div style="display: flex; gap: 15px; margin-bottom: 10px;">
                         <div style="flex: 1;">
@@ -1898,7 +1901,7 @@
         // ==========================================
         async function openViewModal(id) {
             const reg = allRegistrations.find(r => r.id === id);
-            if (!reg) return;
+            if (!reg || !reg.player) return;
 
             const content = document.getElementById('viewContent');
             document.getElementById('viewModal').style.display = 'flex';
@@ -2035,7 +2038,7 @@
         // ==========================================
         function openEditModal(id) {
             const reg = allRegistrations.find(r => r.id === id);
-            if (!reg) return;
+            if (!reg || !reg.player) return;
             
             window.currentEditReg = reg;
 
@@ -2052,7 +2055,8 @@
             
             document.getElementById('editTta').value = reg.player.nationalId || '';
             
-            const isNeverPlayed = reg.player.neverPlayed || (reg.player.rcId && reg.player.rcId.toLowerCase() === 'never played');
+            const safeRcId = reg.player.rcId ? reg.player.rcId.toLowerCase() : '';
+            const isNeverPlayed = reg.player.neverPlayed || (safeRcId === 'never played');
             document.getElementById('editNeverPlayed').checked = isNeverPlayed;
             document.getElementById('editRc').value = isNeverPlayed ? '' : (reg.player.rcId || '');
             document.getElementById('editRcRating').value = reg.player.rcRating || '';

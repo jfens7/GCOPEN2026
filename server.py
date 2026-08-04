@@ -245,7 +245,6 @@ def serve_success(): return send_from_directory(app.static_folder, 'success.html
 
 @app.route('/draws')
 def serve_draws(): 
-    # Redirect directly to beautified live Zermelo results
     return redirect('/results/Tournament.htm')
 
 # ==========================================
@@ -1443,6 +1442,7 @@ def export_zermelo_players():
             continue
             
         events = d.get('events', [])
+        # Exclude doubles events
         event_ids = [str(e.get('id')) for e in events if 'id' in e and e.get('id') not in DOUBLES_EVENT_IDS]
         events_str = " ".join(event_ids)
         
@@ -1498,6 +1498,7 @@ def push_zermelo_sheet():
                 continue
                 
             events = d.get('events', [])
+            # Exclude doubles events
             event_ids = [str(e.get('id')) for e in events if 'id' in e and e.get('id') not in DOUBLES_EVENT_IDS]
             events_str = " ".join(event_ids)
             
