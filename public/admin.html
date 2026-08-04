@@ -226,7 +226,9 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                             <h3 style="margin: 0; color: #0284C7; text-transform: uppercase;">Knockout Bracket Rounds</h3>
                             <div>
-                                <button class="btn-secondary-small" style="background: #F59E0B; color: white; border: none; margin-right: 10px;" onclick="autoGenerateKnockout()">⚡ Auto-Generate Blank Bracket</button>
+                                <button class="btn-secondary-small" style="background: #8B5CF6; color: white; border: none; margin-right: 10px;" onclick="resolveGroupWinners()">⚡ Resolve Group Winners</button>
+                                <button class="btn-secondary-small" style="background: #EF4444; color: white; border: none; margin-right: 10px;" onclick="autoSeedDirectKnockout()">⚡ Auto-Seed Direct Knockout (No Groups)</button>
+                                <button class="btn-secondary-small" style="background: #F59E0B; color: white; border: none; margin-right: 10px;" onclick="autoGenerateKnockout()">⚡ Auto-Gen Blank Bracket</button>
                                 <button class="btn-secondary-small" style="background: #10B981; color: white; border: none;" onclick="addKnockoutRound()">+ Add Manual Round</button>
                             </div>
                         </div>
@@ -239,6 +241,11 @@
                     </div>
                 </div>
             </div>
+            
+            <!-- DATALIST FOR AUTOCOMPLETE -->
+            <datalist id="rosterDatalist">
+                <!-- Injected via JS -->
+            </datalist>
 
             <!-- EVENT ANALYTICS VIEW -->
             <div id="viewAnalytics" class="admin-table-container" style="display: none;">
@@ -430,9 +437,6 @@
                         <label><input type="checkbox" value='{"id":34, "name":"Event #34: Veteran Men’s Doubles", "price":10}'> Event #34: Veteran Men’s Doubles</label>
                     </div>
                     
-                    <h4 style="margin-bottom: 10px; margin-top: 20px; color: var(--gctta-navy);">Doubles Partners (Format -> Event Name: Partner Name)</h4>
-                    <textarea id="editPartners" class="full-width-text" rows="3" placeholder="e.g. Event #3: Men's Open Doubles: Lukas Kozak"></textarea>
-                    
                     <h4 style="margin-bottom: 10px; margin-top: 20px; color: var(--gctta-navy); border-top: 1px solid #E2E8F0; padding-top: 15px;">Payment Details</h4>
                     <div style="display: flex; gap: 15px; margin-bottom: 10px;">
                         <div style="flex: 1;">
@@ -554,6 +558,7 @@
     <script>
         let allRegistrations = [];
         window.currentEditReg = null;
+        window.currentEventRoster = [];
 
         // Master Events List for Dropdown mapping
         const adminMasterEventsList = [
@@ -885,50 +890,10 @@
 
             document.getElementById('drawEditorTitle').innerText = `Editing: ${eventName}`;
             
-            try {
-                const res = await fetch('/api/draws');
-                const data = await res.json();
-                
-                if (data.status === 'success' && data.draws && data.draws[eventId]) {
-                    currentDrawState = JSON.parse(JSON.stringify(data.draws[eventId])); // deep copy
-                } else {
-                    currentDrawState = {
-                        name: eventName,
-                        hasGroups: false,
-                        hasKnockout: false,
-                        groups: [],
-                        knockout: []
-                    };
-                }
-            } catch (err) {
-                alert("Failed to load existing draws. Starting fresh.");
-                currentDrawState = {
-                    name: eventName,
-                    hasGroups: false,
-                    hasKnockout: false,
-                    groups: [],
-                    knockout: []
-                };
-            }
-
-            document.getElementById('drawEditorArea').style.display = 'block';
-            renderDrawEditor();
-        }
-
-        function toggleDrawState(field, value) {
-            if(!currentDrawState) return;
-            currentDrawState[field] = value;
-            renderDrawEditor();
-        }
-
-        function autoSeedGroups() {
-            if(!currentDrawEventId) return alert("Select an event first.");
-            
-            let eventPlayers = [];
+            // Generate Event Roster for dropdowns
+            window.currentEventRoster = [];
             const isDoubles = [3, 4, 21, 33, 34].includes(parseInt(currentDrawEventId));
-            const eventNameObj = adminMasterEventsList.find(e => e.id == currentDrawEventId);
-            const eventNameStr = eventNameObj ? eventNameObj.name : "";
-
+            
             allRegistrations.forEach(reg => {
                 const hasEvent = reg.events && reg.events.some(e => e.id == currentDrawEventId);
                 if(hasEvent) {
@@ -940,36 +905,73 @@
                     
                     if(isDoubles) {
                         let partnerName = "Partner Required";
-                        if (reg.doublesPartners && reg.doublesPartners[eventNameStr]) {
-                            partnerName = reg.doublesPartners[eventNameStr];
+                        if (reg.doublesPartners && reg.doublesPartners[eventName]) {
+                            partnerName = reg.doublesPartners[eventName];
                         }
                         pName += ` / ${partnerName}`;
                     }
-
-                    eventPlayers.push({ name: pName, rating: rating, club: club });
+                    window.currentEventRoster.push({ name: `${pName} (${rating})`, rating: rating, club: club });
                 }
             });
+            window.currentEventRoster.sort((a, b) => b.rating - a.rating);
 
-            if(eventPlayers.length === 0) return alert("No players registered for this event.");
+            try {
+                const res = await fetch('/api/draws');
+                const data = await res.json();
+                
+                if (data.status === 'success' && data.draws && data.draws[eventId]) {
+                    currentDrawState = JSON.parse(JSON.stringify(data.draws[eventId])); 
+                } else {
+                    currentDrawState = { name: eventName, hasGroups: false, hasKnockout: false, groups: [], knockout: [] };
+                }
+            } catch (err) {
+                alert("Failed to load existing draws. Starting fresh.");
+                currentDrawState = { name: eventName, hasGroups: false, hasKnockout: false, groups: [], knockout: [] };
+            }
 
-            // Sort by rating descending
-            eventPlayers.sort((a, b) => b.rating - a.rating);
+            document.getElementById('drawEditorArea').style.display = 'block';
+            updateRosterDatalist();
+            renderDrawEditor();
+        }
 
-            // Determine optimal groups (groups of 3)
-            const optimalGroups = Math.ceil(eventPlayers.length / 3);
-            const numStr = prompt(`Found ${eventPlayers.length} players for this ${isDoubles ? 'Doubles' : 'Singles'} event.\nHow many groups do you want to create? (Calculated for ~3 per group)`, optimalGroups);
+        function updateRosterDatalist() {
+            const dl = document.getElementById('rosterDatalist');
+            if(!dl) return;
+            let html = `<option value="BYE">`;
+            if (currentDrawState && currentDrawState.groups) {
+                currentDrawState.groups.forEach((g, i) => {
+                    html += `<option value="Winner Group ${i+1}">`;
+                    html += `<option value="Runner-Up Group ${i+1}">`;
+                });
+            }
+            window.currentEventRoster.forEach(p => {
+                html += `<option value="${p.name}">`;
+            });
+            dl.innerHTML = html;
+        }
+
+        function toggleDrawState(field, value) {
+            if(!currentDrawState) return;
+            currentDrawState[field] = value;
+            updateRosterDatalist();
+            renderDrawEditor();
+        }
+
+        function autoSeedGroups() {
+            if(!currentDrawEventId) return alert("Select an event first.");
+            if(window.currentEventRoster.length === 0) return alert("No players registered for this event.");
+
+            const optimalGroups = Math.ceil(window.currentEventRoster.length / 3);
+            const numStr = prompt(`Found ${window.currentEventRoster.length} players/pairs.\nHow many round-robin groups do you want to create? (Suggested: ${optimalGroups})`, optimalGroups);
             const numGroups = parseInt(numStr);
             if(isNaN(numGroups) || numGroups <= 0) return;
 
             const newGroups = Array.from({length: numGroups}, (_, i) => ({ name: `Group ${i + 1}`, players: [] }));
             
             // 1. Zermelo/ITTF True Seeding for Position 1 (Group Heads)
-            let groupHeads = eventPlayers.slice(0, numGroups);
-            let unassignedHeads = [...groupHeads];
-            
+            let unassignedHeads = [...window.currentEventRoster].slice(0, numGroups);
             const headAssignments = new Array(numGroups).fill(null);
             
-            // Seed 1 to Group 1, Seed 2 to Group 2
             if(unassignedHeads.length > 0) headAssignments[0] = unassignedHeads[0];
             if(unassignedHeads.length > 1) headAssignments[1] = unassignedHeads[1];
             
@@ -981,7 +983,6 @@
                 return array;
             }
 
-            // Assign remaining heads in ITTF blocks (3-4, 5-8, 9-16, 17-32)
             const blocks = [[2, 4], [4, 8], [8, 16], [16, 32], [32, 64]];
             blocks.forEach(block => {
                 let start = block[0];
@@ -995,70 +996,124 @@
                 }
             });
 
-            // Place heads into groups
             for(let i=0; i<numGroups; i++) {
                 if(headAssignments[i]) {
                     newGroups[i].players.push({
-                        name: `${headAssignments[i].name} (${headAssignments[i].rating})`, 
-                        wins: 0, losses: 0, pts: 0, advance: false,
-                        club: headAssignments[i].club
+                        name: headAssignments[i].name, 
+                        wins: 0, losses: 0, pts: 0, advance: false, club: headAssignments[i].club
                     });
                 }
             }
 
-            // 2. Snake Assignment with Club Separation for remaining players
-            let remainingPlayers = eventPlayers.slice(numGroups);
-            let position = 2; // Start placing position 2
+            // 2. Snake Assignment with Club Separation
+            let remainingPlayers = [...window.currentEventRoster].slice(numGroups);
+            let position = 2; 
             
             while(remainingPlayers.length > 0) {
-                // Determine direction of snake for this tier
                 let isLeftToRight = (position % 2 !== 0); 
                 let groupIndices = Array.from({length: numGroups}, (_, i) => i);
                 if (!isLeftToRight) groupIndices.reverse();
 
                 let tierPlayers = remainingPlayers.splice(0, numGroups);
                 
-                // For each slot in this tier, find the best player from tierPlayers that doesn't violate club sep
                 groupIndices.forEach(gIdx => {
                     if (tierPlayers.length === 0) return;
-                    
                     let groupClubs = newGroups[gIdx].players.map(p => p.club).filter(c => c !== 'None');
-                    
-                    // Find highest rated player in tierPlayers who does NOT share a club
                     let selectedPlayerIdx = -1;
+                    
                     for(let i=0; i<tierPlayers.length; i++) {
                         if(!groupClubs.includes(tierPlayers[i].club) || tierPlayers[i].club === 'None') {
                             selectedPlayerIdx = i;
                             break;
                         }
                     }
-                    
-                    // If all players violate club separation, just take the highest rated (first one)
                     if(selectedPlayerIdx === -1) selectedPlayerIdx = 0;
-
                     let p = tierPlayers.splice(selectedPlayerIdx, 1)[0];
+                    
                     newGroups[gIdx].players.push({
-                        name: `${p.name} (${p.rating})`, 
-                        wins: 0, losses: 0, pts: 0, advance: false,
-                        club: p.club
+                        name: p.name, 
+                        wins: 0, losses: 0, pts: 0, advance: false, club: p.club
                     });
                 });
-                
                 position++;
             }
 
             currentDrawState.groups = newGroups;
             document.getElementById('drawHasGroups').checked = true;
             currentDrawState.hasGroups = true;
+            updateRosterDatalist();
             
-            // Auto generate knockout size based on groups (1 advances per group)
             if(confirm(`Successfully generated ${numGroups} seeded groups with club separation!\n\nDo you want to automatically create a Knockout Bracket for the ${numGroups} players that will advance?`)) {
                 let size = 2;
-                while(size < numGroups) size *= 2; // Find next power of 2
+                while(size < numGroups) size *= 2; 
                 generateKnockoutSize(size);
             } else {
                 renderDrawEditor();
             }
+        }
+
+        function getSeedingOrder(size) {
+            if (size === 2) return [1, 2];
+            let order = [1, 2];
+            while (order.length < size) {
+                let nextOrder = [];
+                let curSize = order.length * 2;
+                for (let i = 0; i < order.length; i++) {
+                    nextOrder.push(order[i]);
+                    nextOrder.push(curSize - order[i] + 1);
+                }
+                order = nextOrder;
+            }
+            return order;
+        }
+
+        function autoSeedDirectKnockout() {
+            if(!currentDrawEventId) return alert("Select an event first.");
+            let players = [...window.currentEventRoster];
+            if(players.length === 0) return alert("No players registered for this event.");
+            
+            const sizeStr = prompt(`Found ${players.length} players.\nEnter bracket size (e.g., 2, 4, 8, 16, 32, 64):`, Math.pow(2, Math.ceil(Math.log2(players.length))));
+            const size = parseInt(sizeStr);
+            if(isNaN(size) || size < players.length || (Math.log2(size) % 1 !== 0)) {
+                return alert("Size must be a power of 2 and greater than or equal to the number of players.");
+            }
+            
+            const roundsCount = Math.log2(size);
+            const knockout = [];
+            const roundNames = {1: "Grand Final", 2: "Semi Finals", 3: "Quarter Finals", 4: "Round of 16", 5: "Round of 32", 6: "Round of 64"};
+            
+            for(let i=roundsCount; i>=1; i--) {
+                const numMatches = Math.pow(2, i-1);
+                const rName = roundNames[i] || `Round of ${Math.pow(2, i)}`;
+                const matches = [];
+                for(let m=0; m<numMatches; m++) {
+                    matches.push({p1: "", s1: "0", p2: "", s2: "0", winner: 0});
+                }
+                knockout.push({roundName: rName, matches: matches});
+            }
+            
+            const round1 = knockout[0].matches;
+            const standardOrder = getSeedingOrder(size); 
+            
+            for(let i=0; i<size; i+=2) {
+                let seedA = standardOrder[i];
+                let seedB = standardOrder[i+1];
+                
+                let pA = seedA <= players.length ? players[seedA-1].name : "BYE";
+                let pB = seedB <= players.length ? players[seedB-1].name : "BYE";
+                
+                round1[i/2].p1 = pA;
+                round1[i/2].p2 = pB;
+                if(pB === "BYE") round1[i/2].winner = 1;
+                if(pA === "BYE") round1[i/2].winner = 2;
+            }
+            
+            currentDrawState.knockout = knockout;
+            currentDrawState.hasKnockout = true;
+            currentDrawState.hasGroups = false;
+            document.getElementById('drawHasGroups').checked = false;
+            document.getElementById('drawHasKnockout').checked = true;
+            renderDrawEditor();
         }
 
         function generateKnockoutSize(size) {
@@ -1083,12 +1138,41 @@
         }
 
         function autoGenerateKnockout() {
-            const sizeStr = prompt("Enter knockout draw size (e.g., 4, 8, 16, 32, 64):", "8");
+            const sizeStr = prompt("Enter blank knockout draw size (e.g., 4, 8, 16, 32, 64):", "8");
             const size = parseInt(sizeStr);
-            if(isNaN(size) || size <= 1 || (Math.log2(size) % 1 !== 0)) {
-                return alert("Size must be a valid power of 2 (2, 4, 8, 16, etc.)");
-            }
+            if(isNaN(size) || size <= 1 || (Math.log2(size) % 1 !== 0)) return alert("Size must be a valid power of 2");
             generateKnockoutSize(size);
+        }
+
+        function resolveGroupWinners() {
+            if (!currentDrawState.hasGroups || !currentDrawState.hasKnockout) {
+                return alert("Both Group Stage and Knockout Stage must be enabled to resolve winners.");
+            }
+            
+            const resolutions = {};
+            currentDrawState.groups.forEach((g, i) => {
+                const sorted = [...g.players].sort((a,b) => {
+                    if (b.pts !== a.pts) return b.pts - a.pts;
+                    return b.wins - a.wins;
+                });
+                
+                let winner = sorted.find(p => p.advance) || sorted[0];
+                let runnerUp = sorted.find(p => p !== winner);
+                
+                if (winner && winner.name) resolutions[`Winner Group ${i+1}`] = winner.name;
+                if (runnerUp && runnerUp.name) resolutions[`Runner-Up Group ${i+1}`] = runnerUp.name;
+            });
+
+            let updatedCount = 0;
+            currentDrawState.knockout.forEach(r => {
+                r.matches.forEach(m => {
+                    if (resolutions[m.p1]) { m.p1 = resolutions[m.p1]; updatedCount++; }
+                    if (resolutions[m.p2]) { m.p2 = resolutions[m.p2]; updatedCount++; }
+                });
+            });
+
+            renderDrawEditor();
+            alert(`Resolved ${updatedCount} bracket slots from group results!`);
         }
 
         function renderDrawEditor() {
@@ -1110,7 +1194,7 @@
                 currentDrawState.groups.forEach((g, gIdx) => {
                     let playerRows = g.players.map((p, pIdx) => `
                         <tr>
-                            <td><input type="text" class="draw-input" style="width:90%;" value="${p.name}" onchange="updateGroupPlayer(${gIdx}, ${pIdx}, 'name', this.value)" placeholder="Player Name"></td>
+                            <td><input type="text" list="rosterDatalist" class="draw-input" style="width:90%;" value="${p.name}" onchange="updateGroupPlayer(${gIdx}, ${pIdx}, 'name', this.value)" placeholder="Select or type player"></td>
                             <td><input type="number" class="draw-input" style="width:50px;" value="${p.wins}" onchange="updateGroupPlayer(${gIdx}, ${pIdx}, 'wins', this.value)"></td>
                             <td><input type="number" class="draw-input" style="width:50px;" value="${p.losses}" onchange="updateGroupPlayer(${gIdx}, ${pIdx}, 'losses', this.value)"></td>
                             <td><input type="number" class="draw-input" style="width:50px;" value="${p.pts}" onchange="updateGroupPlayer(${gIdx}, ${pIdx}, 'pts', this.value)"></td>
@@ -1146,8 +1230,8 @@
                         <div class="match-row">
                             <span style="font-weight:bold; color:#64748B; width: 20px;">M${mIdx+1}</span>
                             <div style="flex:1;">
-                                <input type="text" class="draw-input" style="width:80%; margin-bottom:4px;" value="${m.p1}" placeholder="Player 1 (or BYE)" onchange="updateMatch(${rIdx}, ${mIdx}, 'p1', this.value)">
-                                <input type="text" class="draw-input" style="width:80%;" value="${m.p2}" placeholder="Player 2 (or BYE)" onchange="updateMatch(${rIdx}, ${mIdx}, 'p2', this.value)">
+                                <input type="text" list="rosterDatalist" class="draw-input" style="width:80%; margin-bottom:4px;" value="${m.p1}" placeholder="Select Player / BYE" onchange="updateMatch(${rIdx}, ${mIdx}, 'p1', this.value)">
+                                <input type="text" list="rosterDatalist" class="draw-input" style="width:80%;" value="${m.p2}" placeholder="Select Player / BYE" onchange="updateMatch(${rIdx}, ${mIdx}, 'p2', this.value)">
                             </div>
                             <div style="width:60px;">
                                 <input type="text" class="draw-input" style="width:100%; margin-bottom:4px; font-family:monospace;" value="${m.s1}" placeholder="S1" onchange="updateMatch(${rIdx}, ${mIdx}, 's1', this.value)">
@@ -1178,17 +1262,19 @@
             }
         }
 
-        // --- Group State Handlers ---
         function addGroup() {
             currentDrawState.groups.push({ name: `Group ${currentDrawState.groups.length + 1}`, players: [] });
+            updateRosterDatalist();
             renderDrawEditor();
         }
         function removeGroup(gIdx) {
             currentDrawState.groups.splice(gIdx, 1);
+            updateRosterDatalist();
             renderDrawEditor();
         }
         function updateGroupName(gIdx, val) {
             currentDrawState.groups[gIdx].name = val;
+            updateRosterDatalist();
         }
         function addPlayerToGroup(gIdx) {
             currentDrawState.groups[gIdx].players.push({ name: "", wins: 0, losses: 0, pts: 0, advance: false });
@@ -1203,7 +1289,6 @@
             currentDrawState.groups[gIdx].players[pIdx][field] = val;
         }
 
-        // --- Knockout State Handlers ---
         function addKnockoutRound() {
             currentDrawState.knockout.push({ roundName: "New Round", matches: [] });
             renderDrawEditor();
@@ -1227,7 +1312,6 @@
             currentDrawState.knockout[rIdx].matches[mIdx][field] = val;
         }
 
-        // --- Save to Backend ---
         async function saveLiveDraw() {
             if(!currentDrawEventId || !currentDrawState) return;
             
@@ -1316,7 +1400,6 @@
                 if (playerCount === 0) {
                     html += `<tr><td colspan="5" style="text-align: center; color: #64748B;">No entries yet.</td></tr>`;
                 } else {
-                    // Sort players alphabetically by name
                     ev.players.sort((a, b) => a.playerName.localeCompare(b.playerName));
 
                     ev.players.forEach(p => {
@@ -1428,7 +1511,6 @@
                 }
             });
 
-            // Calculate Mean & Median
             let rMean = 0;
             let rMedian = 0;
             if (validRatings.length > 0) {
@@ -1783,7 +1865,8 @@
                     body: JSON.stringify({
                         lateFee: 0,
                         balanceDue: newBalance,
-                        finalTotal: newTotal
+                        finalTotal: newTotal,
+                        manualFeeWaived: true
                     })
                 }).then(() => window.location.reload());
             }
