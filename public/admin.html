@@ -209,18 +209,26 @@
                         </div>
                     </div>
 
+                    <!-- Groups Container -->
                     <div id="groupsEditorContainer" style="display: none; margin-bottom: 40px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                             <h3 style="margin: 0; color: #D97706; text-transform: uppercase;">Group Stage Pools</h3>
-                            <button class="btn-secondary-small" style="background: #10B981; color: white; border: none;" onclick="addGroup()">+ Add New Group / Pool</button>
+                            <div>
+                                <button class="btn-secondary-small" style="background: #F59E0B; color: white; border: none; margin-right: 10px;" onclick="autoSeedGroups()">⚡ Auto-Seed Players (Snake Method)</button>
+                                <button class="btn-secondary-small" style="background: #10B981; color: white; border: none;" onclick="addGroup()">+ Add Manual Group</button>
+                            </div>
                         </div>
                         <div id="groupsListEditor"></div>
                     </div>
 
+                    <!-- Knockout Container -->
                     <div id="knockoutEditorContainer" style="display: none; margin-bottom: 40px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                             <h3 style="margin: 0; color: #0284C7; text-transform: uppercase;">Knockout Bracket Rounds</h3>
-                            <button class="btn-secondary-small" style="background: #10B981; color: white; border: none;" onclick="addKnockoutRound()">+ Add Knockout Round</button>
+                            <div>
+                                <button class="btn-secondary-small" style="background: #F59E0B; color: white; border: none; margin-right: 10px;" onclick="autoGenerateKnockout()">⚡ Auto-Generate Blank Bracket</button>
+                                <button class="btn-secondary-small" style="background: #10B981; color: white; border: none;" onclick="addKnockoutRound()">+ Add Manual Round</button>
+                            </div>
                         </div>
                         <div id="knockoutListEditor"></div>
                     </div>
@@ -910,6 +918,84 @@
         function toggleDrawState(field, value) {
             if(!currentDrawState) return;
             currentDrawState[field] = value;
+            renderDrawEditor();
+        }
+
+        function autoSeedGroups() {
+            if(!currentDrawEventId) return alert("Select an event first.");
+            
+            let eventPlayers = [];
+            const isDoubles = [3, 4, 21, 33, 34].includes(parseInt(currentDrawEventId));
+            const eventNameObj = adminMasterEventsList.find(e => e.id == currentDrawEventId);
+            const eventNameStr = eventNameObj ? eventNameObj.name : "";
+
+            allRegistrations.forEach(reg => {
+                const hasEvent = reg.events && reg.events.some(e => e.id == currentDrawEventId);
+                if(hasEvent) {
+                    let rating = parseInt(reg.player.rcRating) || 0;
+                    if(isNaN(rating)) rating = 0;
+                    
+                    let pName = `${reg.player.firstName} ${reg.player.lastName}`;
+                    
+                    if(isDoubles && reg.doublesPartners && reg.doublesPartners[eventNameStr]) {
+                        pName += ` / ${reg.doublesPartners[eventNameStr]}`;
+                    }
+
+                    eventPlayers.push({ name: pName, rating: rating });
+                }
+            });
+
+            if(eventPlayers.length === 0) return alert("No players registered for this event.");
+
+            eventPlayers.sort((a, b) => b.rating - a.rating);
+
+            const numStr = prompt(`Found ${eventPlayers.length} players/pairs. How many round-robin groups do you want to create?`);
+            const numGroups = parseInt(numStr);
+            if(isNaN(numGroups) || numGroups <= 0) return;
+
+            const newGroups = Array.from({length: numGroups}, (_, i) => ({ name: `Group ${i + 1}`, players: [] }));
+            
+            for (let i = 0; i < eventPlayers.length; i++) {
+                const round = Math.floor(i / numGroups);
+                const remainder = i % numGroups;
+                const groupIndex = (round % 2 === 0) ? remainder : (numGroups - 1 - remainder);
+                
+                newGroups[groupIndex].players.push({
+                    name: `${eventPlayers[i].name} (${eventPlayers[i].rating})`, 
+                    wins: 0, losses: 0, pts: 0, advance: false
+                });
+            }
+
+            currentDrawState.groups = newGroups;
+            document.getElementById('drawHasGroups').checked = true;
+            currentDrawState.hasGroups = true;
+            renderDrawEditor();
+        }
+
+        function autoGenerateKnockout() {
+            const sizeStr = prompt("Enter knockout draw size (e.g., 4, 8, 16, 32, 64):", "8");
+            const size = parseInt(sizeStr);
+            if(isNaN(size) || size <= 1 || (Math.log2(size) % 1 !== 0)) {
+                return alert("Size must be a valid power of 2 (2, 4, 8, 16, etc.)");
+            }
+
+            const roundsCount = Math.log2(size);
+            const knockout = [];
+            const roundNames = {1: "Grand Final", 2: "Semi Finals", 3: "Quarter Finals", 4: "Round of 16", 5: "Round of 32", 6: "Round of 64"};
+            
+            for(let i=roundsCount; i>=1; i--) {
+                const numMatches = Math.pow(2, i-1);
+                const rName = roundNames[i] || `Round of ${Math.pow(2, i)}`;
+                const matches = [];
+                for(let m=0; m<numMatches; m++) {
+                    matches.push({p1: "TBD", s1: "0", p2: "TBD", s2: "0", winner: 0});
+                }
+                knockout.push({roundName: rName, matches: matches});
+            }
+            
+            currentDrawState.knockout = knockout;
+            document.getElementById('drawHasKnockout').checked = true;
+            currentDrawState.hasKnockout = true;
             renderDrawEditor();
         }
 
