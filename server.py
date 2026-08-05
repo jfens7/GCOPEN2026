@@ -494,10 +494,7 @@ def register():
     ttq_levy = 5.00
     discount_amount = 0
 
-    brisbane_tz = pytz.timezone('Australia/Brisbane')
-    now = datetime.now(brisbane_tz)
-    late_cutoff = brisbane_tz.localize(datetime(2026, 8, 5, 17, 0, 0))
-    late_fee = 10.0 if now >= late_cutoff else 0.0
+    late_fee = 0.0
 
     if discount_code:
         docs = list(db.collection('discount_codes').where(filter=FieldFilter('code', '==', discount_code)).stream())
