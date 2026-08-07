@@ -1527,53 +1527,59 @@ def save_draw(event_id):
     db.collection('draws').document(str(event_id)).set(data)
     return jsonify({"status": "success"})
 
+
 # ==========================================
-# NEW: ZERMELO SCRAPER & TABLE ASSIGNER
+# ZERMELO SCRAPER & TABLE ASSIGNER (WITH PLAYWRIGHT)
 # ==========================================
 def scrape_zermelo_matches():
     """
-    Hunts through Zermelo HTML files on the FTP looking for matches.
-    Returns a list of dictionaries with match data.
+    Hunts through Zermelo HTML files on the FTP using Playwright to bypass 
+    InfinityFree's anti-bot aes.js math challenge.
     """
     matches = []
     try:
-        # Added headers to bypass InfinityFree bots
-        resp = requests.get(f"{ZERMELO_HOST_URL}/Tournament.htm", headers=SCRAPER_HEADERS, timeout=5)
-        if resp.status_code != 200: return []
-        
-        soup = BeautifulSoup(resp.text, 'html.parser')
-        event_links = [a['href'] for a in soup.find_all('a', href=True) if '.htm' in a['href']]
-        
-        for link in event_links:
-            ev_resp = requests.get(f"{ZERMELO_HOST_URL}/{link}", headers=SCRAPER_HEADERS, timeout=5)
-            if ev_resp.status_code != 200: continue
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
+            context = browser.new_context(user_agent=SCRAPER_HEADERS["User-Agent"])
+            page = context.new_page()
             
-            ev_soup = BeautifulSoup(ev_resp.text, 'html.parser')
-            event_name_tag = ev_soup.find(['h1', 'h2', 'h3'])
-            event_name = event_name_tag.text.strip() if event_name_tag else "Unknown Event"
+            page.goto(f"{ZERMELO_HOST_URL}/Tournament.htm")
+            # Wait for InfinityFree's security challenge to execute and redirect
+            page.wait_for_timeout(3500) 
             
-            tables = ev_soup.find_all('table')
-            for table in tables:
-                rows = table.find_all('tr')
-                for i in range(len(rows) - 1):
-                    tds1 = rows[i].find_all('td')
-                    tds2 = rows[i+1].find_all('td')
-                    
-                    if len(tds1) > 0 and len(tds2) > 0:
-                        p1 = tds1[0].get_text(strip=True)
-                        p2 = tds2[0].get_text(strip=True)
+            soup = BeautifulSoup(page.content(), 'html.parser')
+            event_links = [a['href'] for a in soup.find_all('a', href=True) if '.htm' in a['href']]
+            
+            for link in event_links:
+                page.goto(f"{ZERMELO_HOST_URL}/{link}")
+                page.wait_for_timeout(1000) # Fast wait for subsequent pages
+                
+                ev_soup = BeautifulSoup(page.content(), 'html.parser')
+                event_name_tag = ev_soup.find(['h1', 'h2', 'h3'])
+                event_name = event_name_tag.text.strip() if event_name_tag else "Unknown Event"
+                
+                tables = ev_soup.find_all('table')
+                for table in tables:
+                    rows = table.find_all('tr')
+                    for i in range(len(rows) - 1):
+                        tds1 = rows[i].find_all('td')
+                        tds2 = rows[i+1].find_all('td')
                         
-                        if p1 and p2 and p1 != "BYE" and p2 != "BYE" and len(p1) > 3 and len(p2) > 3:
-                            match_hash = hashlib.md5(f"{event_name}-{p1}-{p2}".encode()).hexdigest()[:8]
+                        if len(tds1) > 0 and len(tds2) > 0:
+                            p1 = tds1[0].get_text(strip=True)
+                            p2 = tds2[0].get_text(strip=True)
                             
-                            matches.append({
-                                "id": match_hash,
-                                "event": event_name,
-                                "p1": p1,
-                                "p2": p2,
-                                "status": "Pending"
-                            })
-                            
+                            if p1 and p2 and p1 != "BYE" and p2 != "BYE" and len(p1) > 3 and len(p2) > 3:
+                                match_hash = hashlib.md5(f"{event_name}-{p1}-{p2}".encode()).hexdigest()[:8]
+                                
+                                matches.append({
+                                    "id": match_hash,
+                                    "event": event_name,
+                                    "p1": p1,
+                                    "p2": p2,
+                                    "status": "Pending"
+                                })
+            browser.close()
     except Exception as e:
         print(f"Scraper error: {e}")
         
@@ -1645,7 +1651,6 @@ def lookup_schedule():
             return jsonify({"error": "No registration found matching those details. Please check for typos."}), 404
 
         active_matches = scrape_zermelo_matches()
-        
         assignments_ref = db.collection('table_assignments').stream()
         assigned_dict = {doc.id: doc.to_dict().get('table', 'Unassigned') for doc in assignments_ref}
 
@@ -1688,14 +1693,27 @@ def lookup_schedule():
 
 
 # ==========================================
-# ZERMELO PROXY & BEAUTIFIER
+# ZERMELO PROXY & BEAUTIFIER (WITH PLAYWRIGHT)
 # ==========================================
 @app.route('/results/<path:filename>')
 def serve_zermelo_results(filename):
     try:
-        resp = requests.get(f"{ZERMELO_HOST_URL}/{filename}", headers=SCRAPER_HEADERS, timeout=8)
+        target_url = f"{ZERMELO_HOST_URL}/{filename}"
         
-        if resp.status_code != 200:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
+            context = browser.new_context(user_agent=SCRAPER_HEADERS["User-Agent"])
+            page = context.new_page()
+            
+            page.goto(target_url)
+            # Give InfinityFree 3.5 seconds to run the aes.js math and redirect to the actual page
+            page.wait_for_timeout(3500) 
+            
+            html_content = page.content()
+            browser.close()
+            
+        # If the page failed to load or is completely empty
+        if not html_content or len(html_content) < 50:
             return """
                 <div style="font-family: sans-serif; padding: 40px; text-align: center; color: #334155;">
                     <h2>Draws Not Yet Available</h2>
@@ -1703,7 +1721,7 @@ def serve_zermelo_results(filename):
                 </div>
             """, 404
             
-        soup = BeautifulSoup(resp.text, 'html.parser')
+        soup = BeautifulSoup(html_content, 'html.parser')
         
         for tag in soup.find_all(['font', 'center']):
             tag.unwrap()
@@ -1740,7 +1758,8 @@ def serve_zermelo_results(filename):
                 
         return str(soup)
 
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
+        print(f"Zermelo Proxy Error: {e}")
         return """
             <div style="font-family: sans-serif; padding: 40px; text-align: center; color: #334155;">
                 <h2>Tournament Server Offline</h2>
