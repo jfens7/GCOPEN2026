@@ -1747,12 +1747,15 @@
 
                     ev.players.forEach(p => {
                         const badgeClass = p.paymentStatus && p.paymentStatus.includes('Paid') ? 'badge-paid' : 'badge-pending';
+                        const clubDisplay = (p.club && p.club !== 'N/A' && p.club !== 'Independent / None' && p.club !== '') ? `<br><span style="font-size: 11px; color: #64748B; font-weight: normal;">${p.club}</span>` : '';
+                        
                         html += `
                             <tr>
                                 <td style="font-weight: bold; color: var(--gctta-navy); font-size: 14px;">
                                     <a href="#" onclick="openViewModal('${p.regId}'); return false;" style="color: inherit; text-decoration: none;">
                                         ${p.playerName}
                                     </a>
+                                    ${clubDisplay}
                                 </td>
                                 <td style="color: #B45309; font-weight: bold; font-size: 14px;">${p.rcRating}</td>
                                 <td><a href="mailto:${p.email}" style="color: #0284C7;">${p.email}</a></td>
@@ -2337,19 +2340,4 @@
                     const res = await fetch(`/api/admin/draws/${currentDrawEventId}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(currentDrawState)
-                    });
-                    const data = await res.json();
-                    if(data.status === 'success') {
-                        alert("Draw successfully published to the live website!");
-                    } else {
-                        alert("Error saving draw.");
-                    }
-                } catch(err) {
-                    alert("Network error while saving.");
-                }
-            }
-        }
-    </script>
-</body>
-</html>
+                        body: JSON.stringify(currentDrawI seem to be encountering an error. Can I try something else for you?
