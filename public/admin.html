@@ -2340,4 +2340,19 @@
                     const res = await fetch(`/api/admin/draws/${currentDrawEventId}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(currentDrawI seem to be encountering an error. Can I try something else for you?
+                        body: JSON.stringify(currentDrawState)
+                    });
+                    const data = await res.json();
+                    if(data.status === 'success') {
+                        alert("Draw successfully published to the live website!");
+                    } else {
+                        alert("Error saving draw.");
+                    }
+                } catch(err) {
+                    alert("Network error while saving.");
+                }
+            }
+        }
+    </script>
+</body>
+</html>

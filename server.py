@@ -2,6 +2,7 @@ import os
 import string
 import random
 import re
+import hashlib
 from datetime import datetime
 import pytz
 from flask import Flask, request, jsonify, send_from_directory, redirect
@@ -28,6 +29,12 @@ resend.api_key = os.getenv("RESEND_API_KEY", "")
 
 # URL of your free FTP bucket holding raw Zermelo HTML output
 ZERMELO_HOST_URL = os.getenv("ZERMELO_HOST_URL", "http://gcopen-draws.infinityfreeapp.com").rstrip("/")
+
+# Standard browser header to bypass InfinityFree Bot Protection
+SCRAPER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+}
 
 raw_url = os.getenv("BASE_URL", "https://goldcoastopen.com").strip()
 if not raw_url.startswith("http"):
@@ -168,7 +175,7 @@ def find_missing_rc(nat_id, first, last):
                     r_str = re.sub(r'[^\d]', '', tds[1].get_text(strip=True).split('±')[0])
                     return tds[3].get_text(strip=True), r_str
                 elif len(tds) == 4:
-                    r_str = re.sub(r'[^\d]', '', tds[0].get_text(strip=True).split('±')[0])
+                    r_str = re.sub(r'[^\d]', '', tds[0].get_text(strip=True).split('±')[0].strip())
                     return tds[2].get_text(strip=True), r_str
     except: pass
     return "N/A", "N/A"
@@ -187,30 +194,14 @@ def sync_to_sheet(reg_id, record):
     warnings_str = " | ".join(warnings) if warnings else ""
 
     row_data = [
-        reg_id, 
-        p.get('firstName', ''), 
-        p.get('lastName', ''), 
-        p.get('email', ''),
-        p.get('phone', ''), 
-        p.get('dob', 'N/A'),
-        p.get('gender', 'N/A'),
-        p.get('nationalId', 'N/A'), 
-        p.get('club', 'N/A'),
-        p.get('rcId', 'N/A'), 
-        p.get('rcRating', 'N/A'),
-        str(p.get('neverPlayed', False)).upper(),
-        events_str, 
-        partners_str, 
-        record.get('ttqLevy', 5.0), 
-        record.get('discountAmount', 0),
-        record.get('finalTotal', 0), 
-        record.get('paymentStatus', 'Pending'),
-        record.get('registeredAt', 'N/A'),
-        record.get('paidAt', 'N/A'),
-        singles_count,
-        doubles_count,
-        total_events,
-        warnings_str
+        reg_id, p.get('firstName', ''), p.get('lastName', ''), p.get('email', ''),
+        p.get('phone', ''), p.get('dob', 'N/A'), p.get('gender', 'N/A'),
+        p.get('nationalId', 'N/A'), p.get('club', 'N/A'), p.get('rcId', 'N/A'), 
+        p.get('rcRating', 'N/A'), str(p.get('neverPlayed', False)).upper(),
+        events_str, partners_str, record.get('ttqLevy', 5.0), record.get('discountAmount', 0),
+        record.get('finalTotal', 0), record.get('paymentStatus', 'Pending'),
+        record.get('registeredAt', 'N/A'), record.get('paidAt', 'N/A'),
+        singles_count, doubles_count, total_events, warnings_str
     ]
     
     try:
@@ -964,6 +955,7 @@ def get_event_entries():
                     "email": player.get('email', 'N/A'),
                     "phone": player.get('phone', 'N/A'),
                     "rcRating": player.get('rcRating', 'N/A'),
+                    "club": player.get('club', 'N/A'),
                     "paymentStatus": d.get('paymentStatus', 'Pending')
                 })
         
@@ -1536,15 +1528,180 @@ def save_draw(event_id):
     return jsonify({"status": "success"})
 
 # ==========================================
+# NEW: ZERMELO SCRAPER & TABLE ASSIGNER
+# ==========================================
+def scrape_zermelo_matches():
+    """
+    Hunts through Zermelo HTML files on the FTP looking for matches.
+    Returns a list of dictionaries with match data.
+    """
+    matches = []
+    try:
+        # Added headers to bypass InfinityFree bots
+        resp = requests.get(f"{ZERMELO_HOST_URL}/Tournament.htm", headers=SCRAPER_HEADERS, timeout=5)
+        if resp.status_code != 200: return []
+        
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        event_links = [a['href'] for a in soup.find_all('a', href=True) if '.htm' in a['href']]
+        
+        for link in event_links:
+            ev_resp = requests.get(f"{ZERMELO_HOST_URL}/{link}", headers=SCRAPER_HEADERS, timeout=5)
+            if ev_resp.status_code != 200: continue
+            
+            ev_soup = BeautifulSoup(ev_resp.text, 'html.parser')
+            event_name_tag = ev_soup.find(['h1', 'h2', 'h3'])
+            event_name = event_name_tag.text.strip() if event_name_tag else "Unknown Event"
+            
+            tables = ev_soup.find_all('table')
+            for table in tables:
+                rows = table.find_all('tr')
+                for i in range(len(rows) - 1):
+                    tds1 = rows[i].find_all('td')
+                    tds2 = rows[i+1].find_all('td')
+                    
+                    if len(tds1) > 0 and len(tds2) > 0:
+                        p1 = tds1[0].get_text(strip=True)
+                        p2 = tds2[0].get_text(strip=True)
+                        
+                        if p1 and p2 and p1 != "BYE" and p2 != "BYE" and len(p1) > 3 and len(p2) > 3:
+                            match_hash = hashlib.md5(f"{event_name}-{p1}-{p2}".encode()).hexdigest()[:8]
+                            
+                            matches.append({
+                                "id": match_hash,
+                                "event": event_name,
+                                "p1": p1,
+                                "p2": p2,
+                                "status": "Pending"
+                            })
+                            
+    except Exception as e:
+        print(f"Scraper error: {e}")
+        
+    return matches
+
+@app.route('/api/admin/active-matches', methods=['GET'])
+def get_active_matches():
+    scraped_matches = scrape_zermelo_matches()
+    
+    assignments_ref = db.collection('table_assignments').stream()
+    assigned_dict = {doc.id: doc.to_dict().get('table', 'Unassigned') for doc in assignments_ref}
+    
+    for match in scraped_matches:
+        match['table'] = assigned_dict.get(match['id'], 'Unassigned')
+        
+    return jsonify({"status": "success", "matches": scraped_matches})
+
+@app.route('/api/admin/assign-table', methods=['POST'])
+def assign_table():
+    data = request.json
+    match_id = data.get('matchId')
+    table_num = data.get('tableNumber')
+    
+    if not match_id or not table_num:
+        return jsonify({"error": "Missing data"}), 400
+        
+    db.collection('table_assignments').document(match_id).set({
+        "table": table_num,
+        "updatedAt": firestore.SERVER_TIMESTAMP
+    }, merge=True)
+    
+    return jsonify({"status": "success"})
+
+
+# ==========================================
+# PERSONALIZED SCHEDULE API (MOCK DRAW READY)
+# ==========================================
+@app.route('/api/schedule/lookup', methods=['POST'])
+def lookup_schedule():
+    try:
+        data = request.json
+        first = data.get('firstName', '').strip().lower()
+        last = data.get('lastName', '').strip().lower()
+        dob = data.get('dob', '').strip()
+
+        if not first or not last or not dob:
+            return jsonify({"error": "Please provide First Name, Last Name, and Date of Birth."}), 400
+
+        docs = db.collection('registrations').stream()
+        player_found = False
+        player_data = {}
+        registered_events = []
+        
+        for doc in docs:
+            d = doc.to_dict()
+            p = d.get('player', {})
+            
+            db_first = p.get('firstName', '').strip().lower()
+            db_last = p.get('lastName', '').strip().lower()
+            db_dob = p.get('dob', '').strip()
+            
+            if db_first == first and db_last == last and db_dob == dob:
+                player_found = True
+                player_data = {"firstName": p.get('firstName', ''), "lastName": p.get('lastName', '')}
+                registered_events = d.get('events', [])
+                break
+
+        if not player_found:
+            return jsonify({"error": "No registration found matching those details. Please check for typos."}), 404
+
+        active_matches = scrape_zermelo_matches()
+        
+        assignments_ref = db.collection('table_assignments').stream()
+        assigned_dict = {doc.id: doc.to_dict().get('table', 'Unassigned') for doc in assignments_ref}
+
+        my_matches = []
+        last_name_check = player_data.get('lastName', '').lower()
+        
+        for match in active_matches:
+            m_p1 = match['p1'].lower()
+            m_p2 = match['p2'].lower()
+            
+            if last_name_check in m_p1 or last_name_check in m_p2:
+                opponent = match['p2'] if last_name_check in m_p1 else match['p1']
+                table = assigned_dict.get(match['id'], 'Unassigned')
+                
+                my_matches.append({
+                    "event": match['event'],
+                    "opponent": opponent,
+                    "table": table
+                })
+
+        # --- MOCK DRAW FALLBACK ---
+        if len(my_matches) == 0 and len(registered_events) > 0:
+            for ev in registered_events:
+                ev_name = ev.get('name', 'Unknown Event') if isinstance(ev, dict) else str(ev)
+                my_matches.append({
+                    "event": ev_name,
+                    "opponent": "TBD (Draw Pending)",
+                    "table": "Unassigned"
+                })
+
+        return jsonify({
+            "status": "success", 
+            "player": player_data,
+            "events": registered_events,
+            "currentMatches": my_matches
+        })
+    except Exception as e:
+        print(f"Schedule Lookup Error: {str(e)}")
+        return jsonify({"error": f"An internal server error occurred while retrieving your schedule."}), 500
+
+
+# ==========================================
 # ZERMELO PROXY & BEAUTIFIER
 # ==========================================
 @app.route('/results/<path:filename>')
 def serve_zermelo_results(filename):
     try:
-        resp = requests.get(f"{ZERMELO_HOST_URL}/{filename}")
+        resp = requests.get(f"{ZERMELO_HOST_URL}/{filename}", headers=SCRAPER_HEADERS, timeout=8)
         
         if resp.status_code != 200:
-            return "Results not available yet.", 404
+            return """
+                <div style="font-family: sans-serif; padding: 40px; text-align: center; color: #334155;">
+                    <h2>Draws Not Yet Available</h2>
+                    <p>The tournament results server is currently offline or the draws have not been published yet.</p>
+                </div>
+            """, 404
             
         soup = BeautifulSoup(resp.text, 'html.parser')
         
@@ -1556,50 +1713,16 @@ def serve_zermelo_results(filename):
             
         custom_css = """
         <style>
-            body { 
-                background-color: #0F172A; 
-                color: #E2E8F0; 
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-                padding: 30px; 
-            }
+            body { background-color: #0F172A; color: #E2E8F0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 30px; }
             a { color: #FDE68A; text-decoration: none; font-weight: bold; transition: 0.2s; }
             a:hover { color: #D97706; text-decoration: underline; }
             h1, h2, h3, h4 { color: #D97706; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #1E3A8A; padding-bottom: 10px; }
-            
-            table { 
-                width: 100%; 
-                max-width: 1200px;
-                border-collapse: collapse; 
-                margin: 20px 0 40px 0; 
-                background: rgba(255, 255, 255, 0.03); 
-                border-radius: 8px; 
-                overflow: hidden; 
-                box-shadow: 0 4px 6px rgba(0,0,0,0.3); 
-            }
-            th { 
-                background: #1E3A8A; 
-                color: #F8FAFC; 
-                padding: 15px; 
-                text-align: left; 
-                text-transform: uppercase; 
-                font-size: 13px; 
-                letter-spacing: 1px; 
-            }
-            td { 
-                padding: 12px 15px; 
-                border-bottom: 1px solid #334155; 
-                border-right: 1px solid #334155;
-                font-size: 14px; 
-            }
+            table { width: 100%; max-width: 1200px; border-collapse: collapse; margin: 20px 0 40px 0; background: rgba(255, 255, 255, 0.03); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+            th { background: #1E3A8A; color: #F8FAFC; padding: 15px; text-align: left; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; }
+            td { padding: 12px 15px; border-bottom: 1px solid #334155; border-right: 1px solid #334155; font-size: 14px; }
             tr:hover td { background: rgba(255,255,255,0.05); }
-            
             td[colspan] { text-align: center; font-weight: bold; background: rgba(30,58,138,0.2); color: #FDE68A; }
-            
-            @media (max-width: 768px) {
-                body { padding: 15px; }
-                table { font-size: 12px; }
-                th, td { padding: 8px; }
-            }
+            @media (max-width: 768px) { body { padding: 15px; } table { font-size: 12px; } th, td { padding: 8px; } }
         </style>
         """
         
@@ -1617,8 +1740,13 @@ def serve_zermelo_results(filename):
                 
         return str(soup)
 
-    except Exception as e:
-        return f"Error loading live results: {str(e)}", 500
+    except requests.exceptions.RequestException as e:
+        return """
+            <div style="font-family: sans-serif; padding: 40px; text-align: center; color: #334155;">
+                <h2>Tournament Server Offline</h2>
+                <p>Unable to connect to the live draw server. Please check back closer to the tournament date.</p>
+            </div>
+        """, 500
 
 
 if __name__ == '__main__':
