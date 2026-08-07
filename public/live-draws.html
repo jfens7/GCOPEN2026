@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Live Scores & Results | Gold Coast Open</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --gctta-navy: #1E3A8A;
+            --gctta-gold: #D97706;
+            --bg-color: #F8FAFC;
+            --card-bg: #FFFFFF;
+            --border-color: #CBD5E1;
+            --text-main: #0F172A;
+            --text-muted: #64748B;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            margin: 0; 
+            padding: 0; 
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        .header { 
+            background: var(--gctta-navy); 
+            color: white; 
+            padding: 20px 25px; 
+            text-align: center; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header h1 { 
+            margin: 0; 
+            font-weight: 900; 
+            letter-spacing: 1px; 
+            color: var(--gctta-gold); 
+            text-transform: uppercase; 
+            font-size: 22px; 
+        }
+        
+        .container { 
+            max-width: 1200px; 
+            margin: 30px auto; 
+            padding: 0 20px; 
+        }
+        
+        .btn-back { 
+            display: inline-flex; 
+            align-items: center;
+            margin-bottom: 25px; 
+            color: var(--gctta-navy); 
+            text-decoration: none; 
+            font-weight: bold; 
+            font-size: 14px; 
+            background: white;
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            transition: 0.2s;
+        }
+        .btn-back:hover { 
+            border-color: var(--gctta-navy);
+            color: var(--gctta-gold);
+        }
+
+        .search-card { 
+            background: var(--card-bg); 
+            padding: 25px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+            margin-bottom: 30px; 
+            border: 1px solid var(--border-color); 
+        }
+        
+        .search-card h3 { 
+            margin-top: 0; 
+            color: var(--gctta-navy); 
+            font-size: 16px; 
+            margin-bottom: 15px; 
+            text-transform: uppercase; 
+        }
+        
+        select { 
+            width: 100%; 
+            padding: 16px; 
+            border-radius: 8px; 
+            border: 2px solid var(--border-color); 
+            font-size: 16px; 
+            font-weight: bold; 
+            color: var(--gctta-navy); 
+            outline: none; 
+            background: #F1F5F9; 
+            cursor: pointer; 
+            appearance: none;
+        }
+        select:focus { border-color: var(--gctta-gold); }
+
+        #loadingState { 
+            text-align: center; 
+            padding: 50px; 
+            font-size: 18px; 
+            color: var(--text-muted); 
+            font-weight: bold; 
+        }
+
+        /* Group Stage Styles */
+        .section-header { 
+            font-size: 20px; 
+            font-weight: 900; 
+            color: var(--gctta-navy); 
+            text-transform: uppercase; 
+            margin: 40px 0 20px 0; 
+            border-bottom: 3px solid var(--gctta-gold); 
+            padding-bottom: 10px; 
+        }
+        
+        .group-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); 
+            gap: 20px; 
+            margin-bottom: 40px; 
+        }
+        
+        .group-card { 
+            background: var(--card-bg); 
+            border: 1px solid var(--border-color); 
+            border-radius: 10px; 
+            overflow: hidden; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02); 
+        }
+        
+        .group-card-header { 
+            background: #F1F5F9; 
+            color: var(--gctta-navy); 
+            padding: 12px 18px; 
+            font-weight: 900; 
+            font-size: 16px; 
+            border-bottom: 1px solid var(--border-color); 
+        }
+        
+        .native-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 14px; 
+        }
+        .native-table th { 
+            background: #F8FAFC; 
+            color: var(--text-muted); 
+            padding: 10px 15px; 
+            text-align: left; 
+            text-transform: uppercase; 
+            font-size: 12px; 
+            border-bottom: 1px solid var(--border-color); 
+        }
+        .native-table td { 
+            padding: 14px 15px; 
+            border-bottom: 1px solid #F1F5F9; 
+            font-weight: 600; 
+        }
+        .native-table tr:last-child td { border-bottom: none; }
+        .native-table tr.advancing { background: #F0FDF4; }
+        
+        .badge-advance { 
+            background: #DCFCE7; 
+            color: #166534; 
+            padding: 4px 8px; 
+            border-radius: 12px; 
+            font-size: 11px; 
+            font-weight: 900;
+            text-transform: uppercase; 
+            display: inline-block; 
+            margin-left: 8px;
+        }
+
+        /* Knockout Bracket Styles */
+        .bracket-container { 
+            display: flex; 
+            gap: 25px; 
+            overflow-x: auto; 
+            padding-bottom: 20px; 
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .bracket-round { 
+            min-width: 280px; 
+            flex: 1; 
+        }
+        
+        .round-title { 
+            background: var(--gctta-navy); 
+            color: white; 
+            padding: 12px 15px; 
+            border-radius: 6px; 
+            font-weight: 900; 
+            font-size: 14px; 
+            text-transform: uppercase; 
+            text-align: center; 
+            margin-bottom: 20px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .match-card { 
+            background: var(--card-bg); 
+            border: 1px solid var(--border-color); 
+            border-left: 4px solid var(--border-color);
+            border-radius: 8px; 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02); 
+            transition: transform 0.2s;
+        }
+        .match-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
+        
+        .player-row { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 8px 0; 
+            font-size: 14px; 
+            font-weight: 600; 
+            color: var(--text-muted);
+        }
+        .player-row:first-child { 
+            border-bottom: 1px solid #F1F5F9; 
+            padding-top: 0;
+        }
+        .player-row:last-child {
+            padding-bottom: 0;
+        }
+        
+        /* Highlight Winner dynamically */
+        .player-row.winner { 
+            color: var(--gctta-navy); 
+            font-weight: 900;
+        }
+        .player-row.winner .score-pill {
+            background: var(--gctta-navy);
+            color: white;
+        }
+        
+        .score-pill { 
+            background: #F1F5F9; 
+            color: var(--text-main);
+            padding: 4px 10px; 
+            border-radius: 6px; 
+            font-family: monospace; 
+            font-size: 14px; 
+            font-weight: bold;
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) { 
+            .group-grid { grid-template-columns: 1fr; } 
+            .container { padding: 0 15px; }
+            .header h1 { font-size: 18px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Live Scores & Results</h1>
+    </div>
+
+    <div class="container">
+        <a href="/" class="btn-back">← Back to Homepage</a>
+
+        <div class="search-card">
+            <h3>Select Tournament Event</h3>
+            <select id="eventSelect" onchange="renderEvent()">
+                <option value="">-- Loading Live Events... --</option>
+            </select>
+        </div>
+
+        <div id="loadingState">Connecting to Live Results...</div>
+        <div id="drawContentArea" style="display: none;"></div>
+    </div>
+
+    <script>
+        let drawsData = [];
+
+        // On Page Load: Fetch the pure JSON draws from Firebase
+        document.addEventListener("DOMContentLoaded", () => {
+            fetch('/api/public/draws')
+                .then(res => res.json())
+                .then(data => {
+                    if(data.status === 'success' && data.draws.length > 0) {
+                        drawsData = data.draws;
+                        const select = document.getElementById('eventSelect');
+                        select.innerHTML = '<option value="">-- Choose an Event --</option>';
+                        
+                        drawsData.forEach(draw => {
+                            const name = draw.eventName || draw.name || 'Event';
+                            select.innerHTML += `<option value="${draw.id}">${name}</option>`;
+                        });
+                        
+                        document.getElementById('loadingState').style.display = 'none';
+                    } else {
+                        document.getElementById('loadingState').innerHTML = 'Live draws are currently being built. Check back soon!';
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('loadingState').innerHTML = 'Failed to connect to the live server. Please refresh your browser.';
+                });
+        });
+
+        // Triggered when a user selects an event from the dropdown
+        function renderEvent() {
+            const select = document.getElementById('eventSelect');
+            const contentArea = document.getElementById('drawContentArea');
+            
+            if(!select.value) { 
+                contentArea.style.display = 'none'; 
+                return; 
+            }
+
+            const draw = drawsData.find(d => d.id === select.value);
+            if(!draw) return;
+
+            let html = `<h2 style="color: var(--gctta-navy); margin-top: 0; font-size: 24px; font-weight: 900;">${draw.eventName || draw.name}</h2>`;
+
+            // 1. RENDER GROUP STAGE POOLS
+            if(draw.hasGroups && draw.groups && draw.groups.length > 0) {
+                html += `<div class="section-header">Group Stage Pools</div><div class="group-grid">`;
+                
+                draw.groups.forEach(g => {
+                    html += `
+                        <div class="group-card">
+                            <div class="group-card-header">${g.name}</div>
+                            <table class="native-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 55%;">Player / Pair</th>
+                                        <th style="text-align:center; width: 15%;">W</th>
+                                        <th style="text-align:center; width: 15%;">L</th>
+                                        <th style="text-align:center; width: 15%;">Pts</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+                    
+                    // Sort players by points (descending), then wins (descending) so leaders sit at the top
+                    const sortedPlayers = [...g.players].sort((a, b) => {
+                        if (b.pts !== a.pts) return b.pts - a.pts;
+                        return b.wins - a.wins;
+                    });
+
+                    sortedPlayers.forEach(p => {
+                        const rowClass = p.advance ? 'class="advancing"' : '';
+                        const badge = p.advance ? ' <span class="badge-advance">ADV</span>' : '';
+                        
+                        html += `
+                            <tr ${rowClass}>
+                                <td>${p.name}${badge}</td>
+                                <td style="text-align:center;">${p.wins}</td>
+                                <td style="text-align:center;">${p.losses}</td>
+                                <td style="text-align:center; color: var(--gctta-gold); font-weight: 900;">${p.pts}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    html += `</tbody></table></div>`;
+                });
+                html += `</div>`;
+            }
+
+            // 2. RENDER KNOCKOUT ELIMINATION BRACKET
+            if(draw.hasKnockout && draw.knockout && draw.knockout.length > 0) {
+                html += `<div class="section-header">Knockout Elimination Bracket</div><div class="bracket-container">`;
+                
+                draw.knockout.forEach(round => {
+                    html += `<div class="bracket-round"><div class="round-title">${round.roundName}</div>`;
+                    
+                    round.matches.forEach(m => {
+                        // Determine styling based on whoever the Admin marked as the winner (1 = P1, 2 = P2, 0 = TBD)
+                        const p1Class = m.winner === 1 ? 'winner' : '';
+                        const p2Class = m.winner === 2 ? 'winner' : '';
+                        const borderStyle = m.winner !== 0 ? 'border-left-color: var(--gctta-navy);' : '';
+                        
+                        html += `
+                            <div class="match-card" style="${borderStyle}">
+                                <div class="player-row ${p1Class}">
+                                    <span>${m.p1 || 'TBD'}</span>
+                                    <span class="score-pill">${m.s1 || '0'}</span>
+                                </div>
+                                <div class="player-row ${p2Class}">
+                                    <span>${m.p2 || 'TBD'}</span>
+                                    <span class="score-pill">${m.s2 || '0'}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += `</div>`;
+                });
+                html += `</div>`;
+            }
+
+            contentArea.innerHTML = html;
+            contentArea.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
