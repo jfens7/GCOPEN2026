@@ -11,3 +11,4 @@ resend
 pytz
 google-genai
 pydantic
+gunicorn
