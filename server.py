@@ -1529,13 +1529,9 @@ def save_draw(event_id):
 
 
 # ==========================================
-# ZERMELO SCRAPER & TABLE ASSIGNER (WITH PLAYWRIGHT)
+# NEW: ZERMELO SCRAPER & TABLE ASSIGNER (PLAYWRIGHT)
 # ==========================================
 def scrape_zermelo_matches():
-    """
-    Hunts through Zermelo HTML files on the FTP using Playwright to bypass 
-    InfinityFree's anti-bot aes.js math challenge.
-    """
     matches = []
     try:
         with sync_playwright() as p:
@@ -1544,15 +1540,14 @@ def scrape_zermelo_matches():
             page = context.new_page()
             
             page.goto(f"{ZERMELO_HOST_URL}/Tournament.htm")
-            # Wait for InfinityFree's security challenge to execute and redirect
-            page.wait_for_timeout(3500) 
+            page.wait_for_timeout(2500) 
             
             soup = BeautifulSoup(page.content(), 'html.parser')
             event_links = [a['href'] for a in soup.find_all('a', href=True) if '.htm' in a['href']]
             
             for link in event_links:
                 page.goto(f"{ZERMELO_HOST_URL}/{link}")
-                page.wait_for_timeout(1000) # Fast wait for subsequent pages
+                page.wait_for_timeout(1000)
                 
                 ev_soup = BeautifulSoup(page.content(), 'html.parser')
                 event_name_tag = ev_soup.find(['h1', 'h2', 'h3'])
@@ -1615,7 +1610,7 @@ def assign_table():
 
 
 # ==========================================
-# PERSONALIZED SCHEDULE API (MOCK DRAW READY)
+# PERSONALIZED SCHEDULE API
 # ==========================================
 @app.route('/api/schedule/lookup', methods=['POST'])
 def lookup_schedule():
@@ -1651,6 +1646,7 @@ def lookup_schedule():
             return jsonify({"error": "No registration found matching those details. Please check for typos."}), 404
 
         active_matches = scrape_zermelo_matches()
+        
         assignments_ref = db.collection('table_assignments').stream()
         assigned_dict = {doc.id: doc.to_dict().get('table', 'Unassigned') for doc in assignments_ref}
 
@@ -1693,7 +1689,7 @@ def lookup_schedule():
 
 
 # ==========================================
-# ZERMELO PROXY & BEAUTIFIER (WITH PLAYWRIGHT)
+# NEW: NATIVE UI INJECTION PROXY
 # ==========================================
 @app.route('/results/<path:filename>')
 def serve_zermelo_results(filename):
@@ -1706,13 +1702,12 @@ def serve_zermelo_results(filename):
             page = context.new_page()
             
             page.goto(target_url)
-            # Give InfinityFree 3.5 seconds to run the aes.js math and redirect to the actual page
-            page.wait_for_timeout(3500) 
+            # Reduced timeout for faster loading while still clearing aes.js
+            page.wait_for_timeout(2500) 
             
             html_content = page.content()
             browser.close()
             
-        # If the page failed to load or is completely empty
         if not html_content or len(html_content) < 50:
             return """
                 <div style="font-family: sans-serif; padding: 40px; text-align: center; color: #334155;">
@@ -1723,24 +1718,105 @@ def serve_zermelo_results(filename):
             
         soup = BeautifulSoup(html_content, 'html.parser')
         
+        # Strip ugly tags
         for tag in soup.find_all(['font', 'center']):
             tag.unwrap()
             
+        # Nuke inline background colors but preserve Zermelo's inline bracket borders
         for tag in soup.find_all(True):
-            tag.attrs = {k: v for k, v in tag.attrs.items() if k not in ['bgcolor', 'color', 'style', 'background', 'border', 'cellpadding', 'cellspacing']}
-            
+            if 'bgcolor' in tag.attrs: del tag.attrs['bgcolor']
+            if 'bordercolor' in tag.attrs: del tag.attrs['bordercolor']
+            if 'background' in tag.attrs: del tag.attrs['background']
+            if 'cellpadding' in tag.attrs: del tag.attrs['cellpadding']
+            if 'cellspacing' in tag.attrs: del tag.attrs['cellspacing']
+
+        # Advanced Native CSS Theme Injection
         custom_css = """
         <style>
-            body { background-color: #0F172A; color: #E2E8F0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 30px; }
-            a { color: #FDE68A; text-decoration: none; font-weight: bold; transition: 0.2s; }
-            a:hover { color: #D97706; text-decoration: underline; }
-            h1, h2, h3, h4 { color: #D97706; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #1E3A8A; padding-bottom: 10px; }
-            table { width: 100%; max-width: 1200px; border-collapse: collapse; margin: 20px 0 40px 0; background: rgba(255, 255, 255, 0.03); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-            th { background: #1E3A8A; color: #F8FAFC; padding: 15px; text-align: left; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; }
-            td { padding: 12px 15px; border-bottom: 1px solid #334155; border-right: 1px solid #334155; font-size: 14px; }
-            tr:hover td { background: rgba(255,255,255,0.05); }
-            td[colspan] { text-align: center; font-weight: bold; background: rgba(30,58,138,0.2); color: #FDE68A; }
-            @media (max-width: 768px) { body { padding: 15px; } table { font-size: 12px; } th, td { padding: 8px; } }
+            :root {
+                --gctta-navy: #1E3A8A;
+                --gctta-gold: #D97706;
+                --bg-color: #F8FAFC;
+                --card-bg: #FFFFFF;
+                --text-main: #334155;
+                --border-color: #E2E8F0;
+            }
+
+            body { 
+                background-color: var(--bg-color); 
+                color: var(--text-main); 
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+                padding: 20px; 
+                margin: 0;
+            }
+            
+            a { color: var(--gctta-navy); text-decoration: none; font-weight: bold; padding: 5px 10px; border-radius: 4px; transition: 0.2s; }
+            a:hover { background-color: var(--gctta-gold); color: white; }
+            
+            h1, h2, h3, h4 { 
+                color: var(--gctta-navy); 
+                text-transform: uppercase; 
+                letter-spacing: 1px; 
+                border-bottom: 3px solid var(--gctta-gold); 
+                padding-bottom: 10px; 
+                margin-top: 30px; 
+            }
+            
+            /* Admin Panel Styled Tables */
+            table { 
+                width: 100%; 
+                max-width: 1200px; 
+                border-collapse: collapse; 
+                margin: 20px 0 40px 0; 
+                background: var(--card-bg); 
+                border-radius: 8px; 
+                overflow: hidden; 
+                box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+            }
+            
+            th, td.header { 
+                background-color: var(--gctta-navy) !important; 
+                color: white !important; 
+                padding: 12px 15px; 
+                text-align: left; 
+                text-transform: uppercase; 
+                font-size: 13px; 
+                letter-spacing: 1px; 
+            }
+            
+            td { 
+                padding: 10px 15px; 
+                border-bottom: 1px solid var(--border-color); 
+                border-right: 1px solid var(--border-color);
+                font-size: 14px; 
+                color: var(--text-main);
+            }
+            
+            tr:nth-child(even) { background-color: #F1F5F9; }
+            tr:hover td { background: #E2E8F0; }
+            
+            /* Bracket UI Overrides */
+            td[colspan] { 
+                text-align: center; 
+                font-weight: bold; 
+                background: #F1F5F9; 
+                color: var(--gctta-navy); 
+            }
+            
+            /* FORCE Zermelo bracket lines to be crisp and gold */
+            td[style*="border-right"] { border-right: 3px solid var(--gctta-gold) !important; }
+            td[style*="border-bottom"] { border-bottom: 3px solid var(--gctta-gold) !important; }
+            td[style*="border-top"] { border-top: 3px solid var(--gctta-gold) !important; }
+            td[style*="border-left"] { border-left: 3px solid var(--gctta-gold) !important; }
+            
+            /* Hide empty spacer rows perfectly */
+            td[height] { padding: 0 !important; height: 10px !important; }
+            
+            @media (max-width: 768px) {
+                body { padding: 10px; }
+                table { font-size: 12px; }
+                th, td { padding: 8px; }
+            }
         </style>
         """
         

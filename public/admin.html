@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-potato
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -14,34 +13,28 @@ potato
         .nav-links a { color: white; text-decoration: none; margin-left: 20px; font-weight: bold; font-size: 14px; }
         .nav-links a:hover { color: var(--gctta-gold); }
 
-        /* Master View Toggle */
         .master-toggle-bar { background: white; padding: 15px 25px; border-bottom: 2px solid #E2E8F0; display: flex; gap: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
         .master-toggle-btn { flex: 1; padding: 15px; font-size: 18px; font-weight: 900; text-transform: uppercase; border-radius: 8px; border: 2px solid #CBD5E1; background: #F1F5F9; color: #64748B; cursor: pointer; transition: all 0.2s; }
         .master-toggle-btn.active { background: var(--gctta-navy); color: white; border-color: var(--gctta-navy); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         
         .main-view { padding: 25px; max-width: 1600px; margin: 0 auto; width: 100%; box-sizing: border-box; }
-        
         .pane-header { font-size: 22px; font-weight: 900; color: var(--gctta-navy); margin-top: 0; margin-bottom: 20px; text-transform: uppercase; border-bottom: 3px solid var(--gctta-gold); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
 
-        /* Stats Blocks */
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 20px; }
         .stat-card { background: white; padding: 20px; border-radius: 8px; border-left: 6px solid var(--gctta-navy); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .stat-card h3 { margin: 0 0 5px 0; font-size: 12px; color: #64748B; text-transform: uppercase; letter-spacing: 1px; }
         .stat-card h1 { margin: 0; font-size: 32px; color: var(--gctta-navy); }
 
-        /* Tables */
         .admin-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); font-size: 13px; }
         .admin-table th { background: var(--gctta-navy); color: white; padding: 15px; text-align: left; text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; z-index: 5; }
         .admin-table td { padding: 15px; border-bottom: 1px solid #E2E8F0; vertical-align: top; }
         .admin-table tr:hover { background: #F8FAFC; }
 
         .ref-code { font-family: monospace; background: #F1F5F9; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #0F172A; font-size: 12px; }
-        
         .badge { padding: 6px 12px; border-radius: 12px; font-size: 11px; font-weight: bold; display: inline-block; text-align: center; text-transform: uppercase; }
         .badge-paid { background: #DCFCE7; color: #166534; }
         .badge-pending { background: #FEF08A; color: #854D0E; }
 
-        /* Controls */
         .admin-controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; background: white; padding: 20px; border-radius: 8px; border: 1px solid #E2E8F0; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
         .btn-secondary-small { padding: 10px 15px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: bold; transition: opacity 0.2s; }
         .btn-secondary-small:hover { opacity: 0.9; }
@@ -57,13 +50,11 @@ potato
 
         .search-bar { flex: 1; padding: 12px; border: 2px solid #CBD5E1; border-radius: 6px; font-size: 14px; box-sizing: border-box; min-width: 250px; }
 
-        /* Internal Tabs */
         .sub-tabs { display: flex; gap: 10px; margin-bottom: 25px; border-bottom: 2px solid #E2E8F0; padding-bottom: 15px; flex-wrap: wrap; }
         .sub-tabs button { background: #F1F5F9; border: 2px solid #CBD5E1; color: #475569; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; transition: all 0.2s; }
         .sub-tabs button.active { background: var(--gctta-gold); color: var(--gctta-navy); border-color: var(--gctta-gold); }
         .sub-tabs button:hover:not(.active) { background: #E2E8F0; }
 
-        /* Match Cards */
         .match-card { background: #F8FAFC; border: 1px solid #E2E8F0; border-left: 5px solid #10B981; padding: 20px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
         .match-info h4 { margin: 0 0 8px 0; color: var(--gctta-navy); font-size: 16px; text-transform: uppercase; }
         .match-info p { margin: 0; color: #0F172A; font-weight: bold; font-size: 20px; }
@@ -71,7 +62,6 @@ potato
         .match-table:hover { background: #FDE047; }
         .match-table.assigned { background: #10B981; color: white; border-color: #059669; }
 
-        /* Modals & Forms */
         .event-checkbox-list { max-height: 250px; overflow-y: auto; border: 1px solid #CBD5E1; padding: 15px; border-radius: 4px; font-size: 13px; background: #F8FAFC; }
         .event-checkbox-list label { display: block; margin-bottom: 8px; cursor: pointer; }
         .full-width-text { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #CBD5E1; font-size: 13px; font-family: inherit; }
@@ -102,7 +92,6 @@ potato
 </head>
 <body>
     
-    <!-- ADMIN LOGIN OVERLAY -->
     <div id="adminLoginOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background-color: #F8FAFC; display: flex; justify-content: center; align-items: center; z-index: 9999;">
         <div class="login-box" style="text-align: center; width: 350px; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
             <h2 style="margin-top: 0; color: var(--gctta-navy);">Admin Portal Login</h2>
@@ -114,7 +103,6 @@ potato
         </div>
     </div>
 
-    <!-- MAIN DASHBOARD CONTENT -->
     <div id="adminDashboardContent" style="display: none; height: 100%; flex-direction: column;">
         <div class="admin-navbar">
             <h1>GCTTA COMMAND CENTER</h1>
@@ -124,15 +112,11 @@ potato
             </div>
         </div>
 
-        <!-- MASTER VIEW TOGGLE -->
         <div class="master-toggle-bar">
             <button id="masterBtnReg" class="master-toggle-btn active" onclick="switchMasterView('registrations')">📋 Registrations & Finance</button>
             <button id="masterBtnTourney" class="master-toggle-btn" onclick="switchMasterView('tournament')">🏆 Draws, Tables & Results</button>
         </div>
 
-        <!-- ============================================== -->
-        <!-- VIEW 1: REGISTRATIONS & FINANCE                -->
-        <!-- ============================================== -->
         <div id="masterViewRegistrations" class="main-view">
             <div class="pane-header">Registrations Overview</div>
             
@@ -158,7 +142,6 @@ potato
                 </div>
             </div>
 
-            <!-- Global Controls -->
             <div class="admin-controls">
                 <button id="btnBulkFix" class="btn-secondary-small" style="background: #0284C7; color: white;" onclick="bulkFixRc()">🔍 Auto-Fetch RC</button>
                 <button id="btnPullSheets" class="btn-secondary-small" style="background: #10B981; color: white;" onclick="pullFromSheets()">📥 Pull GSheet Edits</button>
@@ -170,7 +153,6 @@ potato
                 <button id="btnRebuildSheet" class="btn-secondary-small" style="background: #DC2626; color: white;" onclick="rebuildSheet()">⚠️ Rebuild Entire Sheet</button>
             </div>
 
-            <!-- Table Filters -->
             <div style="display: flex; gap: 15px; margin-bottom: 20px;">
                 <input type="text" id="searchInput" class="search-bar" placeholder="Search name, email, or status..." onkeyup="filterTable()">
                 <select id="statusFilter" onchange="filterTable()" style="padding: 12px; border-radius: 6px; border: 1px solid #CBD5E1; font-weight: bold;">
@@ -197,9 +179,6 @@ potato
             </table>
         </div>
 
-        <!-- ============================================== -->
-        <!-- VIEW 2: TOURNAMENT CONTROLLER                  -->
-        <!-- ============================================== -->
         <div id="masterViewTournament" class="main-view" style="display: none;">
             <div class="pane-header">Tournament Command Center</div>
             
@@ -213,6 +192,15 @@ potato
 
             <!-- LIVE MATCHES TAB -->
             <div id="subViewMatches" style="display: block;">
+                <div style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 25px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3 style="margin: 0 0 5px 0; color: var(--gctta-navy);">Publish Public Draws</h3>
+                        <p style="margin: 0; color: #64748B; font-size: 14px;">Bypass InfinityFree and cache Zermelo draws for instant public viewing.</p>
+                    </div>
+                    <!-- NEW ZERMELO SYNC BUTTON -->
+                    <button class="btn-primary" id="btnSyncPublicDraws" style="padding: 12px 25px; font-size: 15px; border: none; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" onclick="syncZermeloDraws()">🌐 Fetch & Cache Zermelo Draws</button>
+                </div>
+
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <p style="margin: 0; color: #64748B; font-size: 15px;">Auto-scraping Zermelo for active match cards.</p>
                     <button class="btn-secondary-small" style="background: var(--gctta-navy); color: white; font-size: 14px; padding: 10px 20px;" onclick="loadActiveMatches()">🔄 Force Refresh Matches Now</button>
@@ -304,7 +292,6 @@ potato
                         </div>
                     </div>
 
-                    <!-- Groups Container -->
                     <div id="groupsEditorContainer" style="display: none; margin-bottom: 50px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                             <h3 style="margin: 0; color: #D97706; text-transform: uppercase;">Group Stage Pools</h3>
@@ -316,7 +303,6 @@ potato
                         <div id="groupsListEditor"></div>
                     </div>
 
-                    <!-- Knockout Container -->
                     <div id="knockoutEditorContainer" style="display: none; margin-bottom: 50px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                             <h3 style="margin: 0; color: #0284C7; text-transform: uppercase;">Knockout Bracket Rounds</h3>
@@ -616,9 +602,6 @@ potato
             {"id":34, "name":"Event #34: Veteran Men's Doubles"}
         ];
 
-        // ==========================================
-        // AUTO-LOGIN LOGIC
-        // ==========================================
         document.addEventListener("DOMContentLoaded", () => {
             if(localStorage.getItem('gco_admin_auth') === 'true') {
                 document.getElementById('adminLoginOverlay').style.display = 'none';
@@ -652,9 +635,6 @@ potato
             window.location.reload();
         }
 
-        // ==========================================
-        // MASTER VIEW TOGGLE
-        // ==========================================
         function switchMasterView(viewName) {
             document.getElementById('masterBtnReg').classList.remove('active');
             document.getElementById('masterBtnTourney').classList.remove('active');
@@ -668,14 +648,10 @@ potato
             } else {
                 document.getElementById('masterBtnTourney').classList.add('active');
                 document.getElementById('masterViewTournament').style.display = 'block';
-                // Always load matches as default when opening tournament side
                 switchSubTab('matches');
             }
         }
 
-        // ==========================================
-        // DASHBOARD & DATA LOGIC
-        // ==========================================
         function loadDashboardData() {
             fetch('/api/admin/stats')
                 .then(res => res.json())
@@ -716,9 +692,6 @@ potato
             }
         }
 
-        // ==========================================
-        // SUB TAB NAVIGATION (TOURNAMENT)
-        // ==========================================
         function switchSubTab(tabName) {
             const tabs = ['tabMatches', 'tabAnalytics', 'tabEntries', 'tabDraws', 'tabDiscounts'];
             const views = ['subViewMatches', 'subViewAnalytics', 'subViewEntries', 'subViewDraws', 'subViewDiscounts'];
@@ -743,8 +716,39 @@ potato
         }
 
         // ==========================================
-        // REGISTRATION TABLE & ACTIONS
+        // NEW SYNC BUTTON FUNCTION
         // ==========================================
+        function syncZermeloDraws() {
+            const btn = document.getElementById('btnSyncPublicDraws');
+            
+            if(confirm("This will fetch all current event files from your Zermelo FTP, instantly strip out the bad Zermelo styles, format them with your custom Navy & Gold theme, and save them to the database for the public Live Draws page.\n\nDepending on how many events you have uploaded to Zermelo, this may take up to 30 seconds. Proceed?")) {
+                
+                btn.textContent = "⏳ Fetching from Zermelo & Applying Theme... Please Wait";
+                btn.disabled = true;
+                btn.style.opacity = "0.7";
+
+                fetch('/api/admin/sync-zermelo', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    btn.textContent = "🌐 Fetch & Cache Zermelo Draws";
+                    btn.disabled = false;
+                    btn.style.opacity = "1";
+
+                    if(data.status === 'success') {
+                        alert(`Successfully cached and formatted ${data.count} events!\n\nThe public Live Draws page is now instantly accessible with your new UI.`);
+                    } else {
+                        alert('Sync failed: ' + data.error);
+                    }
+                })
+                .catch(err => {
+                    alert('Network error while attempting to sync.');
+                    btn.textContent = "🌐 Fetch & Cache Zermelo Draws";
+                    btn.disabled = false;
+                    btn.style.opacity = "1";
+                });
+            }
+        }
+
         function renderTable(dataArray) {
             const tbody = document.getElementById('adminTableBody');
             tbody.innerHTML = '';
@@ -886,9 +890,6 @@ potato
             };
         }
 
-        // ==========================================
-        // MATCH CONTROLLER (ZERMELO SCRAPER)
-        // ==========================================
         function loadActiveMatches() {
             const container = document.getElementById('liveMatchesContainer');
             
@@ -937,9 +938,6 @@ potato
             }
         }
 
-        // ==========================================
-        // GLOBAL ACTIONS (SHEETS / BULK)
-        // ==========================================
         function bulkFixRc() {
             if(confirm("This will query Ratings Central for every player using their exact TTA ID, update their missing RC IDs and live Ratings, and rebuild the Google Sheet. This may take a minute. Proceed?")) {
                 const btn = document.getElementById('btnBulkFix');
@@ -1140,9 +1138,6 @@ potato
             document.body.removeChild(link);
         }
 
-        // ==========================================
-        // INDIVIDUAL ROW ACTIONS
-        // ==========================================
         function resyncSheet(id) {
             if(confirm("Force sync this registration to Google Sheets and auto-find missing RC ID?")) {
                 fetch(`/api/admin/registrations/${id}/resync`, { method: 'POST' })
@@ -1218,9 +1213,6 @@ potato
             }
         }
 
-        // ==========================================
-        // VIEW SUMMARY MODAL
-        // ==========================================
         async function openViewModal(id) {
             const reg = allRegistrations.find(r => r.id === id);
             if (!reg || !reg.player) return;
@@ -1355,9 +1347,6 @@ potato
             `;
         }
 
-        // ==========================================
-        // EDIT MODAL LOGIC
-        // ==========================================
         function openEditModal(id) {
             const reg = allRegistrations.find(r => r.id === id);
             if (!reg || !reg.player) return;
@@ -1482,9 +1471,6 @@ potato
             });
         }
 
-        // ==========================================
-        // MANUAL ENTRY LOGIC
-        // ==========================================
         function submitManual(e) {
             e.preventDefault();
             
@@ -1528,9 +1514,6 @@ potato
             });
         }
 
-        // ==========================================
-        // ANALYTICS LOGIC
-        // ==========================================
         function renderAnalytics(dataArray) {
             let totalSingles = 0;
             let totalDoubles = 0;
@@ -1678,9 +1661,6 @@ potato
             });
         }
 
-        // ==========================================
-        // EVENT ENTRIES LOGIC
-        // ==========================================
         function loadEventEntries() {
             const container = document.getElementById('eventEntriesList');
             container.innerHTML = '<div style="text-align: center; padding: 50px; font-size: 18px;">Loading event rosters...</div>';
@@ -1787,9 +1767,6 @@ potato
             }
         }
 
-        // ==========================================
-        // DISCOUNT CODES LOGIC
-        // ==========================================
         function loadDiscounts() {
             fetch('/api/admin/discount-codes')
                 .then(res => res.json())
@@ -1862,9 +1839,6 @@ potato
             .then(() => loadDiscounts());
         }
 
-        // ==========================================
-        // DRAWS BUILDER LOGIC (FULL)
-        // ==========================================
         let currentDrawState = null;
         let currentDrawEventId = null;
 
