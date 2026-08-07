@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Live Draws & Results | Gold Coast Open</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --gctta-navy: #1E3A8A;
+            --gctta-gold: #D97706;
+            --bg-color: #F8FAFC;
+            --card-bg: #FFFFFF;
+            --text-main: #334155;
+            --border-color: #E2E8F0;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            margin: 0; 
+            padding: 0; 
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        .header { 
+            background: var(--gctta-navy); 
+            color: white; 
+            padding: 20px; 
+            text-align: center; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+        }
+        .header h1 { 
+            margin: 0; 
+            font-weight: 900; 
+            letter-spacing: 1px; 
+            color: var(--gctta-gold); 
+            text-transform: uppercase; 
+            font-size: 22px;
+        }
+        
+        .container { max-width: 1200px; margin: 20px auto; padding: 0 15px; }
+        
+        .btn-back { 
+            display: inline-block; 
+            margin-bottom: 20px; 
+            color: var(--gctta-navy); 
+            text-decoration: none; 
+            font-weight: bold; 
+            font-size: 14px;
+        }
+        .btn-back:hover { color: var(--gctta-gold); }
+
+        .search-box { 
+            background: var(--card-bg); 
+            padding: 20px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+            margin-bottom: 25px; 
+            border: 1px solid var(--border-color); 
+        }
+        .search-box h3 { margin-top: 0; color: var(--gctta-navy); margin-bottom: 12px; font-size: 16px; }
+        
+        select { 
+            width: 100%; 
+            padding: 15px; 
+            border-radius: 8px; 
+            border: 2px solid var(--border-color); 
+            font-size: 16px; 
+            font-weight: bold; 
+            color: var(--gctta-navy); 
+            outline: none; 
+            background: #F1F5F9; 
+            cursor: pointer; 
+            appearance: none;
+        }
+        select:focus { border-color: var(--gctta-gold); }
+
+        #loadingState { text-align: center; padding: 40px 20px; font-size: 16px; color: #64748B; font-weight: bold; line-height: 1.5; }
+
+        /* The Content Wrapper */
+        .event-title {
+            color: var(--gctta-navy); 
+            border-bottom: 3px solid var(--gctta-gold); 
+            padding-bottom: 10px; 
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 20px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        #drawContentWrapper { display: none; }
+        
+        /* 
+         * MOBILE-FIRST ZERMELO OVERRIDES
+         */
+        .table-responsive-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            background: var(--card-bg); 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+            border: 1px solid var(--border-color);
+            margin-bottom: 30px;
+            padding: 15px;
+            box-sizing: border-box;
+        }
+
+        .zermelo-native-table { 
+            width: 100% !important; 
+            min-width: 600px; /* Forces scrolling instead of squishing on mobile */
+            border-collapse: collapse; 
+            font-size: 14px; 
+        }
+        
+        .zermelo-native-table td, .zermelo-native-table th { 
+            padding: 10px 12px !important; 
+            white-space: normal !important; 
+        }
+        
+        .zermelo-native-table tr { border-bottom: 1px solid var(--border-color); }
+        .zermelo-native-table tr:hover { background-color: #F8FAFC; }
+        
+        /* Style standard group rows */
+        .zermelo-native-table b { color: var(--gctta-navy); font-weight: 900; }
+        
+        /* Force Bracket Lines to be visible */
+        .zermelo-native-table td[style*="border-right"] { border-right: 3px solid var(--gctta-gold) !important; }
+        .zermelo-native-table td[style*="border-bottom"] { border-bottom: 3px solid var(--gctta-gold) !important; }
+        .zermelo-native-table td[style*="border-top"] { border-top: 3px solid var(--gctta-gold) !important; }
+        .zermelo-native-table td[style*="border-left"] { border-left: 3px solid var(--gctta-gold) !important; }
+        
+        /* Hide Zermelo spacer rows completely */
+        .zermelo-native-table td[height] { padding: 0 !important; height: 15px !important; border: none !important; }
+
+        @media (max-width: 768px) {
+            .container { padding: 0 10px; margin-top: 15px; }
+            .search-box { padding: 15px; }
+            .table-responsive-wrapper { padding: 10px; border-radius: 8px; }
+            .zermelo-native-table { font-size: 13px; }
+            .zermelo-native-table td, .zermelo-native-table th { padding: 8px 10px !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Live Draws & Results</h1>
+    </div>
+
+    <div class="container">
+        <a href="/" class="btn-back">← Back to Homepage</a>
+
+        <div class="search-box">
+            <h3>Select Event</h3>
+            <select id="eventSelect" onchange="renderEvent()">
+                <option value="">-- Fetching Live Tournaments... --</option>
+            </select>
+        </div>
+
+        <div id="loadingState">Connecting to Tournament Database...</div>
+        
+        <div id="drawContentWrapper">
+            <h2 class="event-title" id="eventTitleDisplay"></h2>
+            <div id="drawContentArea"></div>
+        </div>
+    </div>
+
+    <script>
+        let drawsData = [];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            fetch('/api/public/draws')
+                .then(res => res.json())
+                .then(data => {
+                    if(data.status === 'success' && data.draws.length > 0) {
+                        drawsData = data.draws;
+                        const select = document.getElementById('eventSelect');
+                        select.innerHTML = '<option value="">-- Choose an Event --</option>';
+                        drawsData.forEach(draw => {
+                            select.innerHTML += `<option value="${draw.id}">${draw.name}</option>`;
+                        });
+                        document.getElementById('loadingState').style.display = 'none';
+                    } else {
+                        document.getElementById('loadingState').innerHTML = 'Draws have not been published yet.<br><br>The Administration needs to click "Fetch & Cache Zermelo Draws" in the Admin Panel.';
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('loadingState').innerHTML = 'Failed to connect to the server. Please check your internet and refresh.';
+                });
+        });
+
+        function renderEvent() {
+            const select = document.getElementById('eventSelect');
+            const wrapper = document.getElementById('drawContentWrapper');
+            const titleDisplay = document.getElementById('eventTitleDisplay');
+            const contentArea = document.getElementById('drawContentArea');
+            
+            if(!select.value) {
+                wrapper.style.display = 'none';
+                return;
+            }
+
+            const draw = drawsData.find(d => d.id === select.value);
+            if(draw) {
+                titleDisplay.innerText = draw.name;
+                
+                // Parse the HTML strings
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(draw.html, 'text/html');
+                
+                // AGGRESSIVE ZERMELO CLEANUP
+                doc.querySelectorAll('table').forEach(table => {
+                    // Remove hardcoded widths
+                    table.removeAttribute('width');
+                    table.style.width = '100%';
+                    
+                    // Wrap every table in a scrollable div for mobile
+                    const wrapperDiv = document.createElement('div');
+                    wrapperDiv.className = 'table-responsive-wrapper';
+                    table.parentNode.insertBefore(wrapperDiv, table);
+                    wrapperDiv.appendChild(table);
+                });
+
+                doc.querySelectorAll('td, th').forEach(cell => {
+                    // Remove all the fixed pixel widths Zermelo uses
+                    cell.removeAttribute('width');
+                    cell.removeAttribute('height');
+                    cell.removeAttribute('nowrap');
+                });
+
+                // Strip script tags just in case
+                doc.querySelectorAll('script').forEach(s => s.remove());
+
+                contentArea.innerHTML = doc.body.innerHTML;
+                wrapper.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>

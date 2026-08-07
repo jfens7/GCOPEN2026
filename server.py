@@ -1,75 +1,219 @@
+"""
+================================================================================
+GOLD COAST OPEN 2026 - MASTER TOURNAMENT SERVER
+================================================================================
+
+This server handles all backend operations for the Gold Coast Open, including:
+1. Stripe Payment Processing & Webhooks
+2. Firebase / Firestore Integration
+3. Google Sheets Two-Way Sync
+4. Ratings Central & TTA National ID Scrapers
+5. Playwright-powered Zermelo FTP Sync
+6. Gemini 3.1 Pro AI Data Extraction
+
+Architecture: Flask + Gunicorn
+API Standard: RESTful JSON
+AI Engine: Gemini 3.1 Pro (google-genai)
+"""
+
 import os
+import sys
 import string
 import random
 import re
 import hashlib
+import json
+import logging
+import traceback
 from datetime import datetime
 import pytz
-from flask import Flask, request, jsonify, send_from_directory, redirect
+
+# Web & API Framework
+from flask import Flask, request, jsonify, send_from_directory, redirect, make_response
 from flask_cors import CORS
+
+# Firebase & Database
 import firebase_admin
 from firebase_admin import credentials, firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
+
+# Google Sheets API
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from google.cloud.firestore_v1.base_query import FieldFilter
+
+# Integrations
 import stripe
 import requests
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 import resend
 
-app = Flask(__name__, static_folder='public', static_url_path='')
-CORS(app)
+# AI Extraction Data Models
+try:
+    from google import genai
+    from pydantic import BaseModel, Field
+    from typing import List, Optional
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+    print("WARNING: google-genai or pydantic not installed. AI Parsing disabled.")
 
-# ==========================================
-# CONFIGURATION & INITIALIZATION
-# ==========================================
+# ==============================================================================
+# 1. LOGGING & ENVIRONMENT SETUP
+# ==============================================================================
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(module)s: %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
+
+app = Flask(__name__, static_folder='public', static_url_path='')
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+# API Keys
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
 resend.api_key = os.getenv("RESEND_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# URL of your free FTP bucket holding raw Zermelo HTML output
+# URLs
 ZERMELO_HOST_URL = os.getenv("ZERMELO_HOST_URL", "http://gcopen-draws.infinityfreeapp.com").rstrip("/")
-
-# Standard browser header to bypass InfinityFree Bot Protection
-SCRAPER_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
-}
-
 raw_url = os.getenv("BASE_URL", "https://goldcoastopen.com").strip()
-if not raw_url.startswith("http"):
-    BASE_URL = f"https://{raw_url}"
-else:
-    BASE_URL = raw_url
+BASE_URL = f"https://{raw_url}" if not raw_url.startswith("http") else raw_url
 BASE_URL = BASE_URL.rstrip("/") 
 
+# Bot Evasion Headers
+SCRAPER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1"
+}
+
 def get_secret_path(filename):
+    """Safely resolve file paths for Render's secret mount points vs local development."""
     if os.path.exists(f"/etc/secrets/{filename}"):
         return f"/etc/secrets/{filename}"
     return filename
 
-# Firebase Setup
-firebase_cred = credentials.Certificate(get_secret_path("gc-open-2026-firebase-adminsdk-fbsvc-efd2385c84.json"))
-firebase_admin.initialize_app(firebase_cred)
-db = firestore.client()
+# ==============================================================================
+# 2. FIREBASE & GOOGLE SHEETS INITIALIZATION
+# ==============================================================================
+try:
+    firebase_cred = credentials.Certificate(get_secret_path("gc-open-2026-firebase-adminsdk-fbsvc-efd2385c84.json"))
+    firebase_admin.initialize_app(firebase_cred)
+    db = firestore.client()
+    logger.info("Firebase initialized successfully.")
+except Exception as e:
+    logger.critical(f"Failed to initialize Firebase: {e}")
 
-# Google Sheets Setup (Master Sheet + Zermelo Sync Sheet)
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-gs_creds = ServiceAccountCredentials.from_json_keyfile_name(get_secret_path("gc-open-2026-260340b13caf.json"), scope)
-client = gspread.authorize(gs_creds)
-sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1EJ5lEZs4eIkAUmYIbpssjhMTkJjWWsA5B2-cHO36gyA/edit?gid=0#gid=0").sheet1
-zermelo_sheet = client.open_by_key("1Rb3HHQxw8qubkA4FNjGxJ6-05Ifjl37C0own4E-ldTE").sheet1
+try:
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    gs_creds = ServiceAccountCredentials.from_json_keyfile_name(get_secret_path("gc-open-2026-260340b13caf.json"), scope)
+    client = gspread.authorize(gs_creds)
+    sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1EJ5lEZs4eIkAUmYIbpssjhMTkJjWWsA5B2-cHO36gyA/edit?gid=0#gid=0").sheet1
+    zermelo_sheet = client.open_by_key("1Rb3HHQxw8qubkA4FNjGxJ6-05Ifjl37C0own4E-ldTE").sheet1
+    logger.info("Google Sheets initialized successfully.")
+except Exception as e:
+    logger.critical(f"Failed to initialize Google Sheets: {e}")
 
+# ==============================================================================
+# 3. CONSTANTS & EVENT METADATA
+# ==============================================================================
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", "noreply@goldcoastopen.com")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "jakobwill7@gmail.com")
 
 DOUBLES_EVENT_IDS = [3, 4, 21, 33, 34]
-
 RATING_LIMITS = {
-    6: 1700, 7: 1400, 18: 1200, 19: 1000, 20: 800
+    6: 1700, 
+    7: 1400, 
+    18: 1200, 
+    19: 1000, 
+    20: 800
 }
 
+# Extensive internal mapping dictionary for validation
+EVENT_CATALOG = {
+    1: "Event #1: Men's Open Singles",
+    2: "Event #2: Women's Open Singles",
+    3: "Event #3: Men's Open Doubles",
+    4: "Event #4: Women's Open Doubles",
+    5: "Event #5: Para Open Singles",
+    6: "Event #6: Under 1700 Singles",
+    7: "Event #7: Under 1400 Singles",
+    8: "Event #8: Under 19 Boy's Singles",
+    9: "Event #9: Under 19 Girl's Singles",
+    10: "Event #10: Under 17 Boy's Singles",
+    11: "Event #11: Under 17 Girl's Singles",
+    12: "Event #12: Under 15 Boy's Singles",
+    13: "Event #13: Under 15 Girl's Singles",
+    14: "Event #14: Under 13 Boy's Singles",
+    15: "Event #15: Under 13 Girl's Singles",
+    16: "Event #16: Under 11 Boy's Singles",
+    17: "Event #17: Under 11 Girl's Singles",
+    18: "Event #18: Under 1200 Singles",
+    19: "Event #19: Under 1000 Singles",
+    20: "Event #20: Under 800 Singles",
+    21: "Event #21: Open Rating Doubles",
+    22: "Event #22: Over 30 Men's Singles",
+    23: "Event #23: Over 30 Women's Singles",
+    24: "Event #24: Over 40 Men's Singles",
+    25: "Event #25: Over 40 Women's Singles",
+    26: "Event #26: Over 50 Men's Singles",
+    27: "Event #27: Over 50 Women's Singles",
+    28: "Event #28: Over 60 Men's Singles",
+    29: "Event #29: Over 60 Women's Singles",
+    30: "Event #30: Over 70 Men's Singles",
+    31: "Event #31: Over 70 Women's Singles",
+    32: "Event #32: Over 80 Singles",
+    33: "Event #33: Veteran Women's Doubles",
+    34: "Event #34: Veteran Men's Doubles"
+}
+
+# ==============================================================================
+# 4. PYDANTIC SCHEMAS FOR GEMINI 3.1 PRO STRUCTURED OUTPUT
+# ==============================================================================
+if GEMINI_AVAILABLE:
+    class PlayerStat(BaseModel):
+        name: str = Field(description="The full name of the player or pair.")
+        wins: int = Field(description="Number of wins in the group stage.")
+        losses: int = Field(description="Number of losses in the group stage.")
+        pts: int = Field(description="Total points accumulated in the group.")
+        advance: bool = Field(description="True if the player advances to knockout, False otherwise.")
+
+    class GroupInfo(BaseModel):
+        name: str = Field(description="Name of the group, e.g., 'Group 1' or 'Group A'.")
+        players: List[PlayerStat] = Field(description="List of players inside this specific group.")
+
+    class MatchInfo(BaseModel):
+        p1: str = Field(description="Name of Player 1. If empty or missing, use 'TBD' or 'BYE'.")
+        s1: str = Field(description="Score or sets won by Player 1.")
+        p2: str = Field(description="Name of Player 2. If empty or missing, use 'TBD' or 'BYE'.")
+        s2: str = Field(description="Score or sets won by Player 2.")
+        winner: int = Field(description="0 if undecided, 1 if p1 won, 2 if p2 won.")
+
+    class KnockoutRound(BaseModel):
+        roundName: str = Field(description="Name of the round, e.g., 'Quarter Finals' or 'Round of 16'.")
+        matches: List[MatchInfo] = Field(description="Matches occurring within this round.")
+
+    class EventDraw(BaseModel):
+        eventName: str = Field(description="The exact title of the event being extracted.")
+        hasGroups: bool = Field(description="True if a round-robin group stage exists.")
+        hasKnockout: bool = Field(description="True if a knockout/elimination bracket exists.")
+        groups: List[GroupInfo] = Field(description="Array of all group structures.")
+        knockout: List[KnockoutRound] = Field(description="Array of all knockout rounds.")
+
+# ==============================================================================
+# 5. CORE UTILITY FUNCTIONS
+# ==============================================================================
+def get_local_now_str():
+    """Returns the current timestamp in Brisbane timezone."""
+    brisbane_tz = pytz.timezone('Australia/Brisbane')
+    return datetime.now(brisbane_tz).strftime('%Y-%m-%d %H:%M:%S')
+
 def evaluate_eligibility_warnings(rating_str, events):
+    """Checks if a player exceeds the maximum rating limit for restricted events."""
     warnings = []
     if str(rating_str).isdigit():
         r_val = int(rating_str)
@@ -79,11 +223,8 @@ def evaluate_eligibility_warnings(rating_str, events):
                 warnings.append(f"Rating {r_val} exceeds limit for {ev.get('name')}")
     return warnings
 
-def get_local_now_str():
-    brisbane_tz = pytz.timezone('Australia/Brisbane')
-    return datetime.now(brisbane_tz).strftime('%Y-%m-%d %H:%M:%S')
-
 def send_email(to_email, subject, body):
+    """Sends an email via the Resend API."""
     try:
         params: resend.Emails.SendParams = {
             "from": f"Gold Coast Open <{SENDER_EMAIL}>",
@@ -92,13 +233,14 @@ def send_email(to_email, subject, body):
             "html": body,
         }
         response = resend.Emails.send(params)
-        print(f"Email sent successfully to {to_email}. Resend ID: {response}")
+        logger.info(f"Email dispatched to {to_email}. ID: {response}")
         return True
     except Exception as e:
-        print(f"CRITICAL EMAIL ERROR - Failed to send to {to_email}: {str(e)}")
+        logger.error(f"Email dispatch failed for {to_email}: {e}")
         return False
 
 def generate_receipt_email(first_name, reg_id, events_str, partners_str, final_total, status, late_fee=0.0):
+    """Generates the HTML payload for the registration receipt email."""
     is_paid = ('Paid' in status) 
     paid_amount = float(final_total) if is_paid else 0.0
     owed_amount = 0.0 if is_paid else float(final_total)
@@ -111,29 +253,41 @@ def generate_receipt_email(first_name, reg_id, events_str, partners_str, final_t
 
     late_fee_text = f"<br><strong>Late Entry Surcharge:</strong> ${late_fee:.2f}" if late_fee > 0 else ""
 
-    return f"""<p>Hi {first_name},</p>
-    <p>Your registration for the 2026 Gold Coast Open Table Tennis Championships has been recorded!</p>
-    <p><strong>Registration Reference ID: {reg_id}</strong> (Please keep this safe. You will need it to update your entry).</p>
-    <p><strong>Events:</strong> {events_str}<br>
-    <strong>Doubles Partners:</strong> {partners_str}</p>
-    
-    <p><strong>Total Paid (Events):</strong> ${events_paid:.2f}<br>
-    <strong>Total Owed:</strong> ${owed_amount:.2f}<br>
-    <strong>TTQ Tournament Levy:</strong> $5.00{late_fee_text}</p>
-    
-    {owed_text}
-    
-    <p>Please contact the Tournament Director for any updates or changes to your entry via email - <a href="mailto:admin@goldcoasttabletennis.org.au">admin@goldcoasttabletennis.org.au</a></p>
-    <p>See you at the tournament!</p>
-    <p><strong>2026 Gold Coast Open</strong></p>"""
+    return f"""
+    <div style="font-family: sans-serif; color: #334155; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #1E3A8A; border-bottom: 2px solid #D97706; padding-bottom: 10px;">Registration Confirmed</h2>
+        <p>Hi {first_name},</p>
+        <p>Your registration for the 2026 Gold Coast Open Table Tennis Championships has been recorded!</p>
+        <div style="background: #F1F5F9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0 0 10px 0;"><strong>Registration Reference ID:</strong> <span style="font-family: monospace; font-size: 16px; background: #E2E8F0; padding: 4px 8px; border-radius: 4px;">{reg_id}</span></p>
+            <p style="margin: 0; font-size: 13px; color: #64748B;">Please keep this ID safe. You will need it to update your entry or pay outstanding balances.</p>
+        </div>
+        <h3 style="color: #1E3A8A; margin-bottom: 10px;">Entry Details</h3>
+        <p style="margin-top: 0;"><strong>Events:</strong><br> {events_str}</p>
+        <p><strong>Doubles Partners:</strong><br> {partners_str}</p>
+        
+        <div style="border-top: 1px solid #E2E8F0; margin: 20px 0; padding-top: 20px;">
+            <p style="margin: 5px 0;"><strong>Total Paid (Events):</strong> ${events_paid:.2f}</p>
+            <p style="margin: 5px 0;"><strong>TTQ Tournament Levy:</strong> $5.00{late_fee_text}</p>
+            <h3 style="color: #D97706; margin: 15px 0 5px 0;"><strong>Total Owed:</strong> ${owed_amount:.2f}</h3>
+        </div>
+        {owed_text}
+        <p style="margin-top: 30px;">Please contact the Tournament Director for any updates or changes to your entry via email - <a href="mailto:admin@goldcoasttabletennis.org.au" style="color: #1E3A8A;">admin@goldcoasttabletennis.org.au</a></p>
+        <p>See you at the tournament!</p>
+        <p><strong>2026 Gold Coast Open Organizing Committee</strong></p>
+    </div>
+    """
 
+# ==============================================================================
+# 6. EXTERNAL SCRAPING & ID LOOKUP FUNCTIONS
+# ==============================================================================
 def lookup_rc_by_tta_id(tta_id):
+    """Scrapes Ratings Central to find an RC ID and rating using a TTA National ID."""
     if not tta_id or str(tta_id).strip() in ["", "N/A", "None"]:
         return "N/A", "N/A"
     try:
         url = f"https://www.ratingscentral.com/PlayerList.php?PlayerTTA_ID={str(tta_id).strip()}&PlayerSport=1"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        resp = requests.get(url, headers=headers, timeout=6)
+        resp = requests.get(url, headers=SCRAPER_HEADERS, timeout=6)
         soup = BeautifulSoup(resp.text, 'html.parser')
         table = soup.find('table', class_='Bordered')
         if table:
@@ -152,19 +306,19 @@ def lookup_rc_by_tta_id(tta_id):
                 if rc_id and rating_str.isdigit():
                     return rc_id, rating_str
     except Exception as e:
-        print(f"RC TTA Lookup Error: {e}")
+        logger.error(f"RC TTA Lookup Error: {e}")
     return "N/A", "N/A"
 
 def find_missing_rc(nat_id, first, last):
+    """Fallback scraping method to search RC by exact name if TTA ID search fails."""
     rc_id, rating = lookup_rc_by_tta_id(nat_id)
     if rc_id != "N/A":
         return rc_id, rating
 
-    headers = {"User-Agent": "Mozilla/5.0"}
     try:
         name_query = f"{last.strip()}, {first.strip()}"
         rc_url = f"https://www.ratingscentral.com/PlayerList.php?PlayerName={requests.utils.quote(name_query)}&PlayerSport=1"
-        resp = requests.get(rc_url, headers=headers, timeout=5)
+        resp = requests.get(rc_url, headers=SCRAPER_HEADERS, timeout=5)
         soup = BeautifulSoup(resp.text, 'html.parser')
         table = soup.find('table', class_='Bordered')
         if table:
@@ -177,10 +331,12 @@ def find_missing_rc(nat_id, first, last):
                 elif len(tds) == 4:
                     r_str = re.sub(r'[^\d]', '', tds[0].get_text(strip=True).split('±')[0].strip())
                     return tds[2].get_text(strip=True), r_str
-    except: pass
+    except Exception as e:
+        logger.warning(f"Fallback Name Search Failed: {e}")
     return "N/A", "N/A"
 
 def sync_to_sheet(reg_id, record):
+    """Appends or updates a row in the Google Sheet for standard registration tracking."""
     p = record.get('player', {})
     events = record.get('events', [])
     events_str = ", ".join([e['name'] for e in events])
@@ -213,34 +369,44 @@ def sync_to_sheet(reg_id, record):
             sheet.update_cells(cell_list, value_input_option='USER_ENTERED')
         else:
             sheet.append_row(row_data, value_input_option='USER_ENTERED')
+        logger.info(f"Google Sheet synced successfully for {reg_id}")
     except Exception as e:
-        print(f"GSheet Sync Error: {str(e)}")
+        logger.error(f"GSheet Sync Error for {reg_id}: {str(e)}")
 
-# ==========================================
-# PAGE ROUTING
-# ==========================================
+# ==============================================================================
+# 7. FLASK PAGE ROUTING
+# ==============================================================================
 @app.route('/')
-def serve_home(): return send_from_directory(app.static_folder, 'index.html')
+def serve_home(): 
+    return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/registration')
-def serve_registration(): return send_from_directory(app.static_folder, 'register.html')
+def serve_registration(): 
+    return send_from_directory(app.static_folder, 'register.html')
 
 @app.route('/schedule')
-def serve_schedule(): return send_from_directory(app.static_folder, 'schedule.html')
+def serve_schedule(): 
+    return send_from_directory(app.static_folder, 'schedule.html')
 
 @app.route('/admin')
-def serve_admin(): return send_from_directory(app.static_folder, 'admin.html')
+def serve_admin(): 
+    return send_from_directory(app.static_folder, 'admin.html')
 
 @app.route('/success.html')
-def serve_success(): return send_from_directory(app.static_folder, 'success.html')
+def serve_success(): 
+    return send_from_directory(app.static_folder, 'success.html')
+
+@app.route('/live-draws.html')
+def serve_live_draws():
+    return send_from_directory(app.static_folder, 'live-draws.html')
 
 @app.route('/draws')
-def serve_draws(): 
-    return redirect('/results/Tournament.htm')
+def serve_draws_redirect(): 
+    return redirect('/live-draws.html')
 
-# ==========================================
-# LOOKUP API ENDPOINTS
-# ==========================================
+# ==============================================================================
+# 8. MEMBER DIRECTORY & NATIONAL ID API
+# ==============================================================================
 @app.route('/api/national-id/search', methods=['GET'])
 def search_national_id():
     name = request.args.get('name')
@@ -254,8 +420,7 @@ def search_national_id():
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
-            page = browser.new_page()
-            
+            page = browser.new_page(user_agent=SCRAPER_HEADERS["User-Agent"])
             page.goto('https://www.tabletennis.org.au/')
             page.wait_for_timeout(3000)
             
@@ -314,6 +479,7 @@ def search_national_id():
             return jsonify({"error": "No matching National ID found."}), 404
             
     except Exception as e:
+        logger.error(f"Playwright Execution Failed: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -326,7 +492,7 @@ def lookup_national_id_by_id():
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
-            page = browser.new_page()
+            page = browser.new_page(user_agent=SCRAPER_HEADERS["User-Agent"])
             
             page.goto('https://www.tabletennis.org.au/')
             page.wait_for_timeout(3000)
@@ -335,10 +501,6 @@ def lookup_national_id_by_id():
                 close_btn = page.locator('.close, button[aria-label="Close"], .ui-dialog-titlebar-close, text="×"').first
                 if close_btn.is_visible():
                     close_btn.click(force=True)
-                else:
-                    viewport = page.viewport_size
-                    if viewport:
-                        page.mouse.click(viewport['width'] / 2, viewport['height'] / 2)
             except Exception:
                 pass
             
@@ -411,7 +573,8 @@ def lookup_national_id_by_id():
 @app.route('/api/ratings-central/search', methods=['GET'])
 def search_ratings_central():
     query = request.args.get('query')
-    if not query: return jsonify({"error": "Missing search query"}), 400
+    if not query: 
+        return jsonify({"error": "Missing search query"}), 400
     try:
         q_str = query.strip()
         if re.match(r'^\d+$', q_str):
@@ -425,8 +588,7 @@ def search_ratings_central():
                 name_query = q_str
             rc_url = f"https://www.ratingscentral.com/PlayerList.php?PlayerName={requests.utils.quote(name_query)}&PlayerSport=1"
         
-        headers = {"User-Agent": "Mozilla/5.0"}
-        resp = requests.get(rc_url, headers=headers, timeout=10)
+        resp = requests.get(rc_url, headers=SCRAPER_HEADERS, timeout=10)
         soup = BeautifulSoup(resp.text, 'html.parser')
         
         players = []
@@ -459,9 +621,9 @@ def validate_discount(code):
             })
     return jsonify({"valid": False, "discountAmount": 0, "discountType": "dollar"})
 
-# ==========================================
-# REGISTRATION API
-# ==========================================
+# ==============================================================================
+# 9. CHECKOUT & REGISTRATION API
+# ==============================================================================
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.json
@@ -484,7 +646,6 @@ def register():
     base_total = sum(float(event['price']) for event in events)
     ttq_levy = 5.00
     discount_amount = 0
-
     late_fee = 0.0
 
     if discount_code:
@@ -596,6 +757,7 @@ def register():
             cancel_url=f"{BASE_URL}/registration?canceled=true",
         )
     except Exception as e:
+        logger.error(f"Stripe Checkout Error: {e}")
         return jsonify({"error": str(e)}), 400
 
     return jsonify({"url": checkout_session.url, "registrationId": registration_id})
@@ -604,6 +766,7 @@ def register():
 def payment_success():
     reg_id = request.args.get('reg_id')
     session_id = request.args.get('session_id', 'N/A')
+    
     if reg_id:
         paid_at = get_local_now_str()
         doc_ref = db.collection('registrations').document(reg_id)
@@ -639,6 +802,7 @@ def payment_success():
             
             events_str = ", ".join([e['name'] for e in updated_doc.get('events', [])])
             partners_str = ", ".join([f"{k}: {v}" for k, v in updated_doc.get('doublesPartners', {}).items()])
+            
             email_body = generate_receipt_email(updated_doc['player']['firstName'], reg_id, events_str, partners_str, updated_doc['finalTotal'], "Paid", late_fee)
             send_email(updated_doc['player']['email'], "Tournament Registration Confirmation", email_body)
             
@@ -648,9 +812,9 @@ def payment_success():
     return redirect(f"/success.html?reg_id={reg_id}")
 
 
-# ==========================================
-# UPDATE / BALANCE ENDPOINTS
-# ==========================================
+# ==============================================================================
+# 10. UPDATE / BALANCE CHECKOUT API
+# ==============================================================================
 @app.route('/api/registration/lookup', methods=['POST'])
 def lookup_reg():
     data = request.json
@@ -858,9 +1022,9 @@ def update_success():
     return redirect(f"/success.html?reg_id={reg_id}&updated=true")
 
 
-# ==========================================
-# ADMIN ENDPOINTS
-# ==========================================
+# ==============================================================================
+# 11. ADMIN DASHBOARD ROUTING
+# ==============================================================================
 @app.route('/api/admin/stats', methods=['GET'])
 def get_admin_stats():
     docs = db.collection('registrations').stream()
@@ -966,6 +1130,10 @@ def get_event_entries():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+# ==============================================================================
+# 12. ADMIN SPREADSHEET SYNC API
+# ==============================================================================
 @app.route('/api/admin/sync-from-sheet', methods=['POST'])
 def sync_from_sheet():
     try:
@@ -994,7 +1162,7 @@ def sync_from_sheet():
                     })
                     updated_count += 1
             except Exception as e:
-                print(f"Error syncing row {reg_id} from sheet: {e}")
+                logger.error(f"Error syncing row {reg_id} from sheet: {e}")
                 
         return jsonify({"status": "success", "updated": updated_count})
     except Exception as e:
@@ -1185,53 +1353,348 @@ def bulk_fix_rc():
         
     return jsonify({"status": "success", "updatedCount": updated_count, "totalRows": len(rows_data)})
 
-@app.route('/api/admin/rebuild-sheet', methods=['POST'])
-def rebuild_sheet():
-    all_docs = db.collection('registrations').order_by('timestamp', direction=firestore.Query.DESCENDING).stream()
-    rows_data = []
-    for doc in all_docs:
-        rec = doc.to_dict()
-        rid = doc.id
-        pl = rec.get('player', {})
-        events = rec.get('events', [])
-        e_str = ", ".join([e['name'] for e in events])
-        pt_str = ", ".join([f"{k}: {v}" for k, v in rec.get('doublesPartners', {}).items()])
-        
-        total_events = len(events)
-        doubles_count = sum(1 for e in events if e.get('id') in DOUBLES_EVENT_IDS)
-        singles_count = total_events - doubles_count
 
-        warns = rec.get('eligibilityWarnings', [])
-        warnings_str = " | ".join(warns) if warns else ""
-
-        row = [
-            rid, pl.get('firstName',''), pl.get('lastName',''), pl.get('email',''),
-            pl.get('phone',''), pl.get('dob','N/A'), pl.get('gender','N/A'),
-            pl.get('nationalId','N/A'), pl.get('club','N/A'), pl.get('rcId','N/A'),
-            pl.get('rcRating','N/A'), str(pl.get('neverPlayed', False)).upper(),
-            e_str, pt_str, rec.get('ttqLevy', 5.0), rec.get('discountAmount', 0),
-            rec.get('finalTotal', 0), rec.get('paymentStatus', 'Pending'),
-            rec.get('registeredAt', 'N/A'), rec.get('paidAt', 'N/A'),
-            singles_count, doubles_count, total_events, warnings_str
-        ]
-        rows_data.append(row)
+# ==============================================================================
+# 13. ZERMELO IMPORT & EXPORT (ADMIN)
+# ==============================================================================
+@app.route('/api/admin/export-zermelo-players', methods=['GET'])
+def export_zermelo_players():
+    docs = db.collection('registrations').where(filter=FieldFilter('zermeloExported', '!=', True)).stream()
+    
+    players_data = []
+    doc_ids_to_update = []
+    
+    for doc in docs:
+        d = doc.to_dict()
+        p = d.get('player', {})
         
-    sheet.batch_clear(["A2:X1000"])
-    if rows_data:
-        cell_list = sheet.range(f"A2:X{len(rows_data)+1}")
-        flat_data = [item for sublist in rows_data for item in sublist]
-        for i, val in enumerate(flat_data):
-            cell_list[i].value = val
-        sheet.update_cells(cell_list, value_input_option='USER_ENTERED')
+        rc_id = p.get('rcId', '').strip()
+        never_played = p.get('neverPlayed', False)
         
-    return jsonify({"status": "success", "rows": len(rows_data)})
+        if never_played or rc_id.lower() in ["", "n/a", "never played", "none"]:
+            continue
+            
+        events = d.get('events', [])
+        # Exclude doubles events
+        event_ids = [str(e.get('id')) for e in events if 'id' in e and e.get('id') not in DOUBLES_EVENT_IDS]
+        events_str = " ".join(event_ids)
+        
+        last_name = p.get('lastName', '').strip()
+        first_name = p.get('firstName', '').strip()
+        full_name = f"{first_name} {last_name}".strip()
+        
+        players_data.append({
+            "Name": full_name,
+            "Ratings Central ID": rc_id,
+            "Events": events_str,
+            "Look up Ratings": "RC",
+            "Look Up Personal Info": "RC",
+            "Check In": "Here Now",
+            "Draw Club": "",
+            "Use Club For Draw Club": "Y"
+        })
+        doc_ids_to_update.append(doc.id)
+        
+    return jsonify({
+        "players": players_data,
+        "docIds": doc_ids_to_update
+    })
 
+@app.route('/api/admin/mark-exported', methods=['POST'])
+def mark_exported():
+    data = request.json
+    doc_ids = data.get('docIds', [])
+    
+    for doc_id in doc_ids:
+        db.collection('registrations').document(doc_id).update({
+            "zermeloExported": True
+        })
+        
+    return jsonify({"status": "success", "updatedCount": len(doc_ids)})
+
+@app.route('/api/admin/push-to-zermelo-sheet', methods=['POST'])
+def push_zermelo_sheet():
+    try:
+        docs = db.collection('registrations').stream()
+        
+        rows_data = []
+        headers = ["Name", "Ratings Central ID", "Events", "Look up Ratings", "Look Up Personal Info", "Check In", "Draw Club", "Use Club For Draw Club"]
+        rows_data.append(headers)
+        
+        for doc in docs:
+            d = doc.to_dict()
+            p = d.get('player', {})
+            rc_id = p.get('rcId', '').strip()
+            never_played = p.get('neverPlayed', False)
+            
+            if never_played or rc_id.lower() in ["", "n/a", "never played", "none"]:
+                continue
+                
+            events = d.get('events', [])
+            event_ids = [str(e.get('id')) for e in events if 'id' in e and e.get('id') not in DOUBLES_EVENT_IDS]
+            events_str = " ".join(event_ids)
+            
+            last_name = p.get('lastName', '').strip()
+            first_name = p.get('firstName', '').strip()
+            full_name = f"{first_name} {last_name}".strip()
+            
+            row = [full_name, rc_id, events_str, "RC", "RC", "Here Now", "", "Y"]
+            rows_data.append(row)
+            
+        zermelo_sheet.batch_clear(["A1:H1000"])
+        if len(rows_data) > 1:
+            cell_list = zermelo_sheet.range(f"A1:H{len(rows_data)}")
+            flat_data = [item for sublist in rows_data for item in sublist]
+            for i, val in enumerate(flat_data):
+                cell_list[i].value = val
+            zermelo_sheet.update_cells(cell_list, value_input_option='USER_ENTERED')
+            
+        return jsonify({"status": "success", "count": len(rows_data)-1})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ==============================================================================
+# 14. NATIVE DRAWS OVERRIDE & AI EXTRACTION VIA GEMINI 3.1 PRO
+# ==============================================================================
+@app.route('/api/admin/sync-zermelo', methods=['POST'])
+def admin_sync_zermelo():
+    """
+    Called manually by Admin. Uses Playwright to navigate InfinityFree's security.
+    Passes the HTML to Gemini 3.1 Pro via google-genai to extract structured JSON data.
+    """
+    if not GEMINI_AVAILABLE:
+        return jsonify({"error": "Gemini SDK is not configured. Missing packages."}), 500
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
+            context = browser.new_context(user_agent=SCRAPER_HEADERS["User-Agent"])
+            page = context.new_page()
+            
+            page.goto(f"{ZERMELO_HOST_URL}/Tournament.htm")
+            page.wait_for_timeout(3500) # Give InfinityFree security script time to execute
+            
+            soup = BeautifulSoup(page.content(), 'html.parser')
+            links = []
+            for a in soup.find_all('a', href=True):
+                if '.htm' in a['href']:
+                    links.append((a.text.strip(), a['href']))
+
+            if not links:
+                browser.close()
+                return jsonify({"error": "No events found on Zermelo. Have you uploaded them?"}), 404
+
+            # Initialize Gemini SDK client
+            client = genai.Client(api_key=GEMINI_API_KEY)
+            
+            batch = db.batch()
+            draws_ref = db.collection('draws')
+            count = 0
+
+            for name, href in links:
+                page.goto(f"{ZERMELO_HOST_URL}/{href}")
+                page.wait_for_timeout(1000) 
+                
+                ev_soup = BeautifulSoup(page.content(), 'html.parser')
+                html_snippet = ev_soup.body.decode_contents() if ev_soup.body else str(ev_soup)
+                
+                # Let Gemini 3.1 Pro perform complex data extraction automatically
+                prompt = (
+                    f"Analyze the following table tennis HTML tournament data carefully. "
+                    f"Extract the specific details for the event named '{name}'. Identify if the HTML "
+                    f"contains round-robin group tables and/or knockout elimination brackets. Map the "
+                    f"names, scores, wins, losses, points, and advancement statuses directly into the schema. "
+                    f"If a match score or outcome is missing, interpret it as TBD. "
+                    f"HTML Content:\n\n{html_snippet}"
+                )
+
+                response = client.models.generate_content(
+                    model='gemini-3.1-pro',
+                    contents=prompt,
+                    config={
+                        'response_mime_type': 'application/json',
+                        'response_schema': EventDraw,
+                        'temperature': 0.1 # low variance for strict data parsing
+                    },
+                )
+                
+                # response.parsed contains the validated Pydantic object
+                if response.parsed:
+                    extracted_data = response.parsed.dict()
+                    
+                    # Search local mapping catalog for standardized event IDs
+                    mapped_id = hashlib.md5(name.encode()).hexdigest()[:8]
+                    for ev_id, ev_title in EVENT_CATALOG.items():
+                        if name.lower() in ev_title.lower():
+                            mapped_id = str(ev_id)
+                            break
+                    
+                    doc_ref = draws_ref.document(mapped_id)
+                    batch.set(doc_ref, extracted_data)
+                    count += 1
+                else:
+                    logger.warning(f"Gemini failed to parse structured output for event: {name}")
+
+            batch.commit()
+            browser.close()
+            return jsonify({"status": "success", "count": count})
+            
+    except Exception as e:
+        logger.error(f"AI Sync error: {traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/public/draws', methods=['GET'])
+def get_public_draws():
+    """Returns the pure JSON draw structure for native rendering."""
+    docs = db.collection('draws').stream()
+    draws = []
+    for d in docs:
+        data = d.to_dict()
+        data["id"] = d.id
+        draws.append(data)
+    
+    # Sort draws alphabetically by event name
+    draws.sort(key=lambda x: x.get('eventName', ''))
+    return jsonify({"status": "success", "draws": draws})
+
+
+# ==============================================================================
+# 15. MATCH CONTROLLER / LIVE TABLES
+# ==============================================================================
+def scrape_zermelo_matches():
+    matches = []
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
+            context = browser.new_context(user_agent=SCRAPER_HEADERS["User-Agent"])
+            page = context.new_page()
+            
+            page.goto(f"{ZERMELO_HOST_URL}/Tournament.htm")
+            page.wait_for_timeout(3500) 
+            
+            soup = BeautifulSoup(page.content(), 'html.parser')
+            event_links = [a['href'] for a in soup.find_all('a', href=True) if '.htm' in a['href']]
+            
+            for link in event_links:
+                page.goto(f"{ZERMELO_HOST_URL}/{link}")
+                page.wait_for_timeout(1000)
+                
+                ev_soup = BeautifulSoup(page.content(), 'html.parser')
+                event_name_tag = ev_soup.find(['h1', 'h2', 'h3'])
+                event_name = event_name_tag.text.strip() if event_name_tag else "Unknown Event"
+                
+                tables = ev_soup.find_all('table')
+                for table in tables:
+                    rows = table.find_all('tr')
+                    for i in range(len(rows) - 1):
+                        tds1 = rows[i].find_all('td')
+                        tds2 = rows[i+1].find_all('td')
+                        
+                        if len(tds1) > 0 and len(tds2) > 0:
+                            p1 = tds1[0].get_text(strip=True)
+                            p2 = tds2[0].get_text(strip=True)
+                            
+                            if p1 and p2 and p1 != "BYE" and p2 != "BYE" and len(p1) > 3 and len(p2) > 3:
+                                match_hash = hashlib.md5(f"{event_name}-{p1}-{p2}".encode()).hexdigest()[:8]
+                                matches.append({
+                                    "id": match_hash, "event": event_name, "p1": p1, "p2": p2, "status": "Pending"
+                                })
+            browser.close()
+    except Exception as e:
+        logger.error(f"Live Table Scraper error: {e}")
+    return matches
+
+@app.route('/api/admin/active-matches', methods=['GET'])
+def get_active_matches():
+    scraped_matches = scrape_zermelo_matches()
+    assignments_ref = db.collection('table_assignments').stream()
+    assigned_dict = {doc.id: doc.to_dict().get('table', 'Unassigned') for doc in assignments_ref}
+    for match in scraped_matches:
+        match['table'] = assigned_dict.get(match['id'], 'Unassigned')
+    return jsonify({"status": "success", "matches": scraped_matches})
+
+@app.route('/api/admin/assign-table', methods=['POST'])
+def assign_table():
+    data = request.json
+    match_id = data.get('matchId')
+    table_num = data.get('tableNumber')
+    if not match_id or not table_num: 
+        return jsonify({"error": "Missing data"}), 400
+    db.collection('table_assignments').document(match_id).set({ "table": table_num, "updatedAt": firestore.SERVER_TIMESTAMP }, merge=True)
+    return jsonify({"status": "success"})
+
+
+# ==============================================================================
+# 16. PLAYER SCHEDULE LOOKUP
+# ==============================================================================
+@app.route('/api/schedule/lookup', methods=['POST'])
+def lookup_schedule():
+    try:
+        data = request.json
+        first = data.get('firstName', '').strip().lower()
+        last = data.get('lastName', '').strip().lower()
+        dob = data.get('dob', '').strip()
+
+        if not first or not last or not dob:
+            return jsonify({"error": "Please provide First Name, Last Name, and Date of Birth."}), 400
+
+        docs = db.collection('registrations').stream()
+        player_found = False
+        player_data = {}
+        registered_events = []
+        
+        for doc in docs:
+            d = doc.to_dict()
+            p = d.get('player', {})
+            db_first = p.get('firstName', '').strip().lower()
+            db_last = p.get('lastName', '').strip().lower()
+            db_dob = p.get('dob', '').strip()
+            
+            if db_first == first and db_last == last and db_dob == dob:
+                player_found = True
+                player_data = {"firstName": p.get('firstName', ''), "lastName": p.get('lastName', '')}
+                registered_events = d.get('events', [])
+                break
+
+        if not player_found:
+            return jsonify({"error": "No registration found matching those details. Please check for typos."}), 404
+
+        active_matches = scrape_zermelo_matches()
+        assignments_ref = db.collection('table_assignments').stream()
+        assigned_dict = {doc.id: doc.to_dict().get('table', 'Unassigned') for doc in assignments_ref}
+
+        my_matches = []
+        last_name_check = player_data.get('lastName', '').lower()
+        
+        for match in active_matches:
+            m_p1 = match['p1'].lower()
+            m_p2 = match['p2'].lower()
+            if last_name_check in m_p1 or last_name_check in m_p2:
+                opponent = match['p2'] if last_name_check in m_p1 else match['p1']
+                table = assigned_dict.get(match['id'], 'Unassigned')
+                my_matches.append({"event": match['event'], "opponent": opponent, "table": table})
+
+        if len(my_matches) == 0 and len(registered_events) > 0:
+            for ev in registered_events:
+                ev_name = ev.get('name', 'Unknown Event') if isinstance(ev, dict) else str(ev)
+                my_matches.append({"event": ev_name, "opponent": "TBD (Draw Pending)", "table": "Unassigned"})
+
+        return jsonify({"status": "success", "player": player_data, "events": registered_events, "currentMatches": my_matches})
+    except Exception as e:
+        return jsonify({"error": f"An internal server error occurred while retrieving your schedule."}), 500
+
+
+# ==============================================================================
+# 17. MANUAL REGISTRATION OPERATIONS
+# ==============================================================================
 @app.route('/api/admin/manual-register', methods=['POST'])
 def manual_register():
     data = request.json
     rc_val = data.get('rcId', 'N/A')
     never_played = data.get('neverPlayed', False)
-    if never_played: rc_val = "Never Played"
+    if never_played: 
+        rc_val = "Never Played"
     
     rc_rating = data.get('rcRating', 'N/A') 
 
@@ -1379,471 +1842,9 @@ def delete_registration(reg_id):
     except: pass
     return jsonify({"status": "deleted"})
 
-@app.route('/api/admin/discount-codes', methods=['POST'])
-def create_discount_code():
-    data = request.json
-    amount = float(data.get('amount', 5.0))
-    discount_type = data.get('discountType', 'dollar')
-    is_perm = data.get('isPermanent', False)
-    code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-    
-    db.collection('discount_codes').add({
-        "code": code,
-        "discountAmount": amount,
-        "discountType": discount_type,
-        "used": False,
-        "isPermanent": is_perm,
-        "timestamp": firestore.SERVER_TIMESTAMP
-    })
-    return jsonify({"code": code, "amount": amount, "discountType": discount_type, "isPermanent": is_perm})
-
-@app.route('/api/admin/discount-codes', methods=['GET'])
-def get_discount_codes():
-    codes = []
-    docs = db.collection('discount_codes').order_by('timestamp', direction=firestore.Query.DESCENDING).stream()
-    for doc in docs:
-        d = doc.to_dict()
-        d['id'] = doc.id
-        codes.append(d)
-    return jsonify(codes)
-
-@app.route('/api/admin/discount-codes/<doc_id>', methods=['PUT'])
-def update_discount_code(doc_id):
-    data = request.json
-    db.collection('discount_codes').document(doc_id).update(data)
-    return jsonify({"status": "updated"})
-
-@app.route('/api/admin/export-zermelo-players', methods=['GET'])
-def export_zermelo_players():
-    docs = db.collection('registrations').where(filter=FieldFilter('zermeloExported', '!=', True)).stream()
-    
-    players_data = []
-    doc_ids_to_update = []
-    
-    for doc in docs:
-        d = doc.to_dict()
-        p = d.get('player', {})
-        
-        rc_id = p.get('rcId', '').strip()
-        never_played = p.get('neverPlayed', False)
-        
-        if never_played or rc_id.lower() in ["", "n/a", "never played", "none"]:
-            continue
-            
-        events = d.get('events', [])
-        # Exclude doubles events
-        event_ids = [str(e.get('id')) for e in events if 'id' in e and e.get('id') not in DOUBLES_EVENT_IDS]
-        events_str = " ".join(event_ids)
-        
-        last_name = p.get('lastName', '').strip()
-        first_name = p.get('firstName', '').strip()
-        full_name = f"{first_name} {last_name}".strip()
-        
-        players_data.append({
-            "Name": full_name,
-            "Ratings Central ID": rc_id,
-            "Events": events_str,
-            "Look up Ratings": "RC",
-            "Look Up Personal Info": "RC",
-            "Check In": "Here Now",
-            "Draw Club": "",
-            "Use Club For Draw Club": "Y"
-        })
-        doc_ids_to_update.append(doc.id)
-        
-    return jsonify({
-        "players": players_data,
-        "docIds": doc_ids_to_update
-    })
-
-@app.route('/api/admin/mark-exported', methods=['POST'])
-def mark_exported():
-    data = request.json
-    doc_ids = data.get('docIds', [])
-    
-    for doc_id in doc_ids:
-        db.collection('registrations').document(doc_id).update({
-            "zermeloExported": True
-        })
-        
-    return jsonify({"status": "success", "updatedCount": len(doc_ids)})
-
-@app.route('/api/admin/push-to-zermelo-sheet', methods=['POST'])
-def push_zermelo_sheet():
-    try:
-        docs = db.collection('registrations').stream()
-        
-        rows_data = []
-        headers = ["Name", "Ratings Central ID", "Events", "Look up Ratings", "Look Up Personal Info", "Check In", "Draw Club", "Use Club For Draw Club"]
-        rows_data.append(headers)
-        
-        for doc in docs:
-            d = doc.to_dict()
-            p = d.get('player', {})
-            rc_id = p.get('rcId', '').strip()
-            never_played = p.get('neverPlayed', False)
-            
-            if never_played or rc_id.lower() in ["", "n/a", "never played", "none"]:
-                continue
-                
-            events = d.get('events', [])
-            # Exclude doubles events
-            event_ids = [str(e.get('id')) for e in events if 'id' in e and e.get('id') not in DOUBLES_EVENT_IDS]
-            events_str = " ".join(event_ids)
-            
-            last_name = p.get('lastName', '').strip()
-            first_name = p.get('firstName', '').strip()
-            full_name = f"{first_name} {last_name}".strip()
-            
-            row = [full_name, rc_id, events_str, "RC", "RC", "Here Now", "", "Y"]
-            rows_data.append(row)
-            
-        zermelo_sheet.batch_clear(["A1:H1000"])
-        if len(rows_data) > 1:
-            cell_list = zermelo_sheet.range(f"A1:H{len(rows_data)}")
-            flat_data = [item for sublist in rows_data for item in sublist]
-            for i, val in enumerate(flat_data):
-                cell_list[i].value = val
-            zermelo_sheet.update_cells(cell_list, value_input_option='USER_ENTERED')
-            
-        return jsonify({"status": "success", "count": len(rows_data)-1})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# ==========================================
-# DRAWS API ENDPOINTS
-# ==========================================
-@app.route('/api/draws', methods=['GET'])
-def get_draws():
-    docs = db.collection('draws').stream()
-    draws_data = {}
-    for doc in docs:
-        draws_data[doc.id] = doc.to_dict()
-    return jsonify({"status": "success", "draws": draws_data})
-
-@app.route('/api/admin/draws/<event_id>', methods=['POST', 'PUT'])
-def save_draw(event_id):
-    data = request.json
-    db.collection('draws').document(str(event_id)).set(data)
-    return jsonify({"status": "success"})
-
-
-# ==========================================
-# NEW: ZERMELO SCRAPER & TABLE ASSIGNER (PLAYWRIGHT)
-# ==========================================
-def scrape_zermelo_matches():
-    matches = []
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
-            context = browser.new_context(user_agent=SCRAPER_HEADERS["User-Agent"])
-            page = context.new_page()
-            
-            page.goto(f"{ZERMELO_HOST_URL}/Tournament.htm")
-            page.wait_for_timeout(2500) 
-            
-            soup = BeautifulSoup(page.content(), 'html.parser')
-            event_links = [a['href'] for a in soup.find_all('a', href=True) if '.htm' in a['href']]
-            
-            for link in event_links:
-                page.goto(f"{ZERMELO_HOST_URL}/{link}")
-                page.wait_for_timeout(1000)
-                
-                ev_soup = BeautifulSoup(page.content(), 'html.parser')
-                event_name_tag = ev_soup.find(['h1', 'h2', 'h3'])
-                event_name = event_name_tag.text.strip() if event_name_tag else "Unknown Event"
-                
-                tables = ev_soup.find_all('table')
-                for table in tables:
-                    rows = table.find_all('tr')
-                    for i in range(len(rows) - 1):
-                        tds1 = rows[i].find_all('td')
-                        tds2 = rows[i+1].find_all('td')
-                        
-                        if len(tds1) > 0 and len(tds2) > 0:
-                            p1 = tds1[0].get_text(strip=True)
-                            p2 = tds2[0].get_text(strip=True)
-                            
-                            if p1 and p2 and p1 != "BYE" and p2 != "BYE" and len(p1) > 3 and len(p2) > 3:
-                                match_hash = hashlib.md5(f"{event_name}-{p1}-{p2}".encode()).hexdigest()[:8]
-                                
-                                matches.append({
-                                    "id": match_hash,
-                                    "event": event_name,
-                                    "p1": p1,
-                                    "p2": p2,
-                                    "status": "Pending"
-                                })
-            browser.close()
-    except Exception as e:
-        print(f"Scraper error: {e}")
-        
-    return matches
-
-@app.route('/api/admin/active-matches', methods=['GET'])
-def get_active_matches():
-    scraped_matches = scrape_zermelo_matches()
-    
-    assignments_ref = db.collection('table_assignments').stream()
-    assigned_dict = {doc.id: doc.to_dict().get('table', 'Unassigned') for doc in assignments_ref}
-    
-    for match in scraped_matches:
-        match['table'] = assigned_dict.get(match['id'], 'Unassigned')
-        
-    return jsonify({"status": "success", "matches": scraped_matches})
-
-@app.route('/api/admin/assign-table', methods=['POST'])
-def assign_table():
-    data = request.json
-    match_id = data.get('matchId')
-    table_num = data.get('tableNumber')
-    
-    if not match_id or not table_num:
-        return jsonify({"error": "Missing data"}), 400
-        
-    db.collection('table_assignments').document(match_id).set({
-        "table": table_num,
-        "updatedAt": firestore.SERVER_TIMESTAMP
-    }, merge=True)
-    
-    return jsonify({"status": "success"})
-
-
-# ==========================================
-# PERSONALIZED SCHEDULE API
-# ==========================================
-@app.route('/api/schedule/lookup', methods=['POST'])
-def lookup_schedule():
-    try:
-        data = request.json
-        first = data.get('firstName', '').strip().lower()
-        last = data.get('lastName', '').strip().lower()
-        dob = data.get('dob', '').strip()
-
-        if not first or not last or not dob:
-            return jsonify({"error": "Please provide First Name, Last Name, and Date of Birth."}), 400
-
-        docs = db.collection('registrations').stream()
-        player_found = False
-        player_data = {}
-        registered_events = []
-        
-        for doc in docs:
-            d = doc.to_dict()
-            p = d.get('player', {})
-            
-            db_first = p.get('firstName', '').strip().lower()
-            db_last = p.get('lastName', '').strip().lower()
-            db_dob = p.get('dob', '').strip()
-            
-            if db_first == first and db_last == last and db_dob == dob:
-                player_found = True
-                player_data = {"firstName": p.get('firstName', ''), "lastName": p.get('lastName', '')}
-                registered_events = d.get('events', [])
-                break
-
-        if not player_found:
-            return jsonify({"error": "No registration found matching those details. Please check for typos."}), 404
-
-        active_matches = scrape_zermelo_matches()
-        
-        assignments_ref = db.collection('table_assignments').stream()
-        assigned_dict = {doc.id: doc.to_dict().get('table', 'Unassigned') for doc in assignments_ref}
-
-        my_matches = []
-        last_name_check = player_data.get('lastName', '').lower()
-        
-        for match in active_matches:
-            m_p1 = match['p1'].lower()
-            m_p2 = match['p2'].lower()
-            
-            if last_name_check in m_p1 or last_name_check in m_p2:
-                opponent = match['p2'] if last_name_check in m_p1 else match['p1']
-                table = assigned_dict.get(match['id'], 'Unassigned')
-                
-                my_matches.append({
-                    "event": match['event'],
-                    "opponent": opponent,
-                    "table": table
-                })
-
-        # --- MOCK DRAW FALLBACK ---
-        if len(my_matches) == 0 and len(registered_events) > 0:
-            for ev in registered_events:
-                ev_name = ev.get('name', 'Unknown Event') if isinstance(ev, dict) else str(ev)
-                my_matches.append({
-                    "event": ev_name,
-                    "opponent": "TBD (Draw Pending)",
-                    "table": "Unassigned"
-                })
-
-        return jsonify({
-            "status": "success", 
-            "player": player_data,
-            "events": registered_events,
-            "currentMatches": my_matches
-        })
-    except Exception as e:
-        print(f"Schedule Lookup Error: {str(e)}")
-        return jsonify({"error": f"An internal server error occurred while retrieving your schedule."}), 500
-
-
-# ==========================================
-# NEW: NATIVE UI INJECTION PROXY
-# ==========================================
-@app.route('/results/<path:filename>')
-def serve_zermelo_results(filename):
-    try:
-        target_url = f"{ZERMELO_HOST_URL}/{filename}"
-        
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
-            context = browser.new_context(user_agent=SCRAPER_HEADERS["User-Agent"])
-            page = context.new_page()
-            
-            page.goto(target_url)
-            # Reduced timeout for faster loading while still clearing aes.js
-            page.wait_for_timeout(2500) 
-            
-            html_content = page.content()
-            browser.close()
-            
-        if not html_content or len(html_content) < 50:
-            return """
-                <div style="font-family: sans-serif; padding: 40px; text-align: center; color: #334155;">
-                    <h2>Draws Not Yet Available</h2>
-                    <p>The tournament results server is currently offline or the draws have not been published yet.</p>
-                </div>
-            """, 404
-            
-        soup = BeautifulSoup(html_content, 'html.parser')
-        
-        # Strip ugly tags
-        for tag in soup.find_all(['font', 'center']):
-            tag.unwrap()
-            
-        # Nuke inline background colors but preserve Zermelo's inline bracket borders
-        for tag in soup.find_all(True):
-            if 'bgcolor' in tag.attrs: del tag.attrs['bgcolor']
-            if 'bordercolor' in tag.attrs: del tag.attrs['bordercolor']
-            if 'background' in tag.attrs: del tag.attrs['background']
-            if 'cellpadding' in tag.attrs: del tag.attrs['cellpadding']
-            if 'cellspacing' in tag.attrs: del tag.attrs['cellspacing']
-
-        # Advanced Native CSS Theme Injection
-        custom_css = """
-        <style>
-            :root {
-                --gctta-navy: #1E3A8A;
-                --gctta-gold: #D97706;
-                --bg-color: #F8FAFC;
-                --card-bg: #FFFFFF;
-                --text-main: #334155;
-                --border-color: #E2E8F0;
-            }
-
-            body { 
-                background-color: var(--bg-color); 
-                color: var(--text-main); 
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-                padding: 20px; 
-                margin: 0;
-            }
-            
-            a { color: var(--gctta-navy); text-decoration: none; font-weight: bold; padding: 5px 10px; border-radius: 4px; transition: 0.2s; }
-            a:hover { background-color: var(--gctta-gold); color: white; }
-            
-            h1, h2, h3, h4 { 
-                color: var(--gctta-navy); 
-                text-transform: uppercase; 
-                letter-spacing: 1px; 
-                border-bottom: 3px solid var(--gctta-gold); 
-                padding-bottom: 10px; 
-                margin-top: 30px; 
-            }
-            
-            /* Admin Panel Styled Tables */
-            table { 
-                width: 100%; 
-                max-width: 1200px; 
-                border-collapse: collapse; 
-                margin: 20px 0 40px 0; 
-                background: var(--card-bg); 
-                border-radius: 8px; 
-                overflow: hidden; 
-                box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
-            }
-            
-            th, td.header { 
-                background-color: var(--gctta-navy) !important; 
-                color: white !important; 
-                padding: 12px 15px; 
-                text-align: left; 
-                text-transform: uppercase; 
-                font-size: 13px; 
-                letter-spacing: 1px; 
-            }
-            
-            td { 
-                padding: 10px 15px; 
-                border-bottom: 1px solid var(--border-color); 
-                border-right: 1px solid var(--border-color);
-                font-size: 14px; 
-                color: var(--text-main);
-            }
-            
-            tr:nth-child(even) { background-color: #F1F5F9; }
-            tr:hover td { background: #E2E8F0; }
-            
-            /* Bracket UI Overrides */
-            td[colspan] { 
-                text-align: center; 
-                font-weight: bold; 
-                background: #F1F5F9; 
-                color: var(--gctta-navy); 
-            }
-            
-            /* FORCE Zermelo bracket lines to be crisp and gold */
-            td[style*="border-right"] { border-right: 3px solid var(--gctta-gold) !important; }
-            td[style*="border-bottom"] { border-bottom: 3px solid var(--gctta-gold) !important; }
-            td[style*="border-top"] { border-top: 3px solid var(--gctta-gold) !important; }
-            td[style*="border-left"] { border-left: 3px solid var(--gctta-gold) !important; }
-            
-            /* Hide empty spacer rows perfectly */
-            td[height] { padding: 0 !important; height: 10px !important; }
-            
-            @media (max-width: 768px) {
-                body { padding: 10px; }
-                table { font-size: 12px; }
-                th, td { padding: 8px; }
-            }
-        </style>
-        """
-        
-        if soup.head:
-            soup.head.append(BeautifulSoup(custom_css, 'html.parser'))
-        else:
-            head_tag = soup.new_tag("head")
-            head_tag.append(BeautifulSoup(custom_css, 'html.parser'))
-            soup.insert(0, head_tag)
-            
-        for a_tag in soup.find_all('a', href=True):
-            href = a_tag['href']
-            if href.endswith('.htm') or href.endswith('.html'):
-                a_tag['href'] = f"/results/{href}"
-                
-        return str(soup)
-
-    except Exception as e:
-        print(f"Zermelo Proxy Error: {e}")
-        return """
-            <div style="font-family: sans-serif; padding: 40px; text-align: center; color: #334155;">
-                <h2>Tournament Server Offline</h2>
-                <p>Unable to connect to the live draw server. Please check back closer to the tournament date.</p>
-            </div>
-        """, 500
-
-
+# ==============================================================================
+# SERVER INITIALIZATION
+# ==============================================================================
 if __name__ == '__main__':
-    print("Starting server on port 5000")
+    logger.info("Initializing Final Server Framework...")
     app.run(host='0.0.0.0', port=5000)
