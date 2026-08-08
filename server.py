@@ -1956,53 +1956,8 @@ def get_public_draws():
 # 13. MATCH CONTROLLER & LIVE TABLES APP
 # ==============================================================================
 def scrape_zermelo_matches():
-    """Scrapes active assigned matches strictly for the Admin Live Controller UI."""
-    matches = []
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
-            context = browser.new_context(user_agent=SCRAPER_HEADERS["User-Agent"])
-            page = context.new_page()
-            
-            page.goto(f"{ZERMELO_HOST_URL}/Tournament.htm")
-            page.wait_for_timeout(3500) 
-            
-            soup = BeautifulSoup(page.content(), 'html.parser')
-            event_links = [a['href'] for a in soup.find_all('a', href=True) if '.htm' in a['href'].lower()]
-            
-            for link in event_links:
-                page.goto(f"{ZERMELO_HOST_URL}/{link}")
-                page.wait_for_timeout(1000)
-                
-                ev_soup = BeautifulSoup(page.content(), 'html.parser')
-                event_name_tag = ev_soup.find(['h1', 'h2', 'h3'])
-                event_name = event_name_tag.text.strip() if event_name_tag else "Unknown Event"
-                
-                tables = ev_soup.find_all('table')
-                for table in tables:
-                    rows = table.find_all('tr')
-                    for i in range(len(rows) - 1):
-                        tds1 = rows[i].find_all('td')
-                        tds2 = rows[i+1].find_all('td')
-                        
-                        if len(tds1) > 0 and len(tds2) > 0:
-                            p1 = tds1[0].get_text(strip=True)
-                            p2 = tds2[0].get_text(strip=True)
-                            
-                            if p1 and p2 and p1 != "BYE" and p2 != "BYE" and len(p1) > 3 and len(p2) > 3:
-                                match_hash = hashlib.md5(f"{event_name}-{p1}-{p2}".encode()).hexdigest()[:8]
-                                matches.append({
-                                    "id": match_hash, 
-                                    "event": event_name, 
-                                    "p1": p1, 
-                                    "p2": p2, 
-                                    "status": "Pending"
-                                })
-            browser.close()
-    except Exception as e:
-        logger.error(f"Match Scraper Error: {e}")
-        
-    return matches
+    """DISABLED: InfinityFree IP ban triggered. Bypassing scraper to keep server alive."""
+    return []
 
 @app.route('/api/admin/active-matches', methods=['GET'])
 def get_active_matches():

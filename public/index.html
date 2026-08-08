@@ -13,7 +13,6 @@
             <a href="/" class="active">Home</a>
             <a href="/registration">Registration</a>
             <a href="/schedule">Schedule</a>
-            <!-- Updated Navbar Links for Dual Draws -->
             <a href="/live-draws.html" style="color: #D97706; font-weight: 900;">Live Scores</a>
             <a href="/draws.html">Zermelo Draws</a>
             <a href="/admin">Admin Portal</a>
@@ -37,9 +36,6 @@
 
         <p>The Club would like to acknowledge our event partners in the City of Gold Coast, Table Tennis Queensland & Table Tennis World. Many thanks for your support!</p>
 
-        <!-- ========================================== -->
-        <!-- TOURNAMENT DAY DRAWS BUTTONS -->
-        <!-- ========================================== -->
         <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin: 30px 0;">
             <a href="/live-draws.html" style="background-color: #D97706; color: #1E3A8A; padding: 15px 30px; text-decoration: none; font-weight: 900; font-size: 16px; border-radius: 8px; text-transform: uppercase; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.2s;">
                 🔴 Live Scores & Results
@@ -49,7 +45,6 @@
             </a>
         </div>
 
-        <!-- LIVE COUNTDOWN BANNER -->
         <div style="background-color: #FEF2F2; border: 2px solid #DC2626; border-radius: 8px; padding: 20px; text-align: center; margin-top: 40px;">
             <h3 style="color: #DC2626; font-weight: 900; margin: 0; letter-spacing: 1px;">REGISTRATIONS CLOSE ON WEDNESDAY AUG 5 AT 11:59PM</h3>
             <h2 id="indexCountdown" style="color: var(--gctta-navy); font-size: 32px; margin: 10px 0 0 0;">--:--:--</h2>
@@ -94,7 +89,6 @@
         </div>
     </div>
 
-    <!-- SCRIPT FOR INDEX COUNTDOWN -->
     <script>
         const targetTimeIndex = new Date('August 5, 2026 23:59:59 GMT+1000').getTime();
         
@@ -117,6 +111,18 @@
         }
         setInterval(updateIndexCountdown, 1000);
         updateIndexCountdown();
+    </script>
+    
+    <!-- SERVICE WORKER NEUTRALIZER -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                    console.log("Rogue Service Worker neutralized.");
+                }
+            });
+        }
     </script>
 </body>
 </html>
