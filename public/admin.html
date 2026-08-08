@@ -68,6 +68,16 @@
         .match-table:hover { background: #FDE047; }
         .match-table.assigned { background: #10B981; color: white; border-color: #059669; }
 
+        /* Smart Scoreboard Styles */
+        .smart-queue-card { background: white; border: 2px solid var(--gctta-navy); border-radius: 8px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .smart-queue-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #E2E8F0; padding-bottom: 10px; margin-bottom: 15px; }
+        .smart-queue-header h4 { margin: 0; color: var(--gctta-navy); font-size: 16px; text-transform: uppercase; }
+        .smart-player-row { display: flex; justify-content: space-between; align-items: center; font-size: 18px; font-weight: 900; color: #334155; margin-bottom: 10px; }
+        .smart-score-input { width: 60px; padding: 10px; font-size: 18px; font-weight: bold; text-align: center; border: 2px solid #CBD5E1; border-radius: 6px; }
+        .smart-btn-win { padding: 10px 20px; font-size: 14px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
+        .smart-btn-p1 { background: #10B981; color: white; }
+        .smart-btn-p2 { background: #3B82F6; color: white; }
+        
         /* Draw Editor Styles */
         .draw-editor-card { background: white; border: 1px solid #CBD5E1; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
         .draw-editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #E2E8F0; padding-bottom: 10px; }
@@ -190,13 +200,45 @@
             <div class="pane-header">Tournament Command Center</div>
             
             <div class="sub-tabs">
-                <button id="tabMatches" class="active" onclick="switchSubTab('matches')">🔴 Live Match Controller</button>
-                <button id="tabDraws" onclick="switchSubTab('draws')">🛠️ Manual Draw Builder</button>
+                <button id="tabSmartScore" class="active" onclick="switchSubTab('smartScore')">⚡ Smart Scoreboard</button>
+                <button id="tabMatches" onclick="switchSubTab('matches')">🔴 Live Zermelo Tables</button>
+                <button id="tabDraws" onclick="switchSubTab('draws')">🛠️ Configuration Builder</button>
                 <button id="tabDiscounts" onclick="switchSubTab('discounts')">🎟️ Discount Codes</button>
             </div>
 
-            <!-- LIVE MATCHES TAB -->
-            <div id="subViewMatches" style="display: block;">
+            <!-- ⚡ SMART SCOREBOARD TAB -->
+            <div id="subViewSmartScore" style="display: block;">
+                <div style="background: var(--gctta-navy); padding: 25px; border-radius: 8px; display: flex; gap: 15px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <select id="smartEventSelect" style="flex: 1; padding: 15px; border-radius: 6px; border: none; font-weight: bold; font-size: 18px; color: var(--gctta-navy);">
+                        <option value="">-- Select an Event to Score --</option>
+                    </select>
+                    <button class="btn-primary" style="background: var(--gctta-gold); color: var(--gctta-navy); font-size: 16px; padding: 15px 30px;" onclick="loadSmartScoreboard()">Load Active Matches</button>
+                </div>
+                
+                <div id="smartScoreContentArea" style="display: none;">
+                    <!-- Group Resolution Banner -->
+                    <div id="smartGroupBanner" style="display:none; background: #FEF3C7; border-left: 5px solid #D97706; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                        <h3 style="margin: 0 0 10px 0; color: #92400E;">⚠️ Groups Need Resolution</h3>
+                        <p style="margin: 0 0 15px 0; color: #B45309; font-weight: bold;">There are players waiting in the group stage. The Knockout Bracket cannot fully begin until you advance the winners.</p>
+                        <button class="btn-primary" style="background: #D97706; border: none; font-size: 14px;" onclick="smartResolveGroups()">Advance Group Winners to Bracket</button>
+                    </div>
+
+                    <!-- Pending Knockout Matches -->
+                    <h3 style="color: var(--gctta-navy); text-transform: uppercase; font-size: 20px; margin-bottom: 15px; border-bottom: 2px solid #E2E8F0; padding-bottom: 10px;">🔴 Active Match Queue</h3>
+                    <div id="smartPendingMatches" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(450px, 1fr)); gap: 20px; margin-bottom: 40px;">
+                        <!-- Match Cards Inject Here -->
+                    </div>
+
+                    <!-- Completed Knockout Matches -->
+                    <h3 style="color: #64748B; text-transform: uppercase; font-size: 16px; margin-bottom: 15px; border-bottom: 2px solid #E2E8F0; padding-bottom: 10px;">✅ Completed Matches</h3>
+                    <div id="smartCompletedMatches" style="display: flex; flex-direction: column; gap: 10px;">
+                        <!-- Completed Matches Inject Here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- LIVE ZERMELO TABLES TAB -->
+            <div id="subViewMatches" style="display: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <p style="margin: 0; color: #64748B; font-size: 15px;">Auto-scraping Zermelo HTML for active matches to assign tables.</p>
                     <button class="btn-secondary-small" style="background: var(--gctta-navy); color: white; font-size: 14px; padding: 10px 20px;" onclick="loadActiveMatches()">🔄 Force Refresh Zermelo Matches</button>
@@ -207,7 +249,7 @@
                 </div>
             </div>
 
-            <!-- DRAW BUILDER TAB -->
+            <!-- DRAW CONFIG BUILDER TAB -->
             <div id="subViewDraws" style="display: none;">
                 <div style="background: #F1F5F9; padding: 20px; border-radius: 8px; display: flex; gap: 15px; margin-bottom: 25px;">
                     <select id="drawEventSelect" style="flex: 1; padding: 12px; border-radius: 6px; border: 1px solid #CBD5E1; font-weight: bold; font-size: 16px;">
@@ -229,6 +271,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                             <h3 style="margin: 0; color: #D97706; text-transform: uppercase;">Group Stage Pools</h3>
                             <div>
+                                <button class="btn-secondary-small" style="background: #F59E0B; color: white; border: none; margin-right: 10px; font-size: 14px; padding: 10px 20px;" onclick="autoSeedGroups()">⚡ Auto-Seed Players</button>
                                 <button class="btn-secondary-small" style="background: #10B981; color: white; border: none; font-size: 14px; padding: 10px 20px;" onclick="addGroup()">+ Add Manual Group</button>
                             </div>
                         </div>
@@ -239,8 +282,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                             <h3 style="margin: 0; color: #0284C7; text-transform: uppercase;">Knockout Bracket Rounds</h3>
                             <div>
-                                <button class="btn-secondary-small" style="background: #3B82F6; color: white; border: none; margin-right: 10px; font-size: 14px; padding: 10px 20px;" onclick="autoAdvanceByes()">⏩ Auto-Advance BYEs</button>
-                                <button class="btn-secondary-small" style="background: #8B5CF6; color: white; border: none; margin-right: 10px; font-size: 14px; padding: 10px 20px;" onclick="resolveGroupWinners()">⚡ Resolve Group Winners</button>
+                                <button class="btn-secondary-small" style="background: #EF4444; color: white; border: none; margin-right: 10px; font-size: 14px; padding: 10px 20px;" onclick="autoSeedDirectKnockout()">⚡ Auto-Seed Direct (No Groups)</button>
                                 <button class="btn-secondary-small" style="background: #F59E0B; color: white; border: none; margin-right: 10px; font-size: 14px; padding: 10px 20px;" onclick="autoGenerateKnockout()">⚡ Auto-Gen Blank Bracket</button>
                                 <button class="btn-secondary-small" style="background: #10B981; color: white; border: none; font-size: 14px; padding: 10px 20px;" onclick="addKnockoutRound()">+ Add Manual Round</button>
                             </div>
@@ -249,8 +291,7 @@
                     </div>
 
                     <div style="background: #E2E8F0; padding: 30px; border-radius: 8px; text-align: center;">
-                        <button class="btn-primary" style="font-size: 20px; padding: 20px 50px; border-radius: 8px; border: none; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" onclick="saveLiveDraw()">💾 Publish Draw to Live Website</button>
-                        <p style="margin: 15px 0 0 0; color: #64748B; font-size: 15px; font-weight: bold;">Changes will be instantly visible on the public Live Draws page.</p>
+                        <button class="btn-primary" style="font-size: 20px; padding: 20px 50px; border-radius: 8px; border: none; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" onclick="saveLiveDraw()">💾 Publish Structure to Live Website</button>
                     </div>
                 </div>
                 <datalist id="rosterDatalist"></datalist>
@@ -538,6 +579,7 @@
                 document.getElementById('adminDashboardContent').style.display = 'flex';
                 loadDashboardData();
                 initDrawsDropdown();
+                initSmartScoreDropdown();
                 loadActiveMatches();
                 setInterval(loadActiveMatches, 60000); 
             }
@@ -553,6 +595,7 @@
                 document.getElementById('adminDashboardContent').style.display = 'flex';
                 loadDashboardData(); 
                 initDrawsDropdown();
+                initSmartScoreDropdown();
                 loadActiveMatches();
                 setInterval(loadActiveMatches, 60000); 
             } else {
@@ -578,8 +621,21 @@
             } else {
                 document.getElementById('masterBtnTourney').classList.add('active');
                 document.getElementById('masterViewTournament').style.display = 'block';
-                switchSubTab('matches');
+                switchSubTab('smartScore');
             }
+        }
+
+        function switchSubTab(tabName) {
+            const tabs = ['tabMatches', 'tabDraws', 'tabDiscounts', 'tabSmartScore'];
+            const views = ['subViewMatches', 'subViewDraws', 'subViewDiscounts', 'subViewSmartScore'];
+            
+            tabs.forEach(t => document.getElementById(t).classList.remove('active'));
+            views.forEach(v => document.getElementById(v).style.display = 'none');
+            
+            document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.add('active');
+            document.getElementById('subView' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).style.display = 'block';
+
+            if(tabName === 'discounts') loadDiscounts();
         }
 
         function loadDashboardData() {
@@ -621,19 +677,6 @@
             }
         }
 
-        function switchSubTab(tabName) {
-            const tabs = ['tabMatches', 'tabDraws', 'tabDiscounts'];
-            const views = ['subViewMatches', 'subViewDraws', 'subViewDiscounts'];
-            
-            tabs.forEach(t => document.getElementById(t).classList.remove('active'));
-            views.forEach(v => document.getElementById(v).style.display = 'none');
-            
-            document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.add('active');
-            document.getElementById('subView' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).style.display = 'block';
-
-            if(tabName === 'discounts') loadDiscounts();
-        }
-
         function initDrawsDropdown() {
             const select = document.getElementById('drawEventSelect');
             if(!select) return;
@@ -643,6 +686,197 @@
             });
         }
 
+        // =========================================================
+        // ⚡ SMART SCOREBOARD LOGIC
+        // =========================================================
+        let smartDrawState = null;
+        let smartEventId = null;
+
+        function initSmartScoreDropdown() {
+            const select = document.getElementById('smartEventSelect');
+            if(!select) return;
+            select.innerHTML = '<option value="">-- Select an Event to Score --</option>';
+            adminMasterEventsList.forEach(e => {
+                select.innerHTML += `<option value="${e.id}">${e.name}</option>`;
+            });
+        }
+
+        async function loadSmartScoreboard() {
+            const eventId = document.getElementById('smartEventSelect').value;
+            if(!eventId) return alert("Please select an event.");
+            
+            smartEventId = eventId;
+            
+            try {
+                const res = await fetch('/api/draws');
+                const data = await res.json();
+                if (data.status === 'success' && data.draws && data.draws[eventId]) {
+                    smartDrawState = JSON.parse(JSON.stringify(data.draws[eventId])); 
+                    renderSmartScoreboard();
+                } else {
+                    alert("No draw found for this event yet! Go to the 'Configuration Builder' tab to create it first.");
+                    document.getElementById('smartScoreContentArea').style.display = 'none';
+                }
+            } catch (err) {
+                alert("Error loading draws data.");
+            }
+        }
+
+        function renderSmartScoreboard() {
+            document.getElementById('smartScoreContentArea').style.display = 'block';
+            
+            const pendingContainer = document.getElementById('smartPendingMatches');
+            const completedContainer = document.getElementById('smartCompletedMatches');
+            const banner = document.getElementById('smartGroupBanner');
+            
+            pendingContainer.innerHTML = '';
+            completedContainer.innerHTML = '';
+            
+            // Check if there are unresolved groups haunting the bracket
+            const bracketString = JSON.stringify(smartDrawState.knockout || []);
+            if (bracketString.includes("Winner Group") || bracketString.includes("Runner-Up Group")) {
+                banner.style.display = 'block';
+            } else {
+                banner.style.display = 'none';
+            }
+
+            if(!smartDrawState.hasKnockout || !smartDrawState.knockout) {
+                pendingContainer.innerHTML = '<p>No knockout bracket configured for this event.</p>';
+                return;
+            }
+
+            let foundPending = false;
+            let foundCompleted = false;
+
+            smartDrawState.knockout.forEach((round, rIdx) => {
+                round.matches.forEach((match, mIdx) => {
+                    
+                    const isP1Ready = match.p1 && match.p1 !== "TBD" && !match.p1.includes("Winner") && match.p1 !== "BYE";
+                    const isP2Ready = match.p2 && match.p2 !== "TBD" && !match.p2.includes("Winner") && match.p2 !== "BYE";
+                    
+                    if (match.winner === 0) {
+                        // Pending Match
+                        if (isP1Ready && isP2Ready) {
+                            foundPending = true;
+                            pendingContainer.innerHTML += `
+                                <div class="smart-queue-card">
+                                    <div class="smart-queue-header">
+                                        <h4>${round.roundName} - Match ${mIdx + 1}</h4>
+                                    </div>
+                                    <div class="smart-player-row">
+                                        <div style="flex: 1;">${match.p1}</div>
+                                        <input type="text" id="sm_s1_${rIdx}_${mIdx}" class="smart-score-input" value="${match.s1 || '0'}" placeholder="S1">
+                                        <button class="smart-btn-win smart-btn-p1" style="margin-left: 10px;" onclick="smartSubmitMatch(${rIdx}, ${mIdx}, 1)">${match.p1} Won</button>
+                                    </div>
+                                    <div class="smart-player-row">
+                                        <div style="flex: 1;">${match.p2}</div>
+                                        <input type="text" id="sm_s2_${rIdx}_${mIdx}" class="smart-score-input" value="${match.s2 || '0'}" placeholder="S2">
+                                        <button class="smart-btn-win smart-btn-p2" style="margin-left: 10px;" onclick="smartSubmitMatch(${rIdx}, ${mIdx}, 2)">${match.p2} Won</button>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    } else {
+                        // Completed Match
+                        foundCompleted = true;
+                        const winnerName = match.winner === 1 ? match.p1 : match.p2;
+                        completedContainer.innerHTML += `
+                            <div style="background: #F8FAFC; padding: 10px 15px; border: 1px solid #E2E8F0; border-radius: 6px; display: flex; justify-content: space-between;">
+                                <div><b style="color:#64748B;">${round.roundName}:</b> ${match.p1} [${match.s1}] vs ${match.p2} [${match.s2}]</div>
+                                <div style="color: var(--gctta-navy); font-weight: bold;">Winner: ${winnerName}</div>
+                            </div>
+                        `;
+                    }
+                });
+            });
+
+            if(!foundPending) pendingContainer.innerHTML = '<div style="background: #F1F5F9; padding: 30px; border-radius: 8px; text-align: center; color: #64748B; font-weight: bold;">No active matches waiting for scores right now.</div>';
+            if(!foundCompleted) completedContainer.innerHTML = '<div style="color: #64748B; font-style: italic;">No completed matches yet.</div>';
+        }
+
+        async function smartSubmitMatch(rIdx, mIdx, winner) {
+            const s1 = document.getElementById(`sm_s1_${rIdx}_${mIdx}`).value;
+            const s2 = document.getElementById(`sm_s2_${rIdx}_${mIdx}`).value;
+
+            smartDrawState.knockout[rIdx].matches[mIdx].s1 = s1;
+            smartDrawState.knockout[rIdx].matches[mIdx].s2 = s2;
+            smartDrawState.knockout[rIdx].matches[mIdx].winner = winner;
+
+            const match = smartDrawState.knockout[rIdx].matches[mIdx];
+            const winnerName = winner === 1 ? match.p1 : match.p2;
+
+            // Cascade to next round automatically!
+            if(rIdx + 1 < smartDrawState.knockout.length) {
+                const nextMIdx = Math.floor(mIdx / 2);
+                const isP1 = (mIdx % 2 === 0);
+                if (isP1) smartDrawState.knockout[rIdx+1].matches[nextMIdx].p1 = winnerName;
+                else smartDrawState.knockout[rIdx+1].matches[nextMIdx].p2 = winnerName;
+            }
+
+            // Save immediately to DB
+            try {
+                const res = await fetch(`/api/admin/draws/${smartEventId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(smartDrawState)
+                });
+                const data = await res.json();
+                if(data.status === 'success') {
+                    // Re-render (the match will disappear from the queue)
+                    renderSmartScoreboard();
+                } else {
+                    alert("Error saving draw.");
+                }
+            } catch(err) {
+                alert("Network error while auto-saving.");
+            }
+        }
+
+        async function smartResolveGroups() {
+            if (!smartDrawState.hasGroups || !smartDrawState.hasKnockout) return;
+            
+            const advanceCountStr = prompt("How many players advance from each group into the bracket? (Usually 1 or 2)", "2");
+            const advanceCount = parseInt(advanceCountStr);
+            if(isNaN(advanceCount) || advanceCount < 1 || advanceCount > 2) return;
+            
+            const resolutions = {};
+            smartDrawState.groups.forEach((g, i) => {
+                const sorted = [...g.players].sort((a,b) => {
+                    if (b.pts !== a.pts) return b.pts - a.pts;
+                    return b.wins - a.wins;
+                });
+                
+                let advancedPlayers = sorted.filter(p => p.advance);
+                if(advancedPlayers.length === 0) advancedPlayers = sorted.slice(0, advanceCount);
+                
+                if (advancedPlayers[0] && advancedPlayers[0].name) resolutions[`Winner Group ${i+1}`] = advancedPlayers[0].name;
+                if (advanceCount > 1 && advancedPlayers[1] && advancedPlayers[1].name) resolutions[`Runner-Up Group ${i+1}`] = advancedPlayers[1].name;
+            });
+
+            smartDrawState.knockout.forEach(r => {
+                r.matches.forEach(m => {
+                    if (resolutions[m.p1]) m.p1 = resolutions[m.p1];
+                    if (resolutions[m.p2]) m.p2 = resolutions[m.p2];
+                });
+            });
+
+            try {
+                const res = await fetch(`/api/admin/draws/${smartEventId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(smartDrawState)
+                });
+                if(res.ok) {
+                    alert("Group winners successfully populated into the bracket!");
+                    renderSmartScoreboard();
+                }
+            } catch(err) { alert("Error saving."); }
+        }
+
+        // =========================================================
+        // MANUAL DRAW BUILDER LOGIC (PREVIOUS FUNCTIONS)
+        // =========================================================
+        
         function renderTable(dataArray) {
             const tbody = document.getElementById('adminTableBody');
             tbody.innerHTML = '';
@@ -1204,61 +1438,6 @@
             });
         }
 
-        let currentDrawState = null;
-        let currentDrawEventId = null;
-
-        async function loadDrawEditor() {
-            const eventId = document.getElementById('drawEventSelect').value;
-            if(!eventId) return alert("Please select an event from the dropdown.");
-
-            const eventName = adminMasterEventsList.find(e=>e.id == eventId).name;
-            currentDrawEventId = eventId;
-
-            document.getElementById('drawEditorTitle').innerText = `Editing: ${eventName}`;
-            
-            window.currentEventRoster = [];
-            const isDoubles = [3, 4, 21, 33, 34].includes(parseInt(currentDrawEventId));
-            
-            allRegistrations.forEach(reg => {
-                const hasEvent = reg.events && reg.events.some(e => e.id == currentDrawEventId);
-                if(hasEvent) {
-                    let rating = parseInt(reg.player.rcRating) || 0;
-                    if(isNaN(rating)) rating = 0;
-                    
-                    let pName = `${reg.player.firstName} ${reg.player.lastName}`;
-                    let club = reg.player.club || 'None';
-                    
-                    if(isDoubles) {
-                        let partnerName = "Partner Required";
-                        if (reg.doublesPartners && reg.doublesPartners[eventName]) {
-                            partnerName = reg.doublesPartners[eventName];
-                        }
-                        pName += ` / ${partnerName}`;
-                    }
-                    window.currentEventRoster.push({ name: `${pName} (${rating})`, rating: rating, club: club });
-                }
-            });
-            window.currentEventRoster.sort((a, b) => b.rating - a.rating);
-
-            try {
-                const res = await fetch('/api/draws');
-                const data = await res.json();
-                
-                if (data.status === 'success' && data.draws && data.draws[eventId]) {
-                    currentDrawState = JSON.parse(JSON.stringify(data.draws[eventId])); 
-                } else {
-                    currentDrawState = { name: eventName, hasGroups: false, hasKnockout: false, groups: [], knockout: [] };
-                }
-            } catch (err) {
-                alert("Failed to load existing draws. Starting fresh.");
-                currentDrawState = { name: eventName, hasGroups: false, hasKnockout: false, groups: [], knockout: [] };
-            }
-
-            document.getElementById('drawEditorArea').style.display = 'block';
-            updateRosterDatalist();
-            renderDrawEditor();
-        }
-
         function updateRosterDatalist() {
             const dl = document.getElementById('rosterDatalist');
             if(!dl) return;
@@ -1467,46 +1646,6 @@
             generateKnockoutSize(size);
         }
 
-        function resolveGroupWinners() {
-            if (!currentDrawState.hasGroups || !currentDrawState.hasKnockout) {
-                return alert("Both Group Stage and Knockout Stage must be enabled to resolve winners.");
-            }
-            
-            const advanceCountStr = prompt("How many players should advance from each group?\nEnter 1 (Winners only) or 2 (Winners and Runner-Ups):", "2");
-            const advanceCount = parseInt(advanceCountStr);
-            
-            if(isNaN(advanceCount) || advanceCount < 1 || advanceCount > 2) {
-                return alert("Invalid number. Please enter 1 or 2.");
-            }
-            
-            const resolutions = {};
-            currentDrawState.groups.forEach((g, i) => {
-                const sorted = [...g.players].sort((a,b) => {
-                    if (b.pts !== a.pts) return b.pts - a.pts;
-                    return b.wins - a.wins;
-                });
-                
-                let advancedPlayers = sorted.filter(p => p.advance);
-                if(advancedPlayers.length === 0) {
-                    advancedPlayers = sorted.slice(0, advanceCount);
-                }
-                
-                if (advancedPlayers[0] && advancedPlayers[0].name) resolutions[`Winner Group ${i+1}`] = advancedPlayers[0].name;
-                if (advanceCount > 1 && advancedPlayers[1] && advancedPlayers[1].name) resolutions[`Runner-Up Group ${i+1}`] = advancedPlayers[1].name;
-            });
-
-            let updatedCount = 0;
-            currentDrawState.knockout.forEach(r => {
-                r.matches.forEach(m => {
-                    if (resolutions[m.p1]) { m.p1 = resolutions[m.p1]; updatedCount++; }
-                    if (resolutions[m.p2]) { m.p2 = resolutions[m.p2]; updatedCount++; }
-                });
-            });
-
-            renderDrawEditor();
-            alert(`Resolved ${updatedCount} bracket slots from group results!`);
-        }
-
         function autoAdvanceByes() {
             if(!currentDrawState.hasKnockout || !currentDrawState.knockout) return;
             let updated = 0;
@@ -1642,7 +1781,7 @@
         async function saveLiveDraw() {
             if(!currentDrawEventId || !currentDrawState) return;
             
-            if(confirm("Are you sure you want to publish these changes? The live draws page will update instantly for everyone.")) {
+            if(confirm("Are you sure you want to publish these structural changes?")) {
                 try {
                     const res = await fetch(`/api/admin/draws/${currentDrawEventId}`, {
                         method: 'POST',
