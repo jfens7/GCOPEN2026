@@ -892,6 +892,41 @@ def serve_live_draws():
     logger.info("Serving Native Live Draws Application")
     return send_from_directory(app.static_folder, 'live-draws.html')
 
+@app.route('/draws.html')
+def serve_official_draws():
+    logger.info("Serving Official Zermelo Draws Page")
+    return send_from_directory(app.static_folder, 'draws.html')
+
+@app.route('/results/<path:filename>')
+def serve_zermelo_results(filename):
+    """
+    Proxies raw Zermelo HTML exactly as it appears, bypassing InfinityFree.
+    """
+    try:
+        target_url = f"{ZERMELO_HOST_URL}/{filename}"
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
+            context = browser.new_context(user_agent=SCRAPER_HEADERS["User-Agent"])
+            page = context.new_page()
+            page.goto(target_url)
+            page.wait_for_timeout(3000) # Bypass aes.js
+            html_content = page.content()
+            browser.close()
+            
+        soup = BeautifulSoup(html_content, 'html.parser')
+        
+        # Ensure relative links map back to our proxy
+        for a_tag in soup.find_all('a', href=True):
+            href = a_tag['href']
+            if href.lower().endswith('.htm') or href.lower().endswith('.html'):
+                a_tag['href'] = f"/results/{href}"
+                
+        return str(soup)
+
+    except Exception as e:
+        logger.error(f"Zermelo Proxy Error: {e}")
+        return "<h2>Tournament Server Offline</h2><p>Unable to connect to the live draw server.</p>", 500
+
 @app.route('/draws')
 def serve_draws_redirect(): 
     logger.info("Redirecting Legacy /draws endpoint to /live-draws.html")
