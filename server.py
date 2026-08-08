@@ -28,6 +28,7 @@ import hashlib
 import json
 import logging
 import traceback
+import time
 from datetime import datetime
 import pytz
 
@@ -161,6 +162,9 @@ SCRAPER_HEADERS = {
     "Sec-Fetch-Site": "none",
     "Sec-Fetch-User": "?1"
 }
+
+# Proxy Memory Cache for lightning-fast live Zermelo serving
+PROXY_CACHE = {}
 
 def get_secret_path(filename: str) -> str:
     """
@@ -897,40 +901,76 @@ def serve_official_draws():
     logger.info("Serving Official Zermelo Draws Page")
     return send_from_directory(app.static_folder, 'draws.html')
 
-@app.route('/results/<path:filename>')
-def serve_zermelo_results(filename):
-    """
-    Proxies raw Zermelo HTML exactly as it appears, bypassing InfinityFree.
-    """
-    try:
-        target_url = f"{ZERMELO_HOST_URL}/{filename}"
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
-            context = browser.new_context(user_agent=SCRAPER_HEADERS["User-Agent"])
-            page = context.new_page()
-            page.goto(target_url)
-            page.wait_for_timeout(3000) # Bypass aes.js
-            html_content = page.content()
-            browser.close()
-            
-        soup = BeautifulSoup(html_content, 'html.parser')
-        
-        # Ensure relative links map back to our proxy
-        for a_tag in soup.find_all('a', href=True):
-            href = a_tag['href']
-            if href.lower().endswith('.htm') or href.lower().endswith('.html'):
-                a_tag['href'] = f"/results/{href}"
-                
-        return str(soup)
-
-    except Exception as e:
-        logger.error(f"Zermelo Proxy Error: {e}")
-        return "<h2>Tournament Server Offline</h2><p>Unable to connect to the live draw server.</p>", 500
-
 @app.route('/draws')
 def serve_draws_redirect(): 
     logger.info("Redirecting Legacy /draws endpoint to /live-draws.html")
     return redirect('/live-draws.html')
+
+@app.route('/results/<path:filename>')
+def serve_zermelo_results(filename):
+    """
+    Proxies raw Zermelo HTML. 
+    Includes CSS rewriting for styling and a 2-minute cache for instant loading.
+    """
+    now = time.time()
+    
+    # 1. Check Memory Cache (Fixes the 10-second load time complaint)
+    if filename in PROXY_CACHE and (now - PROXY_CACHE[filename]['time']) < 120:
+        content, mime = PROXY_CACHE[filename]['data']
+        resp = make_response(content, 200)
+        resp.mimetype = mime
+        return resp
+
+    try:
+        target_url = f"{ZERMELO_HOST_URL}/{filename}"
+        mime_type = "text/html"
+        
+        if filename.lower().endswith('.css'):
+            mime_type = "text/css"
+        elif filename.lower().endswith('.js'):
+            mime_type = "application/javascript"
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
+            context = browser.new_context(user_agent=SCRAPER_HEADERS["User-Agent"])
+            page = context.new_page()
+            
+            response = page.goto(target_url)
+            
+            if mime_type == "text/html":
+                page.wait_for_timeout(2500) # Bypass InfinityFree aes.js
+                raw_content = page.content()
+                
+                soup = BeautifulSoup(raw_content, 'html.parser')
+                
+                # Fix standard links
+                for a_tag in soup.find_all('a', href=True):
+                    href = a_tag['href']
+                    if not href.startswith('http') and not href.startswith('#'):
+                        a_tag['href'] = f"/results/{href}"
+                        
+                # Fix CSS links so the page isn't an unstyled bulleted list
+                for link_tag in soup.find_all('link', href=True):
+                    href = link_tag['href']
+                    if not href.startswith('http'):
+                        link_tag['href'] = f"/results/{href}"
+                        
+                final_content = str(soup)
+            else:
+                final_content = response.text()
+                
+            browser.close()
+
+        # Save to cache
+        PROXY_CACHE[filename] = {'data': (final_content, mime_type), 'time': now}
+        
+        resp = make_response(final_content, 200)
+        resp.mimetype = mime_type
+        return resp
+
+    except Exception as e:
+        logger.error(f"Zermelo Proxy Error: {e}")
+        return f"<h2>Tournament Server Offline</h2><p>Unable to connect to the live draw server.</p>", 500
 
 # -- SYSTEM DIAGNOSTICS & STATUS --
 @app.route('/api/health', methods=['GET'])
